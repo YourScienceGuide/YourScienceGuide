@@ -29,7 +29,7 @@ export default function RootLayout({
         <ThemeScript />
         <ThemeProvider>
           <TopNav />
-          <main className="mx-auto max-w-3xl px-6 py-10">{children}</main>
+          <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
         </ThemeProvider>
       </body>
     </html>
