@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 
+import { AuthProvider } from "@/components/auth/auth-provider";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeScript } from "@/components/theme-script";
-import { TopNav } from "@/components/top-nav";
-import { siteContainerClass } from "@/lib/layout";
-import { cn } from "@/lib/utils";
 
 import "./globals.css";
 
@@ -30,8 +29,9 @@ export default function RootLayout({
       <body className="min-h-dvh font-sans antialiased">
         <ThemeScript />
         <ThemeProvider>
-          <TopNav />
-          <main className={cn(siteContainerClass, "py-10")}>{children}</main>
+          <AuthProvider>
+            <AuthShell>{children}</AuthShell>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
