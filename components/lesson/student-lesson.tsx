@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
-import { FlashcardReview } from "@/components/lesson/flashcard-review";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonToast } from "@/components/lesson/lesson-toast";
@@ -66,8 +65,8 @@ export function StudentLesson() {
           Today&apos;s lesson
         </h1>
         <p className="text-base text-slate-600 dark:text-stone-400">
-          Watch the video, then complete all three parts below. Extra Practice
-          is optional and opens on its own page.
+          Watch the video, then complete all three parts below. Extra Practice and
+          Flashcard Review are optional and open on their own pages.
         </p>
       </header>
 
@@ -93,7 +92,7 @@ export function StudentLesson() {
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-stone-400">
               You finished all three lesson questions. Try Extra Practice or
-              review your flashcards.
+              Flashcard Review.
             </p>
           </div>
         ) : (
@@ -132,7 +131,28 @@ export function StudentLesson() {
         </div>
       </section>
 
-      <FlashcardReview />
+      <section
+        className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
+        aria-labelledby="flashcard-review-heading"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h2
+              id="flashcard-review-heading"
+              className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
+            >
+              Flashcard Review
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-stone-400">
+              Anki-style spaced repetition—rate cards after you reveal each
+              answer, with its own mastery progress.
+            </p>
+          </div>
+          <Button asChild className="shrink-0">
+            <Link href="/lesson/flashcards">Flashcard Review</Link>
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }
