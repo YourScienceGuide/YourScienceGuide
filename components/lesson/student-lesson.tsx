@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { LessonNav } from "@/components/student/lesson-nav";
+import { RequiredReadings } from "@/components/student/required-readings";
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
+import { getLessonReadings, getTextbook } from "@/lib/student/textbook";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonToast } from "@/components/lesson/lesson-toast";
@@ -44,6 +46,8 @@ type StudentLessonProps = {
 export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const course = getCourse(courseId);
   const lessonMeta = getLesson(courseId, lessonId);
+  const textbook = getTextbook(courseId);
+  const readings = getLessonReadings(lessonId);
   const { prev, next } = getAdjacentLessons(courseId, lessonId);
 
   const { lesson, ready, error } = useLessonAssessment();
@@ -125,9 +129,13 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
       />
 
       <p className="text-base text-slate-600 dark:text-stone-400">
-        Watch the video, then complete all three parts below. Extra Practice and
-        Flashcard Review are optional and open on their own pages.
+        Complete the required readings, watch the video, then finish all three
+        assignment parts below. Extra Practice and Flashcard Review are optional.
       </p>
+
+      {textbook && readings.length > 0 && (
+        <RequiredReadings textbook={textbook} readings={readings} />
+      )}
 
       <LessonVideo />
 

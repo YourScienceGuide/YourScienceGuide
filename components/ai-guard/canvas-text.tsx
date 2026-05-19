@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 type CanvasTextProps = {
   encoded: string;
-  variant?: "prompt" | "option";
+  variant?: "prompt" | "option" | "body";
   className?: string;
 };
 
@@ -66,7 +66,11 @@ export function CanvasText({
     const text = decodeBase64Utf8(encoded);
     const rootPx = getRootFontSizePx();
     const fontSize =
-      variant === "prompt" ? rootPx * 1.925 : rootPx * 1.4875;
+      variant === "prompt"
+        ? rootPx * 1.925
+        : variant === "body"
+          ? rootPx * 0.875
+          : rootPx * 1.4875;
     const fontWeight = variant === "prompt" ? 600 : 400;
     const lineHeight = fontSize * 1.5;
     const paddingX = 1;

@@ -71,7 +71,7 @@ export function QuestionPanel({
       <AssessmentProtected className="space-y-6">
         <CanvasText
           encoded={toDisplayEncoding(question.prompt)}
-          variant="prompt"
+          variant="body"
         />
 
         {question.type === "multiple-choice" && (

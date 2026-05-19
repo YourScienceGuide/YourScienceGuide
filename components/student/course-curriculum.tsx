@@ -4,7 +4,9 @@ import Link from "next/link";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 
 import { LessonStatusBadge } from "@/components/student/lesson-status-badge";
+import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";
+import { getTextbook } from "@/lib/student/textbook";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import type { Course } from "@/lib/student/curriculum";
 import { getLessonsByUnit } from "@/lib/student/curriculum";
@@ -14,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 export function CourseCurriculum({ course }: { course: Course }) {
   const { percent, statuses } = useCourseProgress(course);
+  const textbook = getTextbook(course.id);
   const units = getLessonsByUnit(course);
   const completedCount = course.lessons.filter(
     (l) => statuses[l.id] === "complete",
@@ -38,6 +41,8 @@ export function CourseCurriculum({ course }: { course: Course }) {
           {course.description}
         </p>
       </header>
+
+      {textbook && <TextbookCard textbook={textbook} />}
 
       <div className="space-y-10">
         {units.map(({ unitId, unitTitle, lessons }) => (

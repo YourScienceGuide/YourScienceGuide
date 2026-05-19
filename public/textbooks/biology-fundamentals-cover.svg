@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="440" viewBox="0 0 320 440" role="img" aria-label="Life Science: A Biological Approach textbook cover">
+  <defs>
+    <linearGradient id="spine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c4a6e"/>
+      <stop offset="100%" stop-color="#164e63"/>
+    </linearGradient>
+    <linearGradient id="cover" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0369a1"/>
+      <stop offset="55%" stop-color="#0e7490"/>
+      <stop offset="100%" stop-color="#155e75"/>
+    </linearGradient>
+    <linearGradient id="cell" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#67e8f9" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#a7f3d0" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="440" rx="4" fill="#0f172a"/>
+  <rect x="12" y="8" width="44" height="424" rx="2" fill="url(#spine)"/>
+  <rect x="52" y="8" width="256" height="424" rx="2" fill="url(#cover)"/>
+  <ellipse cx="200" cy="200" rx="72" ry="56" fill="url(#cell)" opacity="0.85"/>
+  <ellipse cx="168" cy="188" rx="28" ry="22" fill="#ecfeff" opacity="0.35"/>
+  <circle cx="228" cy="178" r="14" fill="#5eead4" opacity="0.5"/>
+  <circle cx="182" cy="218" r="10" fill="#86efac" opacity="0.45"/>
+  <path d="M 120 320 Q 180 280 260 320" stroke="#a5f3fc" stroke-width="2" fill="none" opacity="0.4"/>
+  <text x="180" y="72" text-anchor="middle" font-family="Georgia, serif" font-size="11" fill="#e0f2fe" letter-spacing="0.12em">CLEARWATER ACADEMIC</text>
+  <text x="180" y="118" text-anchor="middle" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#f0fdfa">Life Science</text>
+  <text x="180" y="152" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#ccfbf1">A Biological Approach</text>
+  <line x1="100" y1="168" x2="260" y2="168" stroke="#99f6e4" stroke-width="1" opacity="0.6"/>
+  <text x="180" y="368" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#cffafe">Morris &amp; Okonkwo</text>
+  <text x="180" y="388" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a5f3fc" opacity="0.9">Second Edition</text>
+</svg>
