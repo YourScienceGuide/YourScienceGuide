@@ -3,7 +3,7 @@ import type {
   LongAnswerQuestion,
   MultipleChoiceQuestion,
   ShortAnswerQuestion,
-} from "@/lib/lesson/questions";
+} from "@/lib/lesson/types";
 
 function normalizeShortAnswer(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "");

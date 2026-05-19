@@ -1,19 +1,11 @@
-import { LESSON_QUESTIONS, QUESTION_COUNT } from "@/lib/lesson/questions";
-
-const STEP_NAMES: Record<string, string> = {
-  q1: "Multiple choice",
-  q2: "Short answer",
-  q3: "Parent review",
-};
+import { LESSON_QUESTION_COUNT } from "@/lib/lesson/types";
 
 export function lessonStepLabel(
   questionIndex: number,
   isComplete: boolean,
 ): string {
   if (isComplete) {
-    return `Lesson complete · ${QUESTION_COUNT} of ${QUESTION_COUNT} questions`;
+    return `Lesson complete · ${LESSON_QUESTION_COUNT} of ${LESSON_QUESTION_COUNT}`;
   }
-  const question = LESSON_QUESTIONS[questionIndex];
-  const name = STEP_NAMES[question.id] ?? "Question";
-  return `Question ${questionIndex + 1} of ${QUESTION_COUNT} · ${name}`;
+  return `Question ${questionIndex + 1} of ${LESSON_QUESTION_COUNT}`;
 }

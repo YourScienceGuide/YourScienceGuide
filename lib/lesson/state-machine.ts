@@ -1,4 +1,4 @@
-import { QUESTION_COUNT } from "@/lib/lesson/questions";
+import { LESSON_QUESTION_COUNT } from "@/lib/lesson/types";
 
 export type Difficulty = 1 | 2 | 3;
 
@@ -24,19 +24,19 @@ export const INITIAL_LESSON_STATE: LessonMachineState = {
 
 export function progressPercent(state: LessonMachineState): number {
   if (state.isComplete) return 100;
-  return Math.round((state.completedCount / QUESTION_COUNT) * 100);
+  return Math.round((state.completedCount / LESSON_QUESTION_COUNT) * 100);
 }
 
 export function applyCorrectAnswer(
   state: LessonMachineState,
 ): LessonMachineState {
   const nextCompleted = state.completedCount + 1;
-  const isLast = state.questionIndex >= QUESTION_COUNT - 1;
+  const isLast = state.questionIndex >= LESSON_QUESTION_COUNT - 1;
 
   if (isLast) {
     return {
       ...state,
-      completedCount: QUESTION_COUNT,
+      completedCount: LESSON_QUESTION_COUNT,
       feedback: null,
       feedbackTone: null,
       toast: "Submitted for parent review! Lesson complete.",

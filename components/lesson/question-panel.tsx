@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import { AssessmentProtected } from "@/components/ai-guard/assessment-protected";
+import { CanvasText } from "@/components/ai-guard/canvas-text";
 import { Button } from "@/components/ui/button";
+import { toDisplayEncoding } from "@/lib/ai-guard/encode";
 import { cn } from "@/lib/utils";
 import type { Difficulty } from "@/lib/lesson/state-machine";
-import type { LessonQuestion } from "@/lib/lesson/questions";
+import { shuffleMultipleChoice } from "@/lib/lesson/shuffle-multiple-choice";
+import type { LessonQuestion } from "@/lib/lesson/types";
 import { validateAnswer } from "@/lib/lesson/validate-answer";
 
 type QuestionPanelProps = {
@@ -15,12 +19,6 @@ type QuestionPanelProps = {
   feedbackTone: "success" | "retry" | null;
   disabled: boolean;
   onSubmit: (correct: boolean) => void;
-};
-
-const difficultyLabel: Record<Difficulty, string> = {
-  1: "Warm-up",
-  2: "Building",
-  3: "Challenge",
 };
 
 export function QuestionPanel({
@@ -36,10 +34,23 @@ export function QuestionPanel({
   const [longAnswer, setLongAnswer] = useState("");
   const [parentSubmitted, setParentSubmitted] = useState(false);
 
+  const shuffledMc = useMemo(
+    () =>
+      question.type === "multiple-choice"
+        ? shuffleMultipleChoice(question)
+        : null,
+    [question],
+  );
+
+  const questionForValidation = useMemo(() => {
+    if (question.type !== "multiple-choice" || !shuffledMc) return question;
+    return { ...question, ...shuffledMc };
+  }, [question, shuffledMc]);
+
   function handleCheck(
     payload: { selectedIndex?: number | null; text?: string },
   ) {
-    const correct = validateAnswer(question, payload);
+    const correct = validateAnswer(questionForValidation, payload);
     onSubmit(correct);
   }
 
@@ -50,43 +61,51 @@ export function QuestionPanel({
     setParentSubmitted(false);
   }
 
-  return (
-    <article className="space-y-6 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
-      <header className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-sky-600 dark:text-stone-400">
-          {difficultyLabel[difficulty]} · Level {difficulty}
-        </p>
-        <h2 className="text-lg font-semibold leading-snug text-slate-900 dark:text-stone-50">
-          {question.prompt}
-        </h2>
-      </header>
+  const mcOptions = shuffledMc?.options ?? [];
 
-      {question.type === "multiple-choice" && (
-        <fieldset className="space-y-2" disabled={disabled}>
-          <legend className="sr-only">Choose one answer</legend>
-          {question.options.map((option, index) => (
-            <label
-              key={option}
-              className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 text-sm transition-colors",
-                selectedIndex === index
-                  ? "border-sky-400 bg-sky-50 dark:border-stone-500 dark:bg-stone-800"
-                  : "border-sky-100 hover:bg-sky-50/80 dark:border-stone-700 dark:hover:bg-stone-800/80",
-                disabled && "pointer-events-none opacity-60",
-              )}
-            >
-              <input
-                type="radio"
-                name="mc-answer"
-                className="size-4 accent-sky-600"
-                checked={selectedIndex === index}
-                onChange={() => setSelectedIndex(index)}
-              />
-              <span className="text-slate-800 dark:text-stone-200">{option}</span>
-            </label>
-          ))}
-        </fieldset>
-      )}
+  return (
+    <article
+      className="space-y-6 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
+      data-question-slot={difficulty}
+    >
+      <AssessmentProtected className="space-y-6">
+        <CanvasText
+          encoded={toDisplayEncoding(question.prompt)}
+          variant="prompt"
+        />
+
+        {question.type === "multiple-choice" && (
+          <fieldset className="space-y-2" disabled={disabled}>
+            <legend className="sr-only">Select a response</legend>
+            {mcOptions.map((option, index) => (
+              <label
+                key={`${question.id}-${index}`}
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 transition-colors",
+                  selectedIndex === index
+                    ? "border-sky-400 bg-sky-50 dark:border-stone-500 dark:bg-stone-800"
+                    : "border-sky-100 hover:bg-sky-50/80 dark:border-stone-700 dark:hover:bg-stone-800/80",
+                  disabled && "pointer-events-none opacity-60",
+                )}
+              >
+                <input
+                  type="radio"
+                  name={`mc-${question.id}`}
+                  className="size-4 shrink-0 accent-sky-600"
+                  checked={selectedIndex === index}
+                  onChange={() => setSelectedIndex(index)}
+                  aria-label={`Response ${index + 1}`}
+                />
+                <CanvasText
+                  encoded={toDisplayEncoding(option)}
+                  variant="option"
+                  maxWidth={480}
+                />
+              </label>
+            ))}
+          </fieldset>
+        )}
+      </AssessmentProtected>
 
       {question.type === "short-answer" && (
         <div className="space-y-2">
@@ -97,7 +116,7 @@ export function QuestionPanel({
             id="short-answer"
             type="text"
             inputMode="decimal"
-            placeholder="e.g. 1/4 or 0.25"
+            placeholder="Enter your answer"
             value={textAnswer}
             onChange={(e) => setTextAnswer(e.target.value)}
             disabled={disabled}
@@ -148,10 +167,10 @@ export function QuestionPanel({
             type="button"
             disabled={disabled || parentSubmitted}
             onClick={() => {
-              const correct = validateAnswer(question, { text: longAnswer });
-              if (correct) {
-                setParentSubmitted(true);
-              }
+              const correct = validateAnswer(questionForValidation, {
+                text: longAnswer,
+              });
+              if (correct) setParentSubmitted(true);
               onSubmit(correct);
             }}
           >

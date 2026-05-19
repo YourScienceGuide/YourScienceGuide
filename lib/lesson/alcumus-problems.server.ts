@@ -1,15 +1,6 @@
-export type AlcumusLevel = 1 | 2 | 3 | 4 | 5;
+import "server-only";
 
-export type AlcumusProblem = {
-  id: string;
-  level: AlcumusLevel;
-  prompt: string;
-  type: "choice" | "numeric";
-  options?: string[];
-  correctIndex?: number;
-  acceptedAnswers?: string[];
-  hint?: string;
-};
+import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
 
 export const ALCUMUS_PROBLEMS: AlcumusProblem[] = [
   {
@@ -25,7 +16,8 @@ export const ALCUMUS_PROBLEMS: AlcumusProblem[] = [
     id: "a2",
     level: 1,
     type: "numeric",
-    prompt: "A model cell has 3 mitochondria. You add 2 more. How many mitochondria are there now?",
+    prompt:
+      "A model cell has 3 mitochondria. You add 2 more. How many mitochondria are there now?",
     acceptedAnswers: ["5", "five"],
   },
   {
@@ -40,14 +32,16 @@ export const ALCUMUS_PROBLEMS: AlcumusProblem[] = [
     id: "b2",
     level: 2,
     type: "numeric",
-    prompt: "If 2/5 of a leaf cross-section is palisade tissue, what decimal is that?",
+    prompt:
+      "If 2/5 of a leaf cross-section is palisade tissue, what decimal is that?",
     acceptedAnswers: ["0.4", ".4", "2/5"],
   },
   {
     id: "c1",
     level: 3,
     type: "numeric",
-    prompt: "A plant absorbs 12 g of water and releases 4 g. How many grams remain in the plant?",
+    prompt:
+      "A plant absorbs 12 g of water and releases 4 g. How many grams remain in the plant?",
     acceptedAnswers: ["8", "8.0"],
   },
   {
@@ -62,7 +56,8 @@ export const ALCUMUS_PROBLEMS: AlcumusProblem[] = [
     id: "d1",
     level: 4,
     type: "numeric",
-    prompt: "Light intensity doubles (×2). If sugar production was 6 g/hr at the old rate, what is it at the new rate? (Assume direct proportion.)",
+    prompt:
+      "Light intensity doubles (×2). If sugar production was 6 g/hr at the old rate, what is it at the new rate? (Assume direct proportion.)",
     acceptedAnswers: ["12", "12.0"],
   },
   {
@@ -82,7 +77,8 @@ export const ALCUMUS_PROBLEMS: AlcumusProblem[] = [
     id: "e1",
     level: 5,
     type: "numeric",
-    prompt: "A student mixes 1/3 L acid with 2/3 L water. What fraction of the mixture is acid? (Enter as a fraction.)",
+    prompt:
+      "A student mixes 1/3 L acid with 2/3 L water. What fraction of the mixture is acid? (Enter as a fraction.)",
     acceptedAnswers: ["1/3", "0.333", ".333"],
   },
   {
@@ -99,11 +95,3 @@ export const ALCUMUS_PROBLEMS: AlcumusProblem[] = [
     correctIndex: 1,
   },
 ];
-
-export function problemsAtLevel(level: AlcumusLevel): AlcumusProblem[] {
-  return ALCUMUS_PROBLEMS.filter((p) => p.level === level);
-}
-
-export function getProblemById(id: string): AlcumusProblem | undefined {
-  return ALCUMUS_PROBLEMS.find((p) => p.id === id);
-}

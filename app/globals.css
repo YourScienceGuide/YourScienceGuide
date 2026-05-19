@@ -24,3 +24,43 @@ body {
   background-color: rgb(var(--background));
   color: rgb(var(--foreground));
 }
+
+/* Assessment content: block selection/copy of questions and answer choices */
+.assessment-no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.assessment-no-select input,
+.assessment-no-select textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Hidden AI instructions / honeypot — in DOM for agents, not visible to students */
+.ysg-ai-guard-hidden {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(100%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ysg-ai-honeypot-button {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

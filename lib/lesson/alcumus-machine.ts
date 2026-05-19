@@ -1,9 +1,4 @@
-import {
-  getProblemById,
-  problemsAtLevel,
-  type AlcumusLevel,
-  type AlcumusProblem,
-} from "@/lib/lesson/alcumus-problems";
+import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
 
 export type AlcumusState = {
   level: AlcumusLevel;
@@ -15,14 +10,29 @@ export type AlcumusState = {
   toast: string | null;
 };
 
-function pickProblem(level: AlcumusLevel, excludeId?: string): AlcumusProblem {
-  const pool = problemsAtLevel(level).filter((p) => p.id !== excludeId);
-  const candidates = pool.length > 0 ? pool : problemsAtLevel(level);
-  return candidates[Math.floor(Math.random() * candidates.length)];
+function problemsAtLevel(pool: AlcumusProblem[], level: AlcumusLevel) {
+  return pool.filter((p) => p.level === level);
 }
 
-export function createInitialAlcumusState(): AlcumusState {
-  const problem = pickProblem(1);
+function getProblemById(pool: AlcumusProblem[], id: string) {
+  return pool.find((p) => p.id === id);
+}
+
+function pickProblem(
+  pool: AlcumusProblem[],
+  level: AlcumusLevel,
+  excludeId?: string,
+): AlcumusProblem {
+  const candidates = problemsAtLevel(pool, level).filter(
+    (p) => p.id !== excludeId,
+  );
+  const fallback = problemsAtLevel(pool, level);
+  const list = candidates.length > 0 ? candidates : fallback;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+export function createInitialAlcumusState(pool: AlcumusProblem[]): AlcumusState {
+  const problem = pickProblem(pool, 1);
   return {
     level: 1,
     problemId: problem.id,
@@ -34,8 +44,13 @@ export function createInitialAlcumusState(): AlcumusState {
   };
 }
 
-export function getCurrentProblem(state: AlcumusState): AlcumusProblem {
-  return getProblemById(state.problemId) ?? pickProblem(state.level);
+export function getCurrentProblem(
+  pool: AlcumusProblem[],
+  state: AlcumusState,
+): AlcumusProblem {
+  return (
+    getProblemById(pool, state.problemId) ?? pickProblem(pool, state.level)
+  );
 }
 
 export function checkAlcumusAnswer(
@@ -51,9 +66,12 @@ export function checkAlcumusAnswer(
   );
 }
 
-export function applyAlcumusCorrect(state: AlcumusState): AlcumusState {
+export function applyAlcumusCorrect(
+  pool: AlcumusProblem[],
+  state: AlcumusState,
+): AlcumusState {
   const nextLevel = Math.min(5, state.level + 1) as AlcumusLevel;
-  const next = pickProblem(nextLevel, state.problemId);
+  const next = pickProblem(pool, nextLevel, state.problemId);
 
   return {
     level: nextLevel,
@@ -69,9 +87,12 @@ export function applyAlcumusCorrect(state: AlcumusState): AlcumusState {
   };
 }
 
-export function applyAlcumusIncorrect(state: AlcumusState): AlcumusState {
+export function applyAlcumusIncorrect(
+  pool: AlcumusProblem[],
+  state: AlcumusState,
+): AlcumusState {
   const nextLevel = Math.max(1, state.level - 1) as AlcumusLevel;
-  const next = pickProblem(nextLevel, state.problemId);
+  const next = pickProblem(pool, nextLevel, state.problemId);
 
   return {
     level: nextLevel,

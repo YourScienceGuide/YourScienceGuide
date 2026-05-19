@@ -1,30 +1,8 @@
-export type MultipleChoiceQuestion = {
-  type: "multiple-choice";
-  id: "q1";
-  prompt: string;
-  options: string[];
-  correctIndex: number;
-};
+import "server-only";
 
-export type ShortAnswerQuestion = {
-  type: "short-answer";
-  id: "q2";
-  prompt: string;
-  acceptedAnswers: string[];
-};
+import type { LessonQuestion } from "@/lib/lesson/types";
 
-export type LongAnswerQuestion = {
-  type: "long-answer";
-  id: "q3";
-  prompt: string;
-  minLength: number;
-};
-
-export type LessonQuestion =
-  | MultipleChoiceQuestion
-  | ShortAnswerQuestion
-  | LongAnswerQuestion;
-
+/** Server-only — served via /api/lesson/assessment, not bundled for client. */
 export const LESSON_QUESTIONS: LessonQuestion[] = [
   {
     type: "multiple-choice",
@@ -49,5 +27,3 @@ export const LESSON_QUESTIONS: LessonQuestion[] = [
     minLength: 40,
   },
 ];
-
-export const QUESTION_COUNT = LESSON_QUESTIONS.length;
