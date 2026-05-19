@@ -65,12 +65,13 @@ export function CanvasText({
 
     const text = decodeBase64Utf8(encoded);
     const rootPx = getRootFontSizePx();
+    /** Tailwind-aligned rem scales (~text-lg / text-2xl) for readable assessment text */
     const fontSize =
       variant === "prompt"
-        ? rootPx * 1.925
+        ? rootPx * 1.875
         : variant === "body"
-          ? rootPx * 0.875
-          : rootPx * 1.4875;
+          ? rootPx * 1.25
+          : rootPx * 1.125;
     const fontWeight = variant === "prompt" ? 600 : 400;
     const lineHeight = fontSize * 1.5;
     const paddingX = 1;
