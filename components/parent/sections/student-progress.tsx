@@ -2,16 +2,27 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 
+import { useActiveStudent } from "@/components/family/active-student-provider";
 import { Button } from "@/components/ui/button";
 import {
   MOCK_PENDING_SUBMISSIONS,
   MOCK_RUBRIC,
-  MOCK_STUDENT,
   type PendingSubmission,
 } from "@/lib/parent/mock-data";
+import { cn } from "@/lib/utils";
 
 export function StudentProgressSection() {
+  const { students, activeStudent, getPreferences } = useActiveStudent();
+  const [viewingId, setViewingId] = useState(
+    () => activeStudent?.id ?? students[0]?.id ?? "",
+  );
   const [activeRubricId, setActiveRubricId] = useState<string | null>(null);
+
+  const student =
+    students.find((s) => s.id === viewingId) ?? students[0] ?? null;
+  const prefs = student ? getPreferences(student.id) : null;
+
+  if (!student) return null;
 
   return (
     <div className="space-y-8">
@@ -20,21 +31,57 @@ export function StudentProgressSection() {
         description="Grades, pending reviews, and course completion at a glance."
       />
 
+      {students.length > 1 && (
+        <div className="space-y-2">
+          <label
+            htmlFor="progress-student-select"
+            className="text-sm font-medium text-slate-700 dark:text-stone-300"
+          >
+            Viewing progress for
+          </label>
+          <select
+            id="progress-student-select"
+            value={viewingId}
+            onChange={(e) => setViewingId(e.target.value)}
+            className={cn(
+              "w-full max-w-md rounded-md border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
+              "dark:border-stone-600 dark:bg-stone-900 dark:text-stone-50",
+            )}
+          >
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Current grade" value={MOCK_STUDENT.grade}>
-          <p className="mt-1 text-sm text-slate-600 dark:text-stone-400">
-            {MOCK_STUDENT.gradePercent}% overall
-          </p>
-        </StatCard>
-        <StatCard label="Course" value={MOCK_STUDENT.courseName} />
-        <StatCard label="Progress" value={`${MOCK_STUDENT.courseProgress}%`}>
-          <ProgressBar percent={MOCK_STUDENT.courseProgress} />
+        {prefs?.showGradeOnDashboard && (
+          <StatCard label="Current grade" value={student.gradeLabel}>
+            <p className="mt-1 text-sm text-slate-600 dark:text-stone-400">
+              {student.gradePercent}% overall
+            </p>
+          </StatCard>
+        )}
+        <StatCard
+          label="Course"
+          value={student.courseName}
+          className={!prefs?.showGradeOnDashboard ? "sm:col-span-2" : undefined}
+        />
+        <StatCard label="Progress" value={`${student.courseProgress}%`}>
+          <ProgressBar percent={student.courseProgress} />
         </StatCard>
       </div>
 
       <div className="space-y-4">
         <h3 className="text-sm font-medium text-slate-900 dark:text-stone-50">
           Long-answer submissions awaiting grading
+          <span className="ml-2 font-normal text-slate-500 dark:text-stone-500">
+            ({student.displayName})
+          </span>
         </h3>
         <div className="overflow-hidden rounded-lg border border-sky-200 dark:border-stone-700">
           <table className="w-full text-left text-sm">
@@ -93,13 +140,20 @@ function StatCard({
   label,
   value,
   children,
+  className,
 }: {
   label: string;
   value: string;
   children?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rounded-lg border border-sky-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900">
+    <div
+      className={cn(
+        "rounded-lg border border-sky-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900",
+        className,
+      )}
+    >
       <p className="text-xs font-medium uppercase tracking-wide text-sky-600 dark:text-stone-400">
         {label}
       </p>
@@ -141,34 +195,34 @@ function SubmissionRow({
 }) {
   return (
     <Fragment>
-    <tr>
-      <td className="px-4 py-4 align-top">
-        <p className="font-medium text-slate-900 dark:text-stone-50">
-          {submission.title}
-        </p>
-        <p className="mt-1 line-clamp-2 text-slate-600 dark:text-stone-400">
-          {submission.preview}
-        </p>
-        <p className="mt-2 text-xs text-slate-500 sm:hidden dark:text-stone-500">
-          {submission.submittedAt}
-        </p>
-      </td>
-      <td className="hidden px-4 py-4 align-top text-slate-600 sm:table-cell dark:text-stone-400">
-        {submission.submittedAt}
-      </td>
-      <td className="px-4 py-4 align-top">
-        <Button type="button" size="sm" variant="ghost" onClick={onToggleRubric}>
-          {rubricOpen ? "Hide rubric" : "View rubric"}
-        </Button>
-      </td>
-    </tr>
-    {rubricOpen && (
       <tr>
-        <td colSpan={3} className="bg-sky-50/50 px-4 pb-4 dark:bg-stone-800/50">
-          <RubricPanel />
+        <td className="px-4 py-4 align-top">
+          <p className="font-medium text-slate-900 dark:text-stone-50">
+            {submission.title}
+          </p>
+          <p className="mt-1 line-clamp-2 text-slate-600 dark:text-stone-400">
+            {submission.preview}
+          </p>
+          <p className="mt-2 text-xs text-slate-500 sm:hidden dark:text-stone-500">
+            {submission.submittedAt}
+          </p>
+        </td>
+        <td className="hidden px-4 py-4 align-top text-slate-600 sm:table-cell dark:text-stone-400">
+          {submission.submittedAt}
+        </td>
+        <td className="px-4 py-4 align-top">
+          <Button type="button" size="sm" variant="ghost" onClick={onToggleRubric}>
+            {rubricOpen ? "Hide rubric" : "View rubric"}
+          </Button>
         </td>
       </tr>
-    )}
+      {rubricOpen && (
+        <tr>
+          <td colSpan={3} className="bg-sky-50/50 px-4 pb-4 dark:bg-stone-800/50">
+            <RubricPanel />
+          </td>
+        </tr>
+      )}
     </Fragment>
   );
 }

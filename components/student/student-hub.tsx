@@ -3,23 +3,34 @@
 import Link from "next/link";
 
 import { useContentStore } from "@/components/admin/use-content-store";
+import { useActiveStudent } from "@/components/family/active-student-provider";
+import { SwitchStudentButton } from "@/components/student/switch-student-button";
 import { getCoursesClient } from "@/lib/student/curriculum-client";
 import { coursePath } from "@/lib/student/paths";
 
 export function StudentHub() {
   const { store } = useContentStore();
+  const { activeStudent, students } = useActiveStudent();
   const courses = getCoursesClient(store);
 
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
-          Student
-        </h1>
-        <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
-          Your courses and curriculum. Open a course to see all lessons and track
-          what you&apos;ve completed.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
+              {activeStudent
+                ? `${activeStudent.displayName}'s courses`
+                : "Student"}
+            </h1>
+            <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
+              {activeStudent && students.length > 1
+                ? `Learning as ${activeStudent.displayName}. Open a course to see lessons and track progress.`
+                : "Your courses and curriculum. Open a course to see all lessons and track what you've completed."}
+            </p>
+          </div>
+          <SwitchStudentButton />
+        </div>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">

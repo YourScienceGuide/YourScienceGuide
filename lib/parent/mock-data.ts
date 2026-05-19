@@ -5,6 +5,7 @@ export type PendingSubmission = {
   preview: string;
 };
 
+/** @deprecated Use family mock students via ActiveStudentProvider */
 export const MOCK_STUDENT = {
   name: "Alex",
   grade: "B+",

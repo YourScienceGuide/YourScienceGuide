@@ -3,6 +3,7 @@ import { DM_Sans } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { ActiveStudentProvider } from "@/components/family/active-student-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeScript } from "@/components/theme-script";
 
@@ -30,7 +31,9 @@ export default function RootLayout({
         <ThemeScript />
         <ThemeProvider>
           <AuthProvider>
-            <AuthShell>{children}</AuthShell>
+            <ActiveStudentProvider>
+              <AuthShell>{children}</AuthShell>
+            </ActiveStudentProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -3,11 +3,13 @@
 import { useState } from "react";
 
 import { BillingSection } from "@/components/parent/sections/billing";
+import { FamilyStudentsSection } from "@/components/parent/sections/family-students";
 import { NotificationsSection } from "@/components/parent/sections/notifications";
 import { StudentProgressSection } from "@/components/parent/sections/student-progress";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
+  { id: "students", label: "Students" },
   { id: "progress", label: "Student progress" },
   { id: "notifications", label: "Notifications" },
   { id: "billing", label: "Subscription" },
@@ -16,7 +18,7 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 export function ParentDashboard() {
-  const [active, setActive] = useState<SectionId>("progress");
+  const [active, setActive] = useState<SectionId>("students");
 
   return (
     <div className="space-y-8">
@@ -138,6 +140,7 @@ function NavButton({
 function DashboardPanel({ active }: { active: SectionId }) {
   return (
     <div className="min-w-0 flex-1 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900 lg:p-8">
+      {active === "students" && <FamilyStudentsSection />}
       {active === "progress" && <StudentProgressSection />}
       {active === "notifications" && <NotificationsSection />}
       {active === "billing" && <BillingSection />}

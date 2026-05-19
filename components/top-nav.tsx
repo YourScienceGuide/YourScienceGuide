@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { useActiveStudent } from "@/components/family/active-student-provider";
 import { siteContainerClass } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,8 @@ const baseLinks = [
 export function TopNav() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
+  const { activeStudent, students } = useActiveStudent();
+  const onStudentArea = pathname === "/student" || pathname.startsWith("/student/");
   const links = isAdmin
     ? [...baseLinks, { href: "/admin", label: "Admin" } as const]
     : baseLinks;
@@ -39,6 +42,11 @@ export function TopNav() {
           {links.map(({ href, label }) => {
             const active =
               pathname === href || pathname.startsWith(`${href}/`);
+            const showStudentName =
+              href === "/student" &&
+              onStudentArea &&
+              activeStudent &&
+              students.length > 1;
             return (
               <Button
                 key={href}
@@ -50,7 +58,9 @@ export function TopNav() {
                   active && "shadow-none",
                 )}
               >
-                <Link href={href}>{label}</Link>
+                <Link href={href}>
+                  {showStudentName ? activeStudent.displayName : label}
+                </Link>
               </Button>
             );
           })}

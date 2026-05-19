@@ -23,7 +23,12 @@ export function NotificationsSection() {
           Notifications
         </h2>
         <p className="text-sm text-slate-600 dark:text-stone-400">
-          Choose when we email you about your student&apos;s activity.
+          Account-wide notification defaults. Per-student email preferences are
+          under{" "}
+          <span className="font-medium text-slate-800 dark:text-stone-200">
+            Students
+          </span>{" "}
+          in this portal.
         </p>
       </div>
 
