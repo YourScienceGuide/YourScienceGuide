@@ -10,13 +10,13 @@ export default function HomePage() {
           Welcome
         </h1>
         <p className="max-w-xl text-lg leading-relaxed text-slate-600 dark:text-stone-400">
-          Choose where you&apos;re learning today—the student lesson space or the
+          Choose where you&apos;re learning today—your student courses or the
           parent portal.
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
         <Button asChild>
-          <Link href="/lesson">Go to lesson</Link>
+          <Link href="/student">Go to student</Link>
         </Button>
         <Button asChild variant="ghost">
           <Link href="/parent">Parent portal</Link>

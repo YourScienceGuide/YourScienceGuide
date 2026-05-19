@@ -13,13 +13,17 @@ import {
   masteryStepLabel,
 } from "@/lib/lesson/flashcard-machine";
 import type { DeckState } from "@/lib/lesson/flashcard-types";
+import { getLesson } from "@/lib/student/curriculum";
+import { lessonPath } from "@/lib/student/paths";
 
-const FLASHCARD_STORAGE_KEY = "ysg-flashcard-deck-state";
+function flashcardStorageKey(courseId: string, lessonId: string) {
+  return `ysg-flashcard-deck-state-${courseId}-${lessonId}`;
+}
 
-function loadPersistedState(): DeckState | null {
+function loadPersistedState(courseId: string, lessonId: string): DeckState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(FLASHCARD_STORAGE_KEY);
+    const raw = sessionStorage.getItem(flashcardStorageKey(courseId, lessonId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as DeckState;
     if (!parsed.entries?.length || !parsed.currentCardId) return null;
@@ -29,19 +33,33 @@ function loadPersistedState(): DeckState | null {
   }
 }
 
-export function FlashcardReviewPage() {
+type FlashcardReviewPageProps = {
+  courseId: string;
+  lessonId: string;
+};
+
+export function FlashcardReviewPage({
+  courseId,
+  lessonId,
+}: FlashcardReviewPageProps) {
+  const lessonMeta = getLesson(courseId, lessonId);
   const [state, setState] = useState<DeckState | null>(null);
 
   useEffect(() => {
     if (!state) {
-      setState(loadPersistedState() ?? createInitialDeckState());
+      setState(
+        loadPersistedState(courseId, lessonId) ?? createInitialDeckState(),
+      );
     }
-  }, [state]);
+  }, [state, courseId, lessonId]);
 
   useEffect(() => {
     if (!state) return;
-    sessionStorage.setItem(FLASHCARD_STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    sessionStorage.setItem(
+      flashcardStorageKey(courseId, lessonId),
+      JSON.stringify(state),
+    );
+  }, [state, courseId, lessonId]);
 
   const onStateChange = useCallback((next: DeckState) => {
     setState(next);
@@ -66,7 +84,7 @@ export function FlashcardReviewPage() {
         ariaLabel="Flashcard deck mastery progress"
         trailing={
           <Button variant="ghost" asChild size="sm" className="shrink-0 self-end sm:self-center">
-            <Link href="/lesson">
+            <Link href={lessonPath(courseId, lessonId)}>
               <ArrowLeft aria-hidden />
               Back to lesson
             </Link>
@@ -78,6 +96,11 @@ export function FlashcardReviewPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
           Flashcard Review
         </h1>
+        {lessonMeta && (
+          <p className="text-sm text-slate-500 dark:text-stone-500">
+            {lessonMeta.title}
+          </p>
+        )}
         <p className="text-base text-slate-600 dark:text-stone-400">
           Study with an Anki-style deck—show the answer, then rate how well you
           remembered. Progress is separate from your lesson assignment.

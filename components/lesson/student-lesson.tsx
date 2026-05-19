@@ -1,14 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { LessonNav } from "@/components/student/lesson-nav";
+import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonToast } from "@/components/lesson/lesson-toast";
 import { LessonVideo } from "@/components/lesson/lesson-video";
 import { QuestionPanel } from "@/components/lesson/question-panel";
 import { Button } from "@/components/ui/button";
+import {
+  getAdjacentLessons,
+  getCourse,
+  getLesson,
+} from "@/lib/student/curriculum";
+import {
+  loadLessonProgress,
+  saveLessonProgress,
+  storedToMachineState,
+} from "@/lib/student/lesson-progress";
+import {
+  lessonFlashcardsPath,
+  lessonPath,
+  lessonPracticePath,
+} from "@/lib/student/paths";
 import {
   applyCorrectAnswer,
   applyIncorrectAnswer,
@@ -19,24 +36,51 @@ import {
 } from "@/lib/lesson/state-machine";
 import { lessonStepLabel } from "@/lib/lesson/progress-labels";
 
-export function StudentLesson() {
-  const { lesson, ready, error } = useLessonAssessment();
-  const [state, setState] = useState<LessonMachineState>(INITIAL_LESSON_STATE);
+type StudentLessonProps = {
+  courseId: string;
+  lessonId: string;
+};
 
-  const currentQuestion = lesson[state.questionIndex];
-  const percent = progressPercent(state);
+export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
+  const course = getCourse(courseId);
+  const lessonMeta = getLesson(courseId, lessonId);
+  const { prev, next } = getAdjacentLessons(courseId, lessonId);
+
+  const { lesson, ready, error } = useLessonAssessment();
+  const [state, setState] = useState<LessonMachineState | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const stored = loadLessonProgress(courseId, lessonId);
+    const restored = storedToMachineState(stored);
+    setState(restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE);
+    setHydrated(true);
+  }, [courseId, lessonId]);
+
+  useEffect(() => {
+    if (!state || !hydrated) return;
+    saveLessonProgress(courseId, lessonId, state);
+    notifyProgressUpdated();
+  }, [courseId, lessonId, state, hydrated]);
 
   const dismissToast = useCallback(() => {
-    setState((s) => clearToast(s));
+    setState((s) => (s ? clearToast(s) : s));
   }, []);
 
   const handleAnswer = useCallback((correct: boolean) => {
-    setState((s) =>
-      correct ? applyCorrectAnswer(s) : applyIncorrectAnswer(s),
-    );
+    setState((s) => {
+      if (!s) return s;
+      return correct ? applyCorrectAnswer(s) : applyIncorrectAnswer(s);
+    });
   }, []);
 
-  const stepLabel = lessonStepLabel(state.questionIndex, state.isComplete);
+  if (!course || !lessonMeta) {
+    return (
+      <p className="text-sm text-slate-600 dark:text-stone-400">
+        This lesson could not be found.
+      </p>
+    );
+  }
 
   if (error) {
     return (
@@ -46,7 +90,7 @@ export function StudentLesson() {
     );
   }
 
-  if (!ready || !currentQuestion) {
+  if (!ready || !state) {
     return (
       <p className="text-sm text-slate-600 dark:text-stone-400">
         Loading lesson…
@@ -54,21 +98,36 @@ export function StudentLesson() {
     );
   }
 
+  const currentQuestion = lesson[state.questionIndex];
+  if (!currentQuestion) {
+    return (
+      <p className="text-sm text-slate-600 dark:text-stone-400">
+        Loading lesson…
+      </p>
+    );
+  }
+
+  const percent = progressPercent(state);
+  const stepLabel = lessonStepLabel(state.questionIndex, state.isComplete);
+
   return (
     <div className="space-y-10">
       <LessonToast message={state.toast} onDismiss={dismissToast} />
 
       <LessonProgressRail percent={percent} stepLabel={stepLabel} />
 
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
-          Today&apos;s lesson
-        </h1>
-        <p className="text-base text-slate-600 dark:text-stone-400">
-          Watch the video, then complete all three parts below. Extra Practice and
-          Flashcard Review are optional and open on their own pages.
-        </p>
-      </header>
+      <LessonNav
+        courseId={courseId}
+        courseTitle={course.title}
+        lesson={lessonMeta}
+        prev={prev}
+        next={next}
+      />
+
+      <p className="text-base text-slate-600 dark:text-stone-400">
+        Watch the video, then complete all three parts below. Extra Practice and
+        Flashcard Review are optional and open on their own pages.
+      </p>
 
       <LessonVideo />
 
@@ -92,8 +151,15 @@ export function StudentLesson() {
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-stone-400">
               You finished all three lesson questions. Try Extra Practice or
-              Flashcard Review.
+              Flashcard Review, or continue to the next lesson.
             </p>
+            {next && (
+              <Button asChild className="mt-4">
+                <Link href={lessonPath(courseId, next.id)}>
+                  Next lesson: {next.title}
+                </Link>
+              </Button>
+            )}
           </div>
         ) : (
           <QuestionPanel
@@ -126,7 +192,7 @@ export function StudentLesson() {
             </p>
           </div>
           <Button asChild className="shrink-0">
-            <Link href="/lesson/practice">Extra Practice</Link>
+            <Link href={lessonPracticePath(courseId, lessonId)}>Extra Practice</Link>
           </Button>
         </div>
       </section>
@@ -149,7 +215,9 @@ export function StudentLesson() {
             </p>
           </div>
           <Button asChild className="shrink-0">
-            <Link href="/lesson/flashcards">Flashcard Review</Link>
+            <Link href={lessonFlashcardsPath(courseId, lessonId)}>
+              Flashcard Review
+            </Link>
           </Button>
         </div>
       </section>

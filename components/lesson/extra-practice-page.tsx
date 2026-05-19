@@ -8,6 +8,8 @@ import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { Button } from "@/components/ui/button";
+import { getLesson } from "@/lib/student/curriculum";
+import { lessonPath } from "@/lib/student/paths";
 import {
   createInitialAlcumusState,
   masteryPercent,
@@ -15,12 +17,18 @@ import {
   type AlcumusState,
 } from "@/lib/lesson/alcumus-machine";
 
-const ALCUMUS_STORAGE_KEY = "ysg-alcumus-state";
+function alcumusStorageKey(courseId: string, lessonId: string) {
+  return `ysg-alcumus-state-${courseId}-${lessonId}`;
+}
 
-function loadPersistedState(pool: { id: string }[]): AlcumusState | null {
+function loadPersistedState(
+  courseId: string,
+  lessonId: string,
+  pool: { id: string }[],
+): AlcumusState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(ALCUMUS_STORAGE_KEY);
+    const raw = sessionStorage.getItem(alcumusStorageKey(courseId, lessonId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AlcumusState;
     if (!pool.some((p) => p.id === parsed.problemId)) return null;
@@ -30,20 +38,32 @@ function loadPersistedState(pool: { id: string }[]): AlcumusState | null {
   }
 }
 
-export function ExtraPracticePage() {
+type ExtraPracticePageProps = {
+  courseId: string;
+  lessonId: string;
+};
+
+export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps) {
+  const lessonMeta = getLesson(courseId, lessonId);
   const { alcumus, ready, error } = useLessonAssessment();
   const [state, setState] = useState<AlcumusState | null>(null);
 
   useEffect(() => {
     if (ready && alcumus.length > 0 && !state) {
-      setState(loadPersistedState(alcumus) ?? createInitialAlcumusState(alcumus));
+      setState(
+        loadPersistedState(courseId, lessonId, alcumus) ??
+          createInitialAlcumusState(alcumus),
+      );
     }
-  }, [ready, alcumus, state]);
+  }, [ready, alcumus, state, courseId, lessonId]);
 
   useEffect(() => {
     if (!state) return;
-    sessionStorage.setItem(ALCUMUS_STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    sessionStorage.setItem(
+      alcumusStorageKey(courseId, lessonId),
+      JSON.stringify(state),
+    );
+  }, [state, courseId, lessonId]);
 
   const onStateChange = useCallback((next: AlcumusState) => {
     setState(next);
@@ -76,7 +96,7 @@ export function ExtraPracticePage() {
         ariaLabel="Practice mastery progress"
         trailing={
           <Button variant="ghost" asChild size="sm" className="shrink-0 self-end sm:self-center">
-            <Link href="/lesson">
+            <Link href={lessonPath(courseId, lessonId)}>
               <ArrowLeft aria-hidden />
               Back to lesson
             </Link>
@@ -88,6 +108,11 @@ export function ExtraPracticePage() {
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
           Extra Practice
         </h1>
+        {lessonMeta && (
+          <p className="text-sm text-slate-500 dark:text-stone-500">
+            {lessonMeta.title}
+          </p>
+        )}
         <p className="text-base text-slate-600 dark:text-stone-400">
           Adaptive problems that adjust to your skill—like AoPS Alcumus. Progress
           here is separate from your lesson assignment.
