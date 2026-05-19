@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { AssessmentProtected } from "@/components/ai-guard/assessment-protected";
 import { CanvasText } from "@/components/ai-guard/canvas-text";
@@ -14,7 +14,6 @@ import {
   applyAlcumusIncorrect,
   checkAlcumusAnswer,
   clearAlcumusToast,
-  createInitialAlcumusState,
   getCurrentProblem,
   LEVEL_LABELS,
   type AlcumusState,
@@ -23,58 +22,40 @@ import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import { shuffleMultipleChoice } from "@/lib/lesson/shuffle-multiple-choice";
 import type { MultipleChoiceQuestion } from "@/lib/lesson/types";
 
-export function AlcumusPractice() {
-  const { alcumus, ready } = useLessonAssessment();
-  const [state, setState] = useState<AlcumusState | null>(null);
+type AlcumusPracticeProps = {
+  state: AlcumusState;
+  onStateChange: (state: AlcumusState) => void;
+};
 
-  useEffect(() => {
-    if (ready && alcumus.length > 0 && !state) {
-      setState(createInitialAlcumusState(alcumus));
-    }
-  }, [ready, alcumus, state]);
+export function AlcumusPractice({ state, onStateChange }: AlcumusPracticeProps) {
+  const { alcumus } = useLessonAssessment();
 
   const dismissToast = useCallback(() => {
-    setState((s) => (s ? clearAlcumusToast(s) : s));
-  }, []);
+    onStateChange(clearAlcumusToast(state));
+  }, [onStateChange, state]);
 
   const handleSubmit = useCallback(
     (correct: boolean) => {
-      setState((s) => {
-        if (!s) return s;
-        return correct
-          ? applyAlcumusCorrect(alcumus, s)
-          : applyAlcumusIncorrect(alcumus, s);
-      });
+      onStateChange(
+        correct
+          ? applyAlcumusCorrect(alcumus, state)
+          : applyAlcumusIncorrect(alcumus, state),
+      );
     },
-    [alcumus],
+    [alcumus, onStateChange, state],
   );
-
-  if (!ready || !state) return null;
 
   const problem = getCurrentProblem(alcumus, state);
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6" aria-label="Extra practice problems">
       <LessonToast message={state.toast} onDismiss={dismissToast} />
-
-      <div className="space-y-1">
-        <h2
-          id="extra-practice-heading"
-          className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
-        >
-          Extra practice
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-stone-400">
-          Optional adaptive problems—separate from your lesson questions.
-        </p>
-      </div>
 
       <AlcumusStats state={state} />
 
       <AlcumusProblemCard
         key={problem.id}
         problem={problem}
-        level={state.level}
         feedback={state.feedback}
         feedbackTone={state.feedbackTone}
         onSubmit={handleSubmit}
@@ -139,13 +120,11 @@ function MeterStep({ level, step }: { level: AlcumusLevel; step: AlcumusLevel })
 
 function AlcumusProblemCard({
   problem,
-  level,
   feedback,
   feedbackTone,
   onSubmit,
 }: {
   problem: AlcumusProblem;
-  level: AlcumusLevel;
   feedback: string | null;
   feedbackTone: "success" | "retry" | null;
   onSubmit: (correct: boolean) => void;
@@ -218,7 +197,7 @@ function AlcumusProblemCard({
                 <CanvasText
                   encoded={toDisplayEncoding(option)}
                   variant="option"
-                  maxWidth={480}
+                  className="min-w-0 flex-1"
                 />
               </label>
             ))}
@@ -231,7 +210,6 @@ function AlcumusProblemCard({
             <CanvasText
               encoded={toDisplayEncoding(`Hint: ${problem.hint}`)}
               variant="option"
-              maxWidth={520}
             />
           </div>
         )}

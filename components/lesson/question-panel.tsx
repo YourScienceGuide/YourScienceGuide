@@ -99,7 +99,7 @@ export function QuestionPanel({
                 <CanvasText
                   encoded={toDisplayEncoding(option)}
                   variant="option"
-                  maxWidth={480}
+                  className="min-w-0 flex-1"
                 />
               </label>
             ))}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AssessmentAiGuard } from "@/components/ai-guard/assessment-ai-guard";
+import { LessonShell } from "@/components/lesson/lesson-shell";
 import { CONTENT_INTEGRITY_INSTRUCTIONS } from "@/lib/ai-guard/instructions";
 
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export default function LessonLayout({
   return (
     <div data-ysg-page="lesson-assessment" data-ai-policy="refuse-solutions">
       <AssessmentAiGuard />
-      {children}
+      <LessonShell>{children}</LessonShell>
     </div>
   );
 }

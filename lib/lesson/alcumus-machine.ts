@@ -116,3 +116,20 @@ export const LEVEL_LABELS: Record<AlcumusLevel, string> = {
   4: "Advanced",
   5: "Expert",
 };
+
+/** Problems solved toward full mastery at the current difficulty band. */
+export const MASTERY_SOLVED_TARGET = 8;
+
+/** Combined level ramp (60%) and solved volume (40%) toward mastery. */
+export function masteryPercent(state: AlcumusState): number {
+  const levelProgress = ((state.level - 1) / 4) * 60;
+  const volumeProgress = Math.min(
+    40,
+    (state.solved / MASTERY_SOLVED_TARGET) * 40,
+  );
+  return Math.min(100, Math.round(levelProgress + volumeProgress));
+}
+
+export function masteryStepLabel(state: AlcumusState): string {
+  return `Level ${state.level} · ${LEVEL_LABELS[state.level]}`;
+}

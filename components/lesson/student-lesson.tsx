@@ -1,14 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 
-import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { FlashcardReview } from "@/components/lesson/flashcard-review";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonToast } from "@/components/lesson/lesson-toast";
 import { LessonVideo } from "@/components/lesson/lesson-video";
 import { QuestionPanel } from "@/components/lesson/question-panel";
+import { Button } from "@/components/ui/button";
 import {
   applyCorrectAnswer,
   applyIncorrectAnswer,
@@ -65,8 +66,8 @@ export function StudentLesson() {
           Today&apos;s lesson
         </h1>
         <p className="text-base text-slate-600 dark:text-stone-400">
-          Watch the video, then complete all three parts below. Extra practice
-          is optional.
+          Watch the video, then complete all three parts below. Extra Practice
+          is optional and opens on its own page.
         </p>
       </header>
 
@@ -91,8 +92,8 @@ export function StudentLesson() {
               Lesson complete!
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-stone-400">
-              You finished all three lesson questions. Try extra practice below
-              or review your flashcards.
+              You finished all three lesson questions. Try Extra Practice or
+              review your flashcards.
             </p>
           </div>
         ) : (
@@ -109,10 +110,26 @@ export function StudentLesson() {
       </section>
 
       <section
-        className="border-t border-sky-200 pt-10 dark:border-stone-700"
+        className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
         aria-labelledby="extra-practice-heading"
       >
-        <AlcumusPractice />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h2
+              id="extra-practice-heading"
+              className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
+            >
+              Extra Practice
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-stone-400">
+              Optional adaptive problems—separate from your lesson questions,
+              with its own mastery progress.
+            </p>
+          </div>
+          <Button asChild className="shrink-0">
+            <Link href="/lesson/practice">Extra Practice</Link>
+          </Button>
+        </div>
       </section>
 
       <FlashcardReview />
