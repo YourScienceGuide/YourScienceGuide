@@ -17,7 +17,7 @@ export function TopNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-sky-200 bg-white/90 backdrop-blur-sm dark:border-stone-700 dark:bg-stone-900/90">
+    <header className="sticky top-0 z-50 border-b border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900">
       <div
         className={cn(
           siteContainerClass,

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 
 import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { FlashcardReview } from "@/components/lesson/flashcard-review";
-import { LessonProgress } from "@/components/lesson/lesson-progress";
+import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonToast } from "@/components/lesson/lesson-toast";
 import { LessonVideo } from "@/components/lesson/lesson-video";
 import { QuestionPanel } from "@/components/lesson/question-panel";
@@ -17,6 +17,7 @@ import {
   progressPercent,
   type LessonMachineState,
 } from "@/lib/lesson/state-machine";
+import { lessonStepLabel } from "@/lib/lesson/progress-labels";
 
 export function StudentLesson() {
   const [state, setState] = useState<LessonMachineState>(INITIAL_LESSON_STATE);
@@ -34,9 +35,13 @@ export function StudentLesson() {
     );
   }, []);
 
+  const stepLabel = lessonStepLabel(state.questionIndex, state.isComplete);
+
   return (
     <div className="space-y-10">
       <LessonToast message={state.toast} onDismiss={dismissToast} />
+
+      <LessonProgressRail percent={percent} stepLabel={stepLabel} />
 
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
@@ -64,7 +69,6 @@ export function StudentLesson() {
               long-answer response for parent review.
             </p>
           </div>
-          <LessonProgress percent={percent} label="Lesson completion" />
         </div>
 
         {state.isComplete ? (
