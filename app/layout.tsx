@@ -4,6 +4,8 @@ import { DM_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeScript } from "@/components/theme-script";
 import { TopNav } from "@/components/top-nav";
+import { siteContainerClass } from "@/lib/layout";
+import { cn } from "@/lib/utils";
 
 import "./globals.css";
 
@@ -29,7 +31,7 @@ export default function RootLayout({
         <ThemeScript />
         <ThemeProvider>
           <TopNav />
-          <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
+          <main className={cn(siteContainerClass, "py-10")}>{children}</main>
         </ThemeProvider>
       </body>
     </html>
