@@ -9,8 +9,10 @@ import {
   type ReactNode,
 } from "react";
 
+import type { AuthRole } from "@/lib/auth/constants";
 import {
   clearAuthenticated,
+  getAuthRole,
   isAuthenticated,
   setAuthenticated,
   validateCredentials,
@@ -19,6 +21,8 @@ import {
 type AuthContextValue = {
   ready: boolean;
   authenticated: boolean;
+  role: AuthRole | null;
+  isAdmin: boolean;
   signIn: (username: string, password: string) => boolean;
   signOut: () => void;
 };
@@ -28,27 +32,39 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticatedState] = useState(false);
+  const [role, setRole] = useState<AuthRole | null>(null);
 
   useEffect(() => {
     setAuthenticatedState(isAuthenticated());
+    setRole(getAuthRole());
     setReady(true);
   }, []);
 
   const signIn = useCallback((username: string, password: string) => {
-    if (!validateCredentials(username, password)) return false;
-    setAuthenticated();
+    const resolved = validateCredentials(username, password);
+    if (!resolved) return false;
+    setAuthenticated(resolved);
     setAuthenticatedState(true);
+    setRole(resolved);
     return true;
   }, []);
 
   const signOut = useCallback(() => {
     clearAuthenticated();
     setAuthenticatedState(false);
+    setRole(null);
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ ready, authenticated, signIn, signOut }}
+      value={{
+        ready,
+        authenticated,
+        role,
+        isAdmin: role === "admin",
+        signIn,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -8,7 +8,8 @@ import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { Button } from "@/components/ui/button";
-import { getLesson } from "@/lib/student/curriculum";
+import { useContentStore } from "@/components/admin/use-content-store";
+import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
 import {
   createInitialAlcumusState,
@@ -44,7 +45,8 @@ type ExtraPracticePageProps = {
 };
 
 export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps) {
-  const lessonMeta = getLesson(courseId, lessonId);
+  const { store } = useContentStore();
+  const lessonMeta = getLessonClient(store, courseId, lessonId);
   const { alcumus, ready, error } = useLessonAssessment();
   const [state, setState] = useState<AlcumusState | null>(null);
 

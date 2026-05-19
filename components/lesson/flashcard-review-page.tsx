@@ -13,7 +13,8 @@ import {
   masteryStepLabel,
 } from "@/lib/lesson/flashcard-machine";
 import type { DeckState } from "@/lib/lesson/flashcard-types";
-import { getLesson } from "@/lib/student/curriculum";
+import { useContentStore } from "@/components/admin/use-content-store";
+import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
 
 function flashcardStorageKey(courseId: string, lessonId: string) {
@@ -42,7 +43,8 @@ export function FlashcardReviewPage({
   courseId,
   lessonId,
 }: FlashcardReviewPageProps) {
-  const lessonMeta = getLesson(courseId, lessonId);
+  const { store } = useContentStore();
+  const lessonMeta = getLessonClient(store, courseId, lessonId);
   const [state, setState] = useState<DeckState | null>(null);
 
   useEffect(() => {

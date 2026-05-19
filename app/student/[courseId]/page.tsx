@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 import { CourseCurriculum } from "@/components/student/course-curriculum";
 import { getCourse } from "@/lib/student/curriculum";
@@ -19,8 +18,5 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CoursePage({ params }: PageProps) {
   const { courseId } = await params;
-  const course = getCourse(courseId);
-  if (!course) notFound();
-
-  return <CourseCurriculum course={course} />;
+  return <CourseCurriculum courseId={courseId} />;
 }

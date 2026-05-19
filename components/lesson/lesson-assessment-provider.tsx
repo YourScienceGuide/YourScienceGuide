@@ -8,6 +8,11 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  getAlcumusFromStore,
+  getLessonQuestionsFromStore,
+  loadContentStore,
+} from "@/lib/admin/content-store";
 import { decodeAssessmentPayload } from "@/lib/ai-guard/encode";
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import type { LessonQuestion } from "@/lib/lesson/types";
@@ -28,7 +33,17 @@ const LessonAssessmentContext = createContext<LessonAssessmentContextValue | nul
   null,
 );
 
-export function LessonAssessmentProvider({ children }: { children: ReactNode }) {
+type LessonAssessmentProviderProps = {
+  courseId: string;
+  lessonId: string;
+  children: ReactNode;
+};
+
+export function LessonAssessmentProvider({
+  courseId,
+  lessonId,
+  children,
+}: LessonAssessmentProviderProps) {
   const [lesson, setLesson] = useState<LessonQuestion[]>([]);
   const [alcumus, setAlcumus] = useState<AlcumusProblem[]>([]);
   const [ready, setReady] = useState(false);
@@ -46,19 +61,34 @@ export function LessonAssessmentProvider({ children }: { children: ReactNode }) 
         const body = (await res.json()) as { p: string };
         const data = decodeAssessmentPayload<AssessmentPayload>(body.p);
         if (cancelled) return;
-        setLesson(data.lesson);
-        setAlcumus(data.alcumus);
+
+        const store = loadContentStore();
+        setLesson(
+          getLessonQuestionsFromStore(store, courseId, lessonId, data.lesson),
+        );
+        setAlcumus(
+          getAlcumusFromStore(store, courseId, lessonId, data.alcumus),
+        );
         setReady(true);
       } catch {
-        if (!cancelled) setError("Could not load lesson questions. Please refresh.");
+        if (!cancelled) {
+          setError("Could not load lesson questions. Please refresh.");
+        }
       }
     }
 
     load();
+
+    const onContentUpdate = () => {
+      load();
+    };
+    window.addEventListener("ysg-content-updated", onContentUpdate);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("ysg-content-updated", onContentUpdate);
     };
-  }, []);
+  }, [courseId, lessonId]);
 
   return (
     <LessonAssessmentContext.Provider

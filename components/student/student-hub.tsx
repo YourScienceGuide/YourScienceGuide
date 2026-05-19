@@ -1,9 +1,15 @@
+"use client";
+
 import Link from "next/link";
 
-import { COURSES } from "@/lib/student/curriculum";
+import { useContentStore } from "@/components/admin/use-content-store";
+import { getCoursesClient } from "@/lib/student/curriculum-client";
 import { coursePath } from "@/lib/student/paths";
 
 export function StudentHub() {
+  const { store } = useContentStore();
+  const courses = getCoursesClient(store);
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
@@ -17,7 +23,7 @@ export function StudentHub() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {COURSES.map((course) => (
+        {courses.map((course) => (
           <Link
             key={course.id}
             href={coursePath(course.id)}

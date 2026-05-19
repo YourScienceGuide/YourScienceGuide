@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { useContentStore } from "@/components/admin/use-content-store";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
+import {
+  getAdjacentLessonsClient,
+  getCourseClient,
+  getLessonClient,
+} from "@/lib/student/curriculum-client";
 import { getLessonReadings, getTextbook } from "@/lib/student/textbook";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
@@ -13,11 +19,6 @@ import { LessonToast } from "@/components/lesson/lesson-toast";
 import { LessonVideo } from "@/components/lesson/lesson-video";
 import { QuestionPanel } from "@/components/lesson/question-panel";
 import { Button } from "@/components/ui/button";
-import {
-  getAdjacentLessons,
-  getCourse,
-  getLesson,
-} from "@/lib/student/curriculum";
 import {
   loadLessonProgress,
   saveLessonProgress,
@@ -44,11 +45,12 @@ type StudentLessonProps = {
 };
 
 export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
-  const course = getCourse(courseId);
-  const lessonMeta = getLesson(courseId, lessonId);
+  const { store } = useContentStore();
+  const course = getCourseClient(store, courseId);
+  const lessonMeta = getLessonClient(store, courseId, lessonId);
   const textbook = getTextbook(courseId);
   const readings = getLessonReadings(lessonId);
-  const { prev, next } = getAdjacentLessons(courseId, lessonId);
+  const { prev, next } = getAdjacentLessonsClient(store, courseId, lessonId);
 
   const { lesson, ready, error } = useLessonAssessment();
   const [state, setState] = useState<LessonMachineState | null>(null);
@@ -137,7 +139,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
         <RequiredReadings textbook={textbook} readings={readings} />
       )}
 
-      <LessonVideo />
+      <LessonVideo courseId={courseId} lessonId={lessonId} />
 
       <section className="space-y-6" aria-labelledby="lesson-questions-heading">
         <div className="space-y-1">

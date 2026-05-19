@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { siteContainerClass } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-const links = [
+const baseLinks = [
   { href: "/student", label: "Student" },
   { href: "/parent", label: "Parent" },
   { href: "/settings", label: "Settings" },
@@ -15,6 +16,10 @@ const links = [
 
 export function TopNav() {
   const pathname = usePathname();
+  const { isAdmin } = useAuth();
+  const links = isAdmin
+    ? [...baseLinks, { href: "/admin", label: "Admin" } as const]
+    : baseLinks;
 
   return (
     <header className="sticky top-0 z-50 border-b border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900">

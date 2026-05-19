@@ -3,24 +3,40 @@
 import Link from "next/link";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 
+import { useContentStore } from "@/components/admin/use-content-store";
 import { LessonStatusBadge } from "@/components/student/lesson-status-badge";
 import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";
-import { getTextbook } from "@/lib/student/textbook";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
-import type { Course } from "@/lib/student/curriculum";
-import { getLessonsByUnit } from "@/lib/student/curriculum";
+import { getCourseClient, getLessonsByUnitClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
+import { getTextbook } from "@/lib/student/textbook";
 import { lessonProgressPercent, loadLessonProgress } from "@/lib/student/lesson-progress";
 import { cn } from "@/lib/utils";
 
-export function CourseCurriculum({ course }: { course: Course }) {
-  const { percent, statuses } = useCourseProgress(course);
-  const textbook = getTextbook(course.id);
-  const units = getLessonsByUnit(course);
-  const completedCount = course.lessons.filter(
-    (l) => statuses[l.id] === "complete",
-  ).length;
+type CourseCurriculumProps = {
+  courseId: string;
+};
+
+export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
+  const { store } = useContentStore();
+  const course = getCourseClient(store, courseId);
+  const textbook = getTextbook(courseId);
+  const { percent, statuses } = useCourseProgress(
+    course ?? { id: courseId, title: "", subject: "", description: "", lessons: [] },
+  );
+  const units = course ? getLessonsByUnitClient(course) : [];
+  const completedCount = course
+    ? course.lessons.filter((l) => statuses[l.id] === "complete").length
+    : 0;
+
+  if (!course) {
+    return (
+      <p className="text-sm text-slate-600 dark:text-stone-400">
+        This course could not be found.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-8">

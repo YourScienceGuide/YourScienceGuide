@@ -1,7 +1,7 @@
 # Your Science Guide (YSG) — Project Handover
 
 Last updated: May 2026  
-Repository: `your-science-guide` — Next.js 15 App Router **frontend mockup** (no production backend).
+Repository: `your-science-guide` — Next.js 15 App Router **frontend mockup** with **browser-local persistence** for student progress and admin content. No production backend, database, or real auth service.
 
 ---
 
@@ -14,71 +14,113 @@ Repository: `your-science-guide` — Next.js 15 App Router **frontend mockup** (
 | Framework | Next.js 15 (App Router), React 19, TypeScript |
 | Styling | Tailwind CSS 3, shadcn-style primitives (`Button`, `Switch`, CVA, Radix Slot) |
 | Font | DM Sans (`next/font/google`) |
-| Icons | `lucide-react` (video controls) |
-| Rules file | `.cursorrules.md` (YSG Frontend Rules) |
+| Icons | `lucide-react` |
+| Rules | `.cursorrules.md` (YSG Frontend Rules) |
+
+### Authentication (mock lock screen)
+
+All routes are gated by a **full-screen sign-in** (`components/auth/sign-in-screen.tsx`) until the user authenticates. Session is stored in **`sessionStorage`** (tab-scoped).
+
+| Role | Username | Password | Access |
+|------|----------|----------|--------|
+| Student | `username` | `password` | Student, Parent, Settings |
+| Admin | `admin` | `password` | Same + **Admin** nav link and `/admin` |
+
+- Sign out: **Settings → Account → Sign out** (returns to lock screen).
+- Non-admin users who open `/admin` see an access-denied message (nav still visible).
 
 ### Routes
 
 | Path | Purpose |
 |------|---------|
-| `/` | Home — links to Lesson and Parent portal |
-| `/lesson` | **Student lesson** (primary mock) |
-| `/parent` | **Parent portal** dashboard |
-| `/settings` | Dark mode toggle (stone palette) |
-| `/api/lesson/assessment` | Dynamic API — base64-encoded lesson + Alcumus problem payloads (server-only source files) |
+| `/` | Home — links to Student and Parent portal |
+| `/student` | **Student hub** — course cards |
+| `/student/[courseId]` | **Curriculum** — units, lessons, completion badges, companion textbook |
+| `/student/[courseId]/[lessonId]` | **Lesson** — readings, video, assignment, links to practice/flashcards |
+| `/student/.../practice` | **Extra Practice** (Alcumus-style), per lesson |
+| `/student/.../flashcards` | **Flashcard Review** (Anki-style), per lesson |
+| `/parent` | Parent portal dashboard |
+| `/settings` | Dark mode + sign out |
+| `/admin` | **Admin** content builder (admin role only) |
+| `/api/lesson/assessment` | GET — base64-encoded default lesson + Alcumus payloads |
+
+**Redirects** (`next.config.ts`): legacy `/lesson` paths redirect to `/student` (and default biology lesson for old flat practice/flashcard URLs).
 
 ### Global shell
 
-- **Top nav** (`components/top-nav.tsx`): sticky, **solid** white / stone background (no blur), `max-w-5xl` aligned with main via `lib/layout.ts` → `siteContainerClass`.
-- Links: Lesson, Parent, Settings — all `next/link`, same tab.
-- **Theme**: default **light** (sky-50 page, white cards, sky-600 accents); optional **dark mode** in Settings (stone palette), persisted in `localStorage` (`ysg-theme`).
+- **Auth**: `AuthProvider` + `AuthShell` wrap the app in `app/layout.tsx` (nav hidden until signed in).
+- **Top nav** (`components/top-nav.tsx`): sticky, solid white / stone, `max-w-5xl` via `lib/layout.ts` → `siteContainerClass`.
+- Links: **Student**, Parent, Settings; **Admin** appears only when signed in as admin.
+- **Theme**: default light (sky + white); dark mode in Settings (`localStorage` key `ysg-theme`).
 
-### `/lesson` — student experience
+### Student experience
 
-Rendered by `StudentLesson` inside `LessonAssessmentProvider` (fetches assessment data client-side after mount).
+#### Hub (`/student`)
 
-**Top to bottom:**
+Lists courses from **admin content store** (merged with seed). Default seed: **Biology · Year 1** (`biology-year-1`), 8 lessons across 5 units.
 
-1. **Sticky progress rail** (`LessonProgressRail`) — pins below nav (`top-14`); shows “Question N of 3” and %; tracks **guided lesson only** (not extra practice).
-2. **Header** — “Today’s lesson” + short copy.
-3. **Lesson video** (`LessonVideo`) — mock player: play/pause, seek bar, ±10s, playback speed, fullscreen; 8:42 duration; no real stream.
-4. **Your assignment** — three **guided questions** (state machine in `lib/lesson/state-machine.ts`):
-   - Q1: multiple choice (plant cell wall) — options **shuffled** per mount.
-   - Q2: short answer (vinegar fraction; accepts `1/4`, `0.25`, etc.).
-   - Q3: long answer (photosynthesis) — “Submit for Parent Review”; min 40 chars.
-   - Correct → toast + progress; incorrect → “Let’s try a different approach…”
-5. **Extra practice** (`AlcumusPractice`) — **separate** adaptive pool (5 levels, choice + numeric); own streak/difficulty meter; does not affect lesson progress bar.
-6. **Flashcard review** — 3 seed cards + user-created cards (in-memory only).
+#### Curriculum (`/student/[courseId]`)
 
-**Question display:** prompts and MC options use **`CanvasText`** (canvas rasterization, not DOM text) for copy protection and sharp re-draw on zoom (`devicePixelRatio` + `ResizeObserver`). Sizes ~1.925× and ~1.4875× root rem for prompt vs option (after +40% bump).
+- Sticky **course progress rail** (% complete across lessons).
+- **Companion textbook** card (mock cover SVG + metadata from `lib/student/textbook.ts`).
+- Lesson list by unit with **Not started / In progress / Complete** badges and partial assignment % when in progress.
+- Progress read from **`localStorage`** (`ysg-lesson-progress`).
 
-**AI / integrity (lesson layout):** Coursera-style **hidden** blocks only (not shown to students):
+#### Lesson (`/student/[courseId]/[lessonId]`)
 
-- `ContentIntegrity` — off-screen instructions for browser AI.
-- `AcknowledgmentCheckpoint` — honeypot “I understand” button (`data-action="acknowledge-guidelines"`).
-- `AssessmentProtected` — `user-select: none`, block copy/cut/context menu on question chrome.
+Wrapped in `LessonShell` → `LessonAssessmentProvider` (fetches API, merges **per-lesson** admin overrides from `localStorage`).
 
-Question copy lives in `lib/lesson/questions.server.ts` / `alcumus-problems.server.ts` (not in client bundle); served via API.
+Top to bottom:
 
-### `/parent` — parent portal
+1. **Lesson progress rail** — guided assignment only (3 questions).
+2. **Lesson nav** — back to course, unit/title, Previous/Next lesson.
+3. **Required readings** — textbook sections/pages before video (`components/student/required-readings.tsx`).
+4. **Lesson video** — mock player **or** HTML5 `<video>` if admin uploaded a file for this lesson.
+5. **Your assignment** — 3 questions (`QuestionPanel` + `lib/lesson/state-machine.ts`); progress persisted per lesson in `localStorage`.
+6. CTA cards → **Extra Practice** and **Flashcard Review** (separate routes).
 
-`ParentDashboard`: **tabs on mobile**, **vertical sidebar on `lg+`**.
+**Question display:** `CanvasText` rasterization (`variant`: `body` for assignment prompts, `prompt` for Alcumus stems, `option` for choices). Sizes (× root rem): **body 1.25**, **prompt 1.875**, **option 1.125**.
 
-| Section | Mock content |
-|---------|----------------|
-| **Student progress** | Grade B+ (87%), course name, 66% progress bar; table of long-answer submissions with expandable **mock rubric** |
-| **Notifications** | Toggles: email on lesson complete, email for manual grading; “Save preferences” mock confirmation |
-| **Subscription** | “YSG Physics 101”, renew date, Active badge, “Manage payment method” |
+**Assignment defaults:** server seed in `lib/lesson/questions.server.ts`; admin can override per lesson in Admin → Assignment questions.
 
-Data: `lib/parent/mock-data.ts`.
+#### Extra Practice (`.../practice`)
 
-### `/settings`
+- AoPS Alcumus-style adaptive problems (`lib/lesson/alcumus-machine.ts`).
+- Sticky **mastery progress rail** + **Back to lesson**.
+- State in **`sessionStorage`** per lesson (`ysg-alcumus-state-{courseId}-{lessonId}`).
+- Problems: API seed merged with admin per-lesson overrides.
 
-Single **Appearance** card: dark mode switch (`DarkModeToggle`).
+#### Flashcards (`.../flashcards`)
+
+- Anki-style: show answer → rate Again/Hard/Good/Easy; deck stats (New/Learning/Review).
+- Sticky mastery rail + back to lesson.
+- Deck in **`sessionStorage`** per lesson (`ysg-flashcard-deck-state-...`).
+- User can add cards in-session.
+
+### Parent portal (`/parent`)
+
+Unchanged mock: tabs (mobile) / sidebar (`lg+`). Sections: student progress (static table + rubric), notifications toggles, subscription card. Data: `lib/parent/mock-data.ts`. **Not wired** to student submissions or admin content.
+
+### Admin (`/admin`)
+
+Tabbed dashboard (`components/admin/admin-dashboard.tsx`). All edits persist to **`localStorage`** (`ysg-admin-content`) and broadcast via `ysg-content-updated` event.
+
+| Tab | Capabilities |
+|-----|----------------|
+| **Curriculum & lessons** | Add courses; add/edit lessons (title, description, unit, order) |
+| **Assignment questions** | Edit 3 questions per lesson (MC, short, long); answers and min length |
+| **Extra practice (Alcumus)** | Per-lesson problem list: level 1–5, type, prompt, options/answers, hints; add/remove |
+| **Lesson videos** | Title, description, file upload (data URL, **25 MB** mock cap) |
+
+**Reset all content** restores seed defaults in `localStorage`.
+
+### AI / integrity (lesson layout only)
+
+`app/student/[courseId]/[lessonId]/layout.tsx` mounts hidden `AssessmentAiGuard` (off-screen integrity copy, honeypot checkpoint, copy blocking on assessment chrome). Question banks still decoded in the browser after fetch.
 
 ### Build status
 
-`npm run build` succeeds. Lesson route is ~17–18 kB page JS + shared chunks. API route is dynamic (`force-dynamic`).
+`npx tsc --noEmit` passes. Run `npm run build` before deploy.
 
 ---
 
@@ -87,32 +129,47 @@ Single **Appearance** card: dark mode switch (`DarkModeToggle`).
 ### Product / UX (from `.cursorrules.md`)
 
 - **Simplicity and educational impact** over feature breadth.
-- **No clutter** — no extra sidebars, ads, or decorative chrome beyond nav + section cards.
-- **Same-tab navigation only** — `next/link` / `target="_self"`; never `target="_blank"`.
+- **No clutter** — no ads or decorative chrome; section cards + clear hierarchy only.
+- **Same-tab navigation** — `next/link` only; never `target="_blank"`.
 - **Whitespace and readable typography** for students.
-- **Tailwind + shadcn/ui** patterns for a clean, minimal UI.
+- **Tailwind + shadcn-style** components for a consistent minimal UI.
 
-### Visual design (implemented)
+### Information architecture (implemented)
 
-- **Default theme:** sky blue + white (`sky-50` background, `sky-600` primary buttons, `slate` text).
-- **Dark theme:** stone neutrals (optional via Settings).
-- **Layout width:** `max-w-5xl` shared by `TopNav` and `<main>` (`siteContainerClass`).
-- **No glass / blur** on top nav (explicitly removed after user feedback).
+- **Student** is the top-level learning area (not a single “lesson” page).
+- **Course → lesson** mirrors a year-long curriculum (e.g. biology).
+- **Lesson**, **Extra Practice**, and **Flashcards** are **separate pages** with their own mastery rails and back navigation.
+- **Textbook** is surfaced on the curriculum page and as **required readings** before each lesson video.
+- **Guided assignment** progress is independent from Alcumus/flashcard mastery.
+
+### Visual design
+
+- **Default:** sky blue + white (`sky-50`, `sky-600` buttons, `slate` text).
+- **Dark:** stone palette (Settings).
+- **Layout width:** `max-w-5xl` for nav and main (`siteContainerClass`).
+- **Top nav:** solid background (no blur/glass).
 
 ### Technical patterns
 
-- **App Router** with route-specific layout: `app/lesson/layout.tsx` mounts `AssessmentAiGuard` + metadata hints.
-- **Client state machines** for lesson progression and Alcumus adaptive logic (mock, in-memory).
-- **Server-only question banks** + **client fetch** to reduce plain-text in initial HTML (still decoded in browser for rendering).
-- **Canvas-rendered assessment text** instead of DOM text nodes (tradeoff: weaker screen-reader access to exact question wording; generic `aria-label`).
-- **Composable guards:** `AssessmentProtected`, `CanvasText`, hidden integrity components.
-- **Theme:** `ThemeProvider` + inline `ThemeScript` to avoid flash; `class="dark"` on `<html>`.
+- **App Router** with nested dynamic segments for course/lesson.
+- **Client state machines** for lesson flow and Alcumus (`lib/lesson/state-machine.ts`, `alcumus-machine.ts`, `flashcard-machine.ts`).
+- **Server-only default banks** + client fetch (`/api/lesson/assessment`) + **localStorage overrides** for admin edits.
+- **Canvas-rendered assessment text** for lesson/Alcumus (tradeoff: limited screen-reader access to exact wording).
+- **Browser persistence (mock “backend”):**
+  - `ysg-auth-session` / `ysg-auth-role` — sessionStorage
+  - `ysg-lesson-progress` — localStorage
+  - `ysg-admin-content` — localStorage (courses, questions, Alcumus, videos)
+  - `ysg-alcumus-state-*`, `ysg-flashcard-deck-state-*` — sessionStorage per lesson
+  - `ysg-theme` — localStorage
 
-### Explicit product split (lesson)
+### Explicit product splits
 
-- **Guided lesson** = required 3 questions + progress bar.
-- **Extra practice (Alcumus-style)** = optional, separate section and state.
-- Labels intentionally generic (“Question 1 of 3”, “Your assignment”) — avoid “Step 1 / warm-up / multiple choice” in visible copy (reduces easy AI anchoring).
+| Concern | Tracks |
+|---------|--------|
+| Lesson assignment | 3 questions, lesson progress rail |
+| Extra practice | Alcumus level + mastery rail |
+| Flashcards | Anki deck mastery rail |
+| Course | Aggregate lesson completion on curriculum page |
 
 ---
 
@@ -120,112 +177,130 @@ Single **Appearance** card: dark mode switch (`DarkModeToggle`).
 
 ### Completed (mockup scope)
 
-- [x] Project scaffold (Next.js, Tailwind, TS, ESLint).
-- [x] Global layout, top nav, home page.
-- [x] Lesson: video mock, progress rail, 3-question flow, toasts, completion state.
-- [x] Lesson: Alcumus-style extra practice (adaptive difficulty).
-- [x] Lesson: flashcard review + custom card creation (session-only).
-- [x] Parent portal: three-section dashboard (progress, notifications, billing).
-- [x] Settings: dark mode.
-- [x] Light/dark theming and aligned nav width.
-- [x] Assessment copy protection layer (API + canvas + hidden AI instructions + copy blocking).
-- [x] Production build passes.
+- [x] Next.js scaffold, Tailwind, TypeScript, ESLint.
+- [x] Global layout, top nav, home, settings (dark mode).
+- [x] **Sign-in lock screen** (student + admin mock credentials).
+- [x] **Student hub** and **course curriculum** with lesson status (not started / in progress / complete).
+- [x] **Per-lesson pages** with nav, readings, video, assignment, practice + flashcard routes.
+- [x] **Textbook** on curriculum + required readings per lesson.
+- [x] Lesson video mock player + **admin video upload** playback.
+- [x] Alcumus-style extra practice (adaptive, mastery bar, per-lesson storage).
+- [x] Anki-style flashcards (rating buttons, per-lesson deck).
+- [x] **Admin dashboard** — curriculum, assignment questions, Alcumus, videos.
+- [x] **localStorage** lesson progress across sessions (same browser).
+- [x] Parent portal mock (three sections).
+- [x] Assessment copy protection layer (API + canvas + hidden AI hooks).
+- [x] Legacy `/lesson` redirects.
+- [x] Typecheck passes.
 
 ### Remaining (not in mockup — typical next work)
 
-**Backend / data**
+**Backend / real product**
 
-- [ ] Real auth (student vs parent roles).
-- [ ] Persistent storage (progress, submissions, flashcards, billing, notification prefs).
-- [ ] Server-side answer validation and grading (especially long-answer + parent workflow).
-- [ ] Real video hosting / progress tracking.
-- [ ] Wire parent table to actual student submissions from lesson Q3.
+- [ ] Real authentication (OAuth, sessions, password reset, role management).
+- [ ] Database for courses, lessons, questions, videos, progress, submissions.
+- [ ] Server-side answer validation and long-answer grading workflow.
+- [ ] Wire **parent portal** to real student submissions and course progress.
+- [ ] Email notifications (lesson complete, grading).
+- [ ] Real video hosting (CDN, transcoding) instead of data URLs in `localStorage`.
+- [ ] Multi-device sync (admin edits and student progress currently **per browser only**).
 
 **Frontend polish**
 
-- [ ] README for local dev / env vars.
-- [ ] Accessibility pass for canvas questions (e.g. accommodation path with controlled text exposure).
-- [ ] Loading/error UX beyond “Loading lesson…” / single error string.
-- [ ] Tests (unit for state machines, e2e for lesson flow).
+- [ ] README for env vars, deployment, and content authoring workflow.
+- [ ] Accessibility pass for canvas questions (accommodation path with readable text).
+- [ ] `generateMetadata` for admin-created courses/lessons (server still uses seed `getCourse` / `getLesson`).
+- [ ] Loading/error UX beyond simple strings.
+- [ ] Tests (state machines, lesson flow, admin editors).
+- [ ] Admin: textbook/readings editor; flashcard seed per lesson; duplicate lesson/course.
 
-**AI / integrity (known gap)**
+**AI / integrity**
 
-- [ ] Client-only guards **do not reliably block** Ask Gemini or similar (can use page context, vision, or general knowledge). Coursera-style hidden prompts help but are not sufficient alone.
-- [ ] Possible follow-up: server-delivered questions per session, proctoring, or policy-only (out of scope for pure UI mock).
-
-**Parent / admin**
-
-- [ ] Functional rubric grading, payment integration, email delivery.
-- [ ] Sync notification toggles to backend.
+- [ ] Client-only guards do **not** block in-browser AI or vision tools reliably.
+- [ ] Stronger model needs server-delivered questions, proctoring, or policy (out of UI-only scope).
 
 **DevOps**
 
-- [ ] CI, deployment, environment config.
-- [ ] Rename or duplicate `.cursorrules.md` → `.cursorrules` if tooling should auto-load rules.
+- [ ] CI pipeline, staging/production deploy docs.
+- [ ] Confirm `server-only` usage in `*.server.ts` if clean installs ever fail (build currently OK).
 
 ---
 
 ## 4. Known bugs, limitations, and UI issues
 
-### Addressed recently (verify if regressions appear)
+### Addressed in recent sessions (watch for regressions)
 
 | Issue | Resolution |
 |--------|------------|
-| Top nav misaligned vs content (`max-w-3xl` vs `max-w-5xl`) | Shared `siteContainerClass` (`max-w-5xl`). |
-| Nav blur distracting | Solid `bg-white` / `dark:bg-stone-900`. |
-| Visible yellow AI banners ugly | Removed; Coursera-style **hidden** integrity only. |
-| `ProtectedText` shadow `attachShadow` crash (Strict Mode) | Replaced with `CanvasText` + open shadow / re-draw logic. |
-| Canvas text too small / pixelated on Ctrl+zoom | `ResizeObserver` + `devicePixelRatio` re-rasterize; larger rem-based sizes (+40%). |
-| Alcumus mixed up with main lesson | Separated sections; progress bar lesson-only. |
+| Nav label “Lesson” / flat `/lesson` route | Renamed to **Student**; nested `/student/[courseId]/[lessonId]` routes. |
+| Extra practice & flashcards inline on one page | Moved to **dedicated routes** with mastery bars and back links. |
+| No curriculum navigation or completion state | Course page with units, badges, `localStorage` progress. |
+| No sign-in | Full-screen lock; student vs admin roles. |
+| Assignment question font too small (matched `text-sm`) | `CanvasText` **`body`** variant at 1.25rem; then user reported **both assignment and Alcumus too small** — bumped to **body 1.25**, **prompt 1.875**, **option 1.125** (May need further tuning). |
+| Top nav / content width mismatch | Shared `siteContainerClass` (`max-w-5xl`). |
+| Nav blur | Removed; solid backgrounds. |
+| Visible AI banners | Hidden integrity components only. |
+| Canvas zoom blur | `ResizeObserver` + `devicePixelRatio` redraw. |
+| JSX `motion` typos during rapid edits | Grep shows **no remaining `motion` tags** in repo; fix if TypeScript/compile errors reappear. |
 
 ### Open / accepted limitations
 
-1. **Canvas question text** — Students see crisp text, but screen readers only get generic “Question content”; not WCAG-ideal for assessments.
-2. **Flashcards** — Plain DOM text; not canvas-protected or API-loaded.
-3. **Ask Gemini / in-browser AI** — Still may answer (e.g. “cell wall”) from general knowledge or screen understanding; **not fixable fully on frontend**.
-4. **All parent + billing + notifications** — Mock only; no persistence.
-5. **Lesson video** — Mock UI only.
-6. **Flashcard custom cards** — Lost on refresh (no `localStorage` / API).
-7. **MC shuffle** — New order on remount / question change only (expected).
-8. **`server-only` package** — Used in `*.server.ts` files; ensure it stays a dependency if build ever fails on clean install (currently builds OK via Next bundling).
+1. **Persistence is browser-local only** — admin content, lesson progress, uploads, and Alcumus/flashcard state do not sync across devices or users.
+2. **`localStorage` quota** — admin video uploads as data URLs can fill storage quickly; 25 MB cap in admin UI is a soft guard only.
+3. **Canvas assessment text** — Screen readers get generic labels, not full question text (WCAG gap).
+4. **Parent portal** — Static mock; no link to student `localStorage` or admin store.
+5. **API assessment route** — Still returns **global** seed payloads; per-lesson customization happens **client-side** after fetch.
+6. **Flashcard readings** — Still seed-based in `lib/student/textbook.ts`; not editable in Admin.
+7. **In-browser AI** — Cannot be fully prevented on the frontend.
+8. **MC option shuffle** — New order on remount (by design).
+9. **Unused file** — `components/lesson/lesson-progress.tsx` (superseded by `lesson-progress-rail.tsx`) — safe to delete when cleaning up.
+10. **Course page server metadata** — May be generic for admin-only courses until server reads shared store or metadata is client-driven.
 
-### Not started / discussed but deferred
+### Was about to fix / likely next UI pass
 
-- Server-side grading pipeline for long answers.
-- Stronger anti-AI (per-session tokens, no answers in client).
-- README and contributor docs.
-- Git: repo exists with commits; no deployment docs in tree.
+- **Assessment & Alcumus font size** — User reported both were “way too small” after `body` variant tied assignment to `text-sm`; sizes were increased but **verify visually** on real displays and adjust `CanvasText` rem multipliers if needed.
+- **Fine-tune** mastery formulas or progress copy if stakeholders want different “complete” semantics.
+- **Admin → student parity** — Ensure new courses/lessons always resolve on student routes without relying on seed-only server checks (lesson pages no longer `notFound()` on missing seed; curriculum uses client store).
 
 ---
 
-## 5. Key file map (quick navigation)
+## 5. Key file map
 
 ```
 app/
-  layout.tsx              # Root shell, TopNav, ThemeProvider, max-w-5xl main
-  page.tsx                # Home
-  lesson/layout.tsx       # AssessmentAiGuard (hidden)
-  lesson/page.tsx         # LessonAssessmentProvider → StudentLesson
-  parent/page.tsx         # ParentDashboard
-  settings/page.tsx       # Dark mode
+  layout.tsx                          # Theme + AuthProvider + AuthShell
+  page.tsx                            # Home
+  student/page.tsx                    # Student hub
+  student/[courseId]/page.tsx         # Curriculum
+  student/[courseId]/[lessonId]/
+    layout.tsx                        # AssessmentAiGuard + LessonShell
+    page.tsx                          # StudentLesson
+    practice/page.tsx                 # ExtraPracticePage
+    flashcards/page.tsx               # FlashcardReviewPage
+  parent/page.tsx
+  settings/page.tsx
+  admin/page.tsx                      # AdminDashboard
   api/lesson/assessment/route.ts
 
 components/
-  top-nav.tsx
-  theme-provider.tsx, theme-script.tsx, dark-mode-toggle.tsx
-  lesson/                 # student-lesson, question-panel, lesson-video,
-                          # alcumus-practice, flashcard-review, progress rail
-  parent/                 # dashboard + sections
-  ai-guard/               # canvas-text, assessment-protected, content-integrity,
-                          # acknowledgment-checkpoint
-  ui/                     # button, switch
+  auth/                               # sign-in, auth-provider, auth-shell
+  admin/                              # dashboard + curriculum, assignment, alcumus, video panels
+  student/                            # hub, curriculum, lesson-nav, readings, textbook, progress hooks
+  lesson/                             # student-lesson, question-panel, video, alcumus, anki, rails
+  parent/                             # dashboard + sections
+  ai-guard/                           # canvas-text, protected, integrity, assessment-ai-guard
+  top-nav.tsx, theme-*, ui/
 
 lib/
-  layout.ts               # siteContainerClass
-  lesson/                 # state machines, types, server question banks, shuffle
+  auth/                               # mock credentials, sessionStorage session
+  admin/content-store.ts              # localStorage CMS mock
+  student/                            # curriculum seed/types/client, paths, lesson-progress, textbook
+  lesson/                             # state machines, types, server banks, flashcard seed
   parent/mock-data.ts
-  ai-guard/               # encode, instructions
-  theme.ts
+  layout.ts                           # siteContainerClass
+  ai-guard/
+
+public/textbooks/                     # biology-fundamentals-cover.svg
 ```
 
 ---
@@ -237,10 +312,28 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` — use **Lesson**, **Parent**, **Settings** from the nav.
+Open `http://localhost:3000`.
+
+| Task | Credentials |
+|------|-------------|
+| Student flow | `username` / `password` |
+| Admin CMS | `admin` / `password` |
+
+Default course: `/student/biology-year-1`  
+Example lesson: `/student/biology-year-1/cells-introduction`
 
 ---
 
-## 7. Handoff note for next agent
+## 7. Handoff note for the next agent
 
-Treat this repo as a **high-fidelity UI mock** with **mock state** everywhere. The highest-risk area for false expectations is **AI blocking** — document to stakeholders that real integrity needs server-side and policy layers. The highest-value next UX pass is either **real data wiring** (parent ← student submissions) or **accessibility** for canvas-based questions, depending on product priority.
+Treat this repo as a **high-fidelity UI mock** with a **browser-local CMS** for admins and **localStorage progress** for students. Do not assume multi-user or deployed persistence works without a real API.
+
+**Highest-risk misconception:** AI/copy blocking “stops cheating” — it only raises friction; server and policy layers are still required.
+
+**Highest-value next steps (pick one track):**
+
+1. **Real backend** — auth, Postgres (or similar), API for content + progress + parent submissions.  
+2. **Polish** — font/accessibility, metadata, README, delete dead files, E2E tests.  
+3. **Parent wiring** — read student progress and Q3 submissions from the same store/API admin uses.
+
+When editing assessment UI, test **`CanvasText` variants** at 100% and 125% browser zoom — that is where readability issues were reported.

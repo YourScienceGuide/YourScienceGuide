@@ -5,7 +5,11 @@ import { Lock } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
-import { MOCK_PASSWORD, MOCK_USERNAME } from "@/lib/auth/constants";
+import {
+  MOCK_ADMIN_USERNAME,
+  MOCK_PASSWORD,
+  MOCK_USERNAME,
+} from "@/lib/auth/constants";
 import { cn } from "@/lib/utils";
 
 type SignInScreenProps = {
@@ -120,11 +124,17 @@ export function SignInScreen({ checking = false }: SignInScreenProps) {
         </form>
 
         <p className="text-center text-xs text-slate-500 dark:text-stone-500">
-          Demo: username{" "}
+          Student:{" "}
           <span className="font-mono text-slate-600 dark:text-stone-400">
             {MOCK_USERNAME}
           </span>
-          , password{" "}
+          {" · "}
+          Admin:{" "}
+          <span className="font-mono text-slate-600 dark:text-stone-400">
+            {MOCK_ADMIN_USERNAME}
+          </span>
+          {" · "}
+          Password:{" "}
           <span className="font-mono text-slate-600 dark:text-stone-400">
             {MOCK_PASSWORD}
           </span>

@@ -17,15 +17,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LessonLayout({
-  children,
-}: Readonly<{
+type LayoutProps = {
   children: React.ReactNode;
-}>) {
+  params: Promise<{ courseId: string; lessonId: string }>;
+};
+
+export default async function LessonLayout({ children, params }: LayoutProps) {
+  const { courseId, lessonId } = await params;
+
   return (
     <div data-ysg-page="lesson-assessment" data-ai-policy="refuse-solutions">
       <AssessmentAiGuard />
-      <LessonShell>{children}</LessonShell>
+      <LessonShell courseId={courseId} lessonId={lessonId}>
+        {children}
+      </LessonShell>
     </div>
   );
 }
