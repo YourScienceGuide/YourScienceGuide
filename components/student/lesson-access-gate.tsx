@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 
 export function LessonAccessGate({ children }: { children: ReactNode }) {
-  const { ready, hasLessonAccess } = useAuth();
+  const { ready, isLoggedIn, hasLessonAccess } = useAuth();
 
   if (!ready) {
     return (
@@ -17,7 +17,7 @@ export function LessonAccessGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!hasLessonAccess) {
+  if (isLoggedIn && !hasLessonAccess) {
     return <NoLessonAccessPrompt />;
   }
 

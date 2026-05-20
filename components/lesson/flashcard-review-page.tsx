@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AnkiFlashcardReview } from "@/components/lesson/anki-flashcard-review";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,7 @@ export function FlashcardReviewPage({
   const stepLabel = masteryStepLabel(state);
 
   return (
+    <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
     <div className="space-y-8">
       <LessonProgressRail
         percent={percent}
@@ -111,5 +113,6 @@ export function FlashcardReviewPage({
 
       <AnkiFlashcardReview state={state} onStateChange={onStateChange} />
     </div>
+    </GuestLessonGuard>
   );
 }

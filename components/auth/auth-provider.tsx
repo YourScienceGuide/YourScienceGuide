@@ -22,8 +22,13 @@ import {
 } from "@/lib/auth/session";
 import { hasActiveSubscription } from "@/lib/billing/subscription";
 
+export type SignupModalReason = "limit" | "locked" | "default";
+
 type AuthContextValue = {
   ready: boolean;
+  /** Global login flag — false until a session exists. */
+  isLoggedIn: boolean;
+  isGuest: boolean;
   authenticated: boolean;
   role: AuthRole | null;
   username: string | null;
@@ -36,6 +41,10 @@ type AuthContextValue = {
   ) => { ok: true } | { ok: false; error: string };
   purchaseSubscription: () => void;
   signOut: () => void;
+  signupModalOpen: boolean;
+  signupModalReason: SignupModalReason | null;
+  openSignupModal: (reason?: SignupModalReason) => void;
+  closeSignupModal: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -46,6 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AuthRole | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [subscriptionVersion, setSubscriptionVersion] = useState(0);
+  const [signupModalOpen, setSignupModalOpen] = useState(false);
+  const [signupModalReason, setSignupModalReason] =
+    useState<SignupModalReason | null>(null);
 
   const hydrate = useCallback(() => {
     setAuthenticatedState(isAuthenticated());
@@ -58,14 +70,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, [hydrate]);
 
+  const isLoggedIn = authenticated;
+  const isGuest = !authenticated;
   const isAdmin = role === "admin";
 
   const hasLessonAccess = useMemo(() => {
-    if (!authenticated || !username) return false;
+    if (!isLoggedIn || !username) return false;
     if (isAdmin) return true;
     void subscriptionVersion;
     return hasActiveSubscription(username);
-  }, [authenticated, username, isAdmin, subscriptionVersion]);
+  }, [isLoggedIn, username, isAdmin, subscriptionVersion]);
+
+  const openSignupModal = useCallback((reason: SignupModalReason = "default") => {
+    setSignupModalReason(reason);
+    setSignupModalOpen(true);
+  }, []);
+
+  const closeSignupModal = useCallback(() => {
+    setSignupModalOpen(false);
+    setSignupModalReason(null);
+  }, []);
 
   const signIn = useCallback(
     (user: string, password: string) => {
@@ -75,9 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthenticatedState(true);
       setRole(resolved.role);
       setUsername(resolved.username);
+      closeSignupModal();
       return true;
     },
-    [],
+    [closeSignupModal],
   );
 
   const createAccount = useCallback(
@@ -89,9 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthenticatedState(true);
       setRole("student");
       setUsername(trimmed);
+      closeSignupModal();
       return { ok: true as const };
     },
-    [],
+    [closeSignupModal],
   );
 
   const purchaseSubscription = useCallback(() => {
@@ -109,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         ready,
+        isLoggedIn,
+        isGuest,
         authenticated,
         role,
         username,
@@ -118,6 +146,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createAccount,
         purchaseSubscription,
         signOut,
+        signupModalOpen,
+        signupModalReason,
+        openSignupModal,
+        closeSignupModal,
       }}
     >
       {children}

@@ -1,24 +1,25 @@
 "use client";
 
-import Link from "next/link";
-import { CheckCircle2, ChevronRight } from "lucide-react";
-
+import { useAuth } from "@/components/auth/auth-provider";
 import { useContentStore } from "@/components/admin/use-content-store";
-import { LessonStatusBadge } from "@/components/student/lesson-status-badge";
+import { CurriculumLessonRow } from "@/components/student/curriculum-lesson-row";
 import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { getCourseClient, getLessonsByUnitClient } from "@/lib/student/curriculum-client";
-import { lessonPath } from "@/lib/student/paths";
 import { getTextbook } from "@/lib/student/textbook";
 import { lessonProgressPercent, loadLessonProgress } from "@/lib/student/lesson-progress";
-import { cn } from "@/lib/utils";
+import {
+  GUEST_LESSON_LIMIT,
+  getGuestCompletedCount,
+} from "@/lib/guest/guest-progress";
 
 type CourseCurriculumProps = {
   courseId: string;
 };
 
 export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
+  const { isGuest } = useAuth();
   const { store } = useContentStore();
   const course = getCourseClient(store, courseId);
   const textbook = getTextbook(courseId);
@@ -60,6 +61,14 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
 
       {textbook && <TextbookCard textbook={textbook} />}
 
+      {isGuest && (
+        <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-300">
+          Browsing as a guest — complete up to {GUEST_LESSON_LIMIT} Preview
+          lessons ({getGuestCompletedCount()} of {GUEST_LESSON_LIMIT} used).
+          Advanced lessons require an account.
+        </p>
+      )}
+
       <div className="space-y-10">
         {units.map(({ unitId, unitTitle, lessons }) => (
           <section key={unitId} aria-labelledby={`unit-${unitId}`}>
@@ -79,56 +88,13 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
                     : undefined;
 
                 return (
-                  <li key={lesson.id}>
-                    <Link
-                      href={lessonPath(course.id, lesson.id)}
-                      className={cn(
-                        "group flex items-center gap-4 rounded-lg border px-4 py-4 transition-colors",
-                        "border-sky-200 bg-white hover:border-sky-300 hover:bg-sky-50/50",
-                        "dark:border-stone-700 dark:bg-stone-900 dark:hover:border-stone-600 dark:hover:bg-stone-800/80",
-                        status === "complete" &&
-                          "border-emerald-200 dark:border-emerald-900/50",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums",
-                          status === "complete"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "bg-sky-100 text-sky-800 dark:bg-stone-800 dark:text-stone-200",
-                        )}
-                        aria-hidden
-                      >
-                        {status === "complete" ? (
-                          <CheckCircle2 className="size-5" />
-                        ) : (
-                          lesson.order
-                        )}
-                      </span>
-
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-slate-900 dark:text-stone-50">
-                            {lesson.title}
-                          </span>
-                          <LessonStatusBadge status={status} />
-                        </span>
-                        <span className="mt-0.5 block text-sm text-slate-600 dark:text-stone-400">
-                          {lesson.description}
-                        </span>
-                        {partialPercent !== undefined && partialPercent > 0 && (
-                          <span className="mt-2 block text-xs text-amber-700 dark:text-amber-300">
-                            Assignment {partialPercent}% complete
-                          </span>
-                        )}
-                      </span>
-
-                      <ChevronRight
-                        className="size-5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 dark:text-stone-500"
-                        aria-hidden
-                      />
-                    </Link>
-                  </li>
+                  <CurriculumLessonRow
+                    key={lesson.id}
+                    courseId={course.id}
+                    lesson={lesson}
+                    status={status}
+                    partialPercent={partialPercent}
+                  />
                 );
               })}
             </ol>

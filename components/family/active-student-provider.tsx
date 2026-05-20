@@ -51,8 +51,9 @@ export function ActiveStudentProvider({
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [preferencesVersion, setPreferencesVersion] = useState(0);
 
-  const { hasLessonAccess } = useAuth();
-  const students = hasLessonAccess ? MOCK_FAMILY_STUDENTS : [];
+  const { isLoggedIn, hasLessonAccess } = useAuth();
+  const students =
+    isLoggedIn && hasLessonAccess ? MOCK_FAMILY_STUDENTS : [];
 
   useEffect(() => {
     const stored = readActiveStudentId();

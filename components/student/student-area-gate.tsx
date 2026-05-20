@@ -2,10 +2,12 @@
 
 import type { ReactNode } from "react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
 import { StudentPicker } from "@/components/student/student-picker";
 
 export function StudentAreaGate({ children }: { children: ReactNode }) {
+  const { isGuest } = useAuth();
   const { ready, needsStudentPicker } = useActiveStudent();
 
   if (!ready) {
@@ -16,7 +18,7 @@ export function StudentAreaGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (needsStudentPicker) {
+  if (!isGuest && needsStudentPicker) {
     return <StudentPicker />;
   }
 

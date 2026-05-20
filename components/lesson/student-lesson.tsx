@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { useContentStore } from "@/components/admin/use-content-store";
+import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
@@ -38,6 +40,10 @@ import {
   type LessonMachineState,
 } from "@/lib/lesson/state-machine";
 import { lessonStepLabel } from "@/lib/lesson/progress-labels";
+import {
+  GUEST_LESSON_LIMIT,
+  recordGuestLessonComplete,
+} from "@/lib/guest/guest-progress";
 
 type StudentLessonProps = {
   courseId: string;
@@ -45,7 +51,9 @@ type StudentLessonProps = {
 };
 
 export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
+  const { isGuest, openSignupModal } = useAuth();
   const { store } = useContentStore();
+  const guestCompletionRecorded = useRef(false);
   const course = getCourseClient(store, courseId);
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const textbook = getTextbook(courseId);
@@ -57,6 +65,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    guestCompletionRecorded.current = false;
     const stored = loadLessonProgress(courseId, lessonId);
     const restored = storedToMachineState(stored);
     setState(restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE);
@@ -68,6 +77,23 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     saveLessonProgress(courseId, lessonId, state);
     notifyProgressUpdated();
   }, [courseId, lessonId, state, hydrated]);
+
+  useEffect(() => {
+    if (!isGuest || !hydrated || !state?.isComplete) return;
+    if (guestCompletionRecorded.current) return;
+    guestCompletionRecorded.current = true;
+    const count = recordGuestLessonComplete(courseId, lessonId);
+    if (count >= GUEST_LESSON_LIMIT) {
+      openSignupModal("limit");
+    }
+  }, [
+    isGuest,
+    hydrated,
+    state?.isComplete,
+    courseId,
+    lessonId,
+    openSignupModal,
+  ]);
 
   const dismissToast = useCallback(() => {
     setState((s) => (s ? clearToast(s) : s));
@@ -117,6 +143,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const stepLabel = lessonStepLabel(state.questionIndex, state.isComplete);
 
   return (
+    <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
     <div className="space-y-10">
       <LessonToast message={state.toast} onDismiss={dismissToast} />
 
@@ -232,5 +259,6 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
         </div>
       </section>
     </div>
+    </GuestLessonGuard>
   );
 }

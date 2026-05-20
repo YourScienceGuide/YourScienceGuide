@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
@@ -91,6 +92,7 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
   const stepLabel = masteryStepLabel(state);
 
   return (
+    <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
     <div className="space-y-8">
       <LessonProgressRail
         percent={percent}
@@ -123,5 +125,6 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
 
       <AlcumusPractice state={state} onStateChange={onStateChange} />
     </div>
+    </GuestLessonGuard>
   );
 }

@@ -13,6 +13,8 @@ const buttonVariants = cva(
           "bg-sky-600 text-white hover:bg-sky-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200",
         ghost:
           "hover:bg-sky-100 text-slate-700 dark:text-stone-300 dark:hover:bg-stone-800",
+        outline:
+          "border border-sky-200 bg-white hover:bg-sky-50 text-slate-900 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-50 dark:hover:bg-stone-800",
       },
       size: {
         default: "h-10 px-4 py-2",
