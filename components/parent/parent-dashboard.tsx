@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { BillingSection } from "@/components/parent/sections/billing";
 import { FamilyStudentsSection } from "@/components/parent/sections/family-students";
 import { NotificationsSection } from "@/components/parent/sections/notifications";
@@ -18,7 +19,10 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 export function ParentDashboard() {
-  const [active, setActive] = useState<SectionId>("students");
+  const { hasLessonAccess } = useAuth();
+  const [active, setActive] = useState<SectionId>(() =>
+    hasLessonAccess ? "students" : "billing",
+  );
 
   return (
     <div className="space-y-8">

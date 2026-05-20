@@ -1,6 +1,8 @@
+import { validateRegisteredAccount } from "@/lib/auth/accounts";
 import {
   AUTH_ROLE_KEY,
   AUTH_SESSION_KEY,
+  AUTH_USERNAME_KEY,
   MOCK_ADMIN_USERNAME,
   MOCK_PASSWORD,
   MOCK_USERNAME,
@@ -19,27 +21,41 @@ export function getAuthRole(): AuthRole | null {
   return null;
 }
 
+export function getAuthUsername(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(AUTH_USERNAME_KEY);
+}
+
 export function isAdmin(): boolean {
   return getAuthRole() === "admin";
 }
 
-export function setAuthenticated(role: AuthRole) {
+export function setAuthenticated(role: AuthRole, username: string) {
   sessionStorage.setItem(AUTH_SESSION_KEY, "1");
   sessionStorage.setItem(AUTH_ROLE_KEY, role);
+  sessionStorage.setItem(AUTH_USERNAME_KEY, username.trim());
 }
 
 export function clearAuthenticated() {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
   sessionStorage.removeItem(AUTH_ROLE_KEY);
+  sessionStorage.removeItem(AUTH_USERNAME_KEY);
 }
 
 export function validateCredentials(
   username: string,
   password: string,
-): AuthRole | null {
-  if (password !== MOCK_PASSWORD) return null;
+): { role: AuthRole; username: string } | null {
   const trimmed = username.trim();
-  if (trimmed === MOCK_ADMIN_USERNAME) return "admin";
-  if (trimmed === MOCK_USERNAME) return "student";
+  if (password !== MOCK_PASSWORD) {
+    if (!validateRegisteredAccount(trimmed, password)) return null;
+    return { role: "student", username: trimmed };
+  }
+  if (trimmed === MOCK_ADMIN_USERNAME) {
+    return { role: "admin", username: trimmed };
+  }
+  if (trimmed === MOCK_USERNAME) {
+    return { role: "student", username: trimmed };
+  }
   return null;
 }

@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import {
   clearActiveStudentId,
   readActiveStudentId,
@@ -50,7 +51,8 @@ export function ActiveStudentProvider({
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [preferencesVersion, setPreferencesVersion] = useState(0);
 
-  const students = MOCK_FAMILY_STUDENTS;
+  const { hasLessonAccess } = useAuth();
+  const students = hasLessonAccess ? MOCK_FAMILY_STUDENTS : [];
 
   useEffect(() => {
     const stored = readActiveStudentId();
