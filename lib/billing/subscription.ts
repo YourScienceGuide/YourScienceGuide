@@ -9,6 +9,8 @@ export type SubscriptionRecord = {
   plan: SubscriptionPlan;
   activatedOn: string;
   expiresOn: string;
+  cardLast4?: string;
+  cardBrand?: string;
 };
 
 const STORAGE_KEY = "ysg-subscriptions";
@@ -79,6 +81,7 @@ export function getSubscription(
 export function activateSubscription(
   username: string,
   plan: SubscriptionPlan,
+  payment?: { cardLast4: string },
 ): SubscriptionRecord {
   const key = accountKey(username);
   const now = new Date();
@@ -87,6 +90,8 @@ export function activateSubscription(
     plan,
     activatedOn: formatExpiry(now),
     expiresOn: formatExpiry(expires),
+    cardLast4: payment?.cardLast4,
+    cardBrand: "Visa",
   };
   const store = readStore();
   store[key] = record;
