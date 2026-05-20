@@ -12,16 +12,52 @@ type CanvasTextProps = {
   className?: string;
 };
 
-function getFillColor(theme: "light" | "dark") {
-  return theme === "dark" ? "#fafaf9" : "#0f172a";
+/** Matches required-readings list rows (layout + `text-sm` typography) */
+export const canvasTextFrameClassName =
+  "flex w-full min-w-0 max-w-full flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-md border border-amber-200/80 bg-white px-4 py-3 text-sm text-slate-800 dark:border-amber-900/40 dark:bg-stone-900/80 dark:text-stone-200";
+
+function getContentMetrics(container: HTMLElement) {
+  const style = getComputedStyle(container);
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const paddingRight = parseFloat(style.paddingRight) || 0;
+  const layoutWidth = Math.max(
+    1,
+    Math.floor(container.clientWidth - paddingLeft - paddingRight),
+  );
+
+  const fontSize = parseFloat(style.fontSize) || 14;
+  const lineHeightPx = parseFloat(style.lineHeight);
+  const lineHeight = Number.isFinite(lineHeightPx)
+    ? lineHeightPx
+    : fontSize * 1.25;
+
+  return {
+    layoutWidth,
+    font: style.font,
+    lineHeight,
+    color: style.color,
+  };
 }
 
-function getRootFontSizePx() {
-  return (
-    Number.parseFloat(
-      getComputedStyle(document.documentElement).fontSize,
-    ) || 16
-  );
+function breakLongWord(
+  ctx: CanvasRenderingContext2D,
+  word: string,
+  maxWidth: number,
+): string[] {
+  if (ctx.measureText(word).width <= maxWidth) return [word];
+  const parts: string[] = [];
+  let chunk = "";
+  for (const char of word) {
+    const next = chunk + char;
+    if (ctx.measureText(next).width > maxWidth && chunk) {
+      parts.push(chunk);
+      chunk = char;
+    } else {
+      chunk = next;
+    }
+  }
+  if (chunk) parts.push(chunk);
+  return parts.length > 0 ? parts : [word];
 }
 
 function wrapLines(
@@ -29,26 +65,37 @@ function wrapLines(
   text: string,
   maxWidth: number,
 ): string[] {
-  const words = text.split(/\s+/);
   const lines: string[] = [];
-  let current = "";
 
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (ctx.measureText(next).width > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
+  for (const paragraph of text.split("\n")) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      lines.push("");
+      continue;
     }
+
+    let current = "";
+    for (const word of words) {
+      const segments = breakLongWord(ctx, word, maxWidth);
+      for (const segment of segments) {
+        const next = current ? `${current} ${segment}` : segment;
+        if (ctx.measureText(next).width > maxWidth && current) {
+          lines.push(current);
+          current = segment;
+        } else {
+          current = next;
+        }
+      }
+    }
+    if (current) lines.push(current);
   }
-  if (current) lines.push(current);
+
   return lines.length > 0 ? lines : [text];
 }
 
 export function CanvasText({
   encoded,
-  variant = "option",
+  variant: _variant = "option",
   className,
 }: CanvasTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,40 +107,27 @@ export function CanvasText({
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
 
-    const layoutWidth = container.clientWidth;
+    const { layoutWidth, font, lineHeight, color } = getContentMetrics(container);
     if (layoutWidth <= 0) return;
 
     const text = decodeBase64Utf8(encoded);
-    const rootPx = getRootFontSizePx();
-    /** Tailwind-aligned rem scales (~text-lg / text-2xl) for readable assessment text */
-    const fontSize =
-      variant === "prompt"
-        ? rootPx * 1.875
-        : variant === "body"
-          ? rootPx * 1.25
-          : rootPx * 1.125;
-    const fontWeight = variant === "prompt" ? 600 : 400;
-    const lineHeight = fontSize * 1.5;
-    const paddingX = 1;
-    const paddingY = 2;
-    const font = `${fontWeight} ${fontSize}px var(--font-sans), system-ui, sans-serif`;
 
     const measure = document.createElement("canvas").getContext("2d");
     if (!measure) return;
     measure.font = font;
 
-    const contentWidth = layoutWidth - paddingX * 2;
-    const lines = wrapLines(measure, text, contentWidth);
-    const layoutHeight = lines.length * lineHeight + paddingY * 2;
+    const lines = wrapLines(measure, text, layoutWidth);
+    const textHeight = lines.length * lineHeight;
 
     const dpr = window.devicePixelRatio || 1;
-    const bitmapWidth = Math.max(1, Math.ceil(layoutWidth * dpr));
-    const bitmapHeight = Math.max(1, Math.ceil(layoutHeight * dpr));
+    const bitmapWidth = Math.max(1, Math.round(layoutWidth * dpr));
+    const bitmapHeight = Math.max(1, Math.round(textHeight * dpr));
 
     canvas.width = bitmapWidth;
     canvas.height = bitmapHeight;
-    canvas.style.width = `${layoutWidth}px`;
-    canvas.style.height = `${layoutHeight}px`;
+    canvas.style.width = "100%";
+    canvas.style.height = `${textHeight}px`;
+    canvas.style.maxWidth = "100%";
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -102,45 +136,57 @@ export function CanvasText({
     ctx.clearRect(0, 0, bitmapWidth, bitmapHeight);
     ctx.scale(dpr, dpr);
     ctx.font = font;
-    ctx.fillStyle = getFillColor(theme);
+    ctx.fillStyle = color;
     ctx.textBaseline = "top";
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, layoutWidth, textHeight);
+    ctx.clip();
+
     lines.forEach((line, index) => {
-      ctx.fillText(line, paddingX, paddingY + index * lineHeight);
+      ctx.fillText(line, 0, index * lineHeight);
     });
-  }, [encoded, theme, variant]);
+    ctx.restore();
+  }, [encoded, theme]);
 
   useEffect(() => {
-    draw();
-
     const container = containerRef.current;
     if (!container) return;
 
-    const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(draw);
+    let frame = 0;
+    const scheduleDraw = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(draw);
+    };
+
+    let cancelled = false;
+    void document.fonts.ready.then(() => {
+      if (!cancelled) scheduleDraw();
     });
+
+    const resizeObserver = new ResizeObserver(scheduleDraw);
     resizeObserver.observe(container);
 
-    const onViewportChange = () => requestAnimationFrame(draw);
-    window.addEventListener("resize", onViewportChange);
-    window.visualViewport?.addEventListener("resize", onViewportChange);
-
     return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
       resizeObserver.disconnect();
-      window.removeEventListener("resize", onViewportChange);
-      window.visualViewport?.removeEventListener("resize", onViewportChange);
     };
   }, [draw]);
 
   return (
-    <div ref={containerRef} className={cn("w-full min-w-0", className)}>
+    <div
+      ref={containerRef}
+      className={cn(canvasTextFrameClassName, className)}
+    >
       <canvas
         ref={canvasRef}
         role="img"
         aria-label="Question content"
-        className="block max-w-full select-none"
+        className="block h-auto min-w-0 w-full max-w-full flex-1 select-none"
       />
     </div>
   );

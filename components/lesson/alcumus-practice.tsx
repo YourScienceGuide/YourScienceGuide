@@ -180,24 +180,23 @@ function AlcumusProblemCard({
             {options.map((option, index) => (
               <label
                 key={`${problem.id}-${index}`}
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 text-sm transition-colors",
-                  selectedIndex === index
-                    ? "border-sky-400 bg-sky-50 dark:border-stone-500 dark:bg-stone-800"
-                    : "border-sky-100 hover:bg-sky-50/80 dark:border-stone-700 dark:hover:bg-stone-800/80",
-                )}
+                className="flex cursor-pointer items-start gap-3"
               >
                 <input
                   type="radio"
                   name={`alcumus-${problem.id}`}
-                  className="size-4 accent-sky-600"
+                  className="mt-3 size-4 shrink-0 accent-sky-600"
                   checked={selectedIndex === index}
                   onChange={() => setSelectedIndex(index)}
                 />
                 <CanvasText
                   encoded={toDisplayEncoding(option)}
                   variant="option"
-                  className="min-w-0 flex-1"
+                  className={cn(
+                    "min-w-0 flex-1",
+                    selectedIndex === index &&
+                      "border-amber-400 ring-2 ring-amber-300/80 dark:border-amber-600 dark:ring-amber-700/50",
+                  )}
                 />
               </label>
             ))}
