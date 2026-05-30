@@ -1,4 +1,4 @@
-markdown_content = """# Your Science Guide
+# Your Science Guide
 
 Welcome to the core repository for **Your Science Guide**, an educational platform engineered for high performance, accessibility, and an excellent developer experience. 
 
@@ -58,3 +58,41 @@ The platform is natively deployed on Vercel, providing a zero-configuration pipe
 To run the platform locally, follow these steps:
 
 ### 1. Clone & Install
+Code output
+[file-tag: Your_Science_Guide_Architecture_README.md]
+
+```bash
+git clone <repository-url>
+cd your-science-guide
+npm install
+```
+
+2. Environment Variables
+Copy the local environment template and populate it with your Clerk API keys.
+
+Bash
+cp .env.local.example .env.local
+Ensure the following variables are set from your Clerk Dashboard:
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+CLERK_SECRET_KEY
+
+3. Start the Development Server
+Bash
+npm run dev
+Open http://localhost:3000 to view the application.
+"""
+
+file_name = "Your_Science_Guide_Architecture_README.md"
+with open(file_name, "w", encoding="utf-8") as f:
+f.write(markdown_content)
+
+print(f"[file-tag: {file_name}]")
+
+Your MD file is ready
+[file-tag: code-generated-file-0-1780106457488768766]
+
+The README has been structured to clearly communicate the technical foundation of the project. It highlights the benefits of strict typing with TypeScript, the modern App Router architecture, and deep-dives into the strategic advantages of offloading your authentication to Clerk and your infrastructure to Vercel. 
+
+You can drop this directly into the root of your repository to keep your developer documentation clean and
