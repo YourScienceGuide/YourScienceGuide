@@ -14,7 +14,7 @@ export type LessonVideoMeta = {
 };
 
 export type AdminContentStore = {
-  version: 1;
+  version: 1 | 2;
   courses: Course[];
   lessonQuestions: Record<string, LessonQuestion[]>;
   alcumusByLesson: Record<string, AlcumusProblem[]>;
@@ -23,14 +23,58 @@ export type AdminContentStore = {
 
 export const ADMIN_CONTENT_KEY = "ysg-admin-content";
 export const CONTENT_UPDATED_EVENT = "ysg-content-updated";
+const CURRENT_STORE_VERSION = 2 as const;
 
 function cloneCourses(): Course[] {
   return JSON.parse(JSON.stringify(SEED_COURSES)) as Course[];
 }
 
+function stripLegacyVideoBlobs(store: AdminContentStore): {
+  store: AdminContentStore;
+  changed: boolean;
+} {
+  let changed = store.version !== CURRENT_STORE_VERSION;
+  const videos: Record<string, LessonVideoMeta> = {};
+
+  for (const [key, video] of Object.entries(store.videos ?? {})) {
+    if (video.sourceUrl?.startsWith("data:")) {
+      changed = true;
+      const { sourceUrl: _removed, ...clean } = video;
+      videos[key] = clean;
+    } else {
+      videos[key] = video;
+    }
+  }
+
+  if (!changed) {
+    return { store, changed: false };
+  }
+
+  return {
+    store: { ...store, version: CURRENT_STORE_VERSION, videos },
+    changed: true,
+  };
+}
+
+function persistStoreSafely(store: AdminContentStore) {
+  try {
+    localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(store));
+    notifyContentUpdated();
+    return;
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === "QuotaExceededError")) {
+      throw error;
+    }
+  }
+
+  const withoutVideos = { ...store, videos: {} };
+  localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(withoutVideos));
+  notifyContentUpdated();
+}
+
 export function createDefaultStore(): AdminContentStore {
   return {
-    version: 1,
+    version: CURRENT_STORE_VERSION,
     courses: cloneCourses(),
     lessonQuestions: {},
     alcumusByLesson: {},
@@ -47,20 +91,26 @@ export function loadContentStore(): AdminContentStore {
     if (!raw) return createDefaultStore();
     const parsed = JSON.parse(raw) as AdminContentStore;
     if (!parsed.courses?.length) return createDefaultStore();
-    return parsed;
+
+    const { store, changed } = stripLegacyVideoBlobs(parsed);
+    if (changed) {
+      persistStoreSafely(store);
+    }
+    return store;
   } catch {
     return createDefaultStore();
   }
 }
 
 export function saveContentStore(store: AdminContentStore) {
+  const { store: sanitized } = stripLegacyVideoBlobs(store);
   try {
-    localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(store));
+    localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(sanitized));
     notifyContentUpdated();
   } catch (error) {
     if (error instanceof DOMException && error.name === "QuotaExceededError") {
       throw new Error(
-        "Browser storage is full. Remove older lesson videos and try again.",
+        "Browser storage is full. Clear site data for this app or remove older lesson videos, then try again.",
       );
     }
     throw error;

@@ -33,7 +33,7 @@ export function AdminDashboard() {
           </h1>
           <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
             Build courses and lessons, edit assignment and Alcumus problems, and
-            upload videos. Changes are saved in this browser (localStorage mock).
+            upload videos via Mux. Lesson metadata is saved in this browser.
           </p>
         </div>
         <Button
