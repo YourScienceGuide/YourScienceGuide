@@ -7,7 +7,9 @@ import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 export type LessonVideoMeta = {
   title: string;
   description: string;
+  /** @deprecated Legacy local data-URL uploads — use muxPlaybackId instead. */
   sourceUrl?: string;
+  muxPlaybackId?: string;
   fileName?: string;
 };
 
@@ -52,8 +54,17 @@ export function loadContentStore(): AdminContentStore {
 }
 
 export function saveContentStore(store: AdminContentStore) {
-  localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(store));
-  notifyContentUpdated();
+  try {
+    localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(store));
+    notifyContentUpdated();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      throw new Error(
+        "Browser storage is full. Remove older lesson videos and try again.",
+      );
+    }
+    throw error;
+  }
 }
 
 export function notifyContentUpdated() {
