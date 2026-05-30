@@ -2,8 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "@clerk/ui/themes/shadcn.css";
-
+/* Clerk shadcn theme reads these tokens — map them to the app palette. */
 :root {
   --background: 240 249 255;
   --foreground: 15 23 42;
@@ -11,6 +10,18 @@
   --border: 186 230 253;
   --accent: 2 132 199;
   --surface: 255 255 255;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #0284c7;
+  --primary-foreground: #ffffff;
+  --muted-foreground: #64748b;
+  --input: #e0f2fe;
+  --destructive: #dc2626;
+  --ring: #0284c7;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
 }
 
 .dark {
@@ -20,6 +31,15 @@
   --border: 68 64 60;
   --accent: 245 245 244;
   --surface: 41 37 36;
+
+  --card: #292524;
+  --card-foreground: #fafaf9;
+  --primary: #e7e5e4;
+  --primary-foreground: #1c1917;
+  --muted-foreground: #a8a29e;
+  --input: #44403c;
+  --destructive: #ef4444;
+  --ring: #a8a29e;
 }
 
 body {
