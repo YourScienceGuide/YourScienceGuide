@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
 import { useAuth } from "@/components/auth/auth-provider";
-import { AuthForm } from "@/components/auth/auth-form";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +47,18 @@ export function SignupModal() {
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
-        <AuthForm onSuccess={closeSignupModal} />
+        <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+          <Button asChild className="flex-1">
+            <Link href="/sign-up" onClick={closeSignupModal}>
+              Create account
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="flex-1">
+            <Link href="/sign-in" onClick={closeSignupModal}>
+              Sign in
+            </Link>
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

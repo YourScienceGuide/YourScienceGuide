@@ -17,7 +17,7 @@ const baseLinks = [
 
 export function TopNav() {
   const pathname = usePathname();
-  const { isAdmin, isGuest, openSignupModal } = useAuth();
+  const { isAdmin, isGuest } = useAuth();
   const { activeStudent, students } = useActiveStudent();
   const onStudentArea = pathname === "/student" || pathname.startsWith("/student/");
   const links = isAdmin
@@ -40,12 +40,8 @@ export function TopNav() {
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2">
           {isGuest && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => openSignupModal("default")}
-            >
-              Sign in
+            <Button asChild size="sm">
+              <Link href="/sign-in">Sign in</Link>
             </Button>
           )}
           {links.map(({ href, label }) => {

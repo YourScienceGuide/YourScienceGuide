@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import { DM_Sans } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
@@ -28,14 +30,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={sans.variable} suppressHydrationWarning>
       <body className="min-h-dvh font-sans antialiased">
-        <ThemeScript />
-        <ThemeProvider>
-          <AuthProvider>
-            <ActiveStudentProvider>
-              <AuthShell>{children}</AuthShell>
-            </ActiveStudentProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <ClerkProvider appearance={{ theme: shadcn }}>
+          <ThemeScript />
+          <ThemeProvider>
+            <AuthProvider>
+              <ActiveStudentProvider>
+                <AuthShell>{children}</AuthShell>
+              </ActiveStudentProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );
