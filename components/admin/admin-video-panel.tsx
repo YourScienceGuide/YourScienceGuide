@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import MuxPlayer from "@mux/mux-player-react";
 
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/use-content-store";
@@ -10,8 +11,37 @@ import {
   type LessonVideoMeta,
 } from "@/lib/admin/content-store";
 import { Button } from "@/components/ui/button";
+import { MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/config";
 
-const MAX_MB = 25;
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_ATTEMPTS = 90;
+
+async function pollForPlaybackId(uploadId: string): Promise<string> {
+  for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(`/api/videos/upload/${uploadId}`);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? "Failed to check upload status");
+    }
+
+    const data = (await res.json()) as {
+      status: string;
+      playbackId?: string;
+      error?: string;
+    };
+
+    if (data.status === "ready" && data.playbackId) {
+      return data.playbackId;
+    }
+    if (data.status === "errored") {
+      throw new Error(data.error ?? "Video processing failed");
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  throw new Error("Timed out waiting for video processing. Try again in a moment.");
+}
 
 export function AdminVideoPanel() {
   const { store, persist } = useContentStore();
@@ -22,6 +52,7 @@ export function AdminVideoPanel() {
     description: "",
   });
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const existing = getVideoFromStore(store, courseId, lessonId);
@@ -40,27 +71,63 @@ export function AdminVideoPanel() {
       ...store,
       videos: { ...store.videos, [key]: next },
     };
-    saveContentStore(updated);
-    persist(updated);
+    try {
+      saveContentStore(updated);
+      persist(updated);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Failed to save video metadata.");
+    }
   }
 
-  function handleFile(file: File | null) {
+  async function handleFile(file: File | null) {
     if (!file) return;
-    if (file.size > MAX_MB * 1024 * 1024) {
-      setUploadError(`File must be under ${MAX_MB} MB for this mock.`);
+    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
+      setUploadError(`File must be under ${MAX_VIDEO_UPLOAD_MB} MB.`);
       return;
     }
+
     setUploadError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
+    setUploadStatus("Requesting upload URL…");
+
+    try {
+      const createRes = await fetch("/api/videos/upload", { method: "POST" });
+      if (!createRes.ok) {
+        const body = (await createRes.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to start upload");
+      }
+
+      const { url, uploadId } = (await createRes.json()) as {
+        url: string;
+        uploadId: string;
+      };
+
+      setUploadStatus("Uploading video…");
+      const putRes = await fetch(url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type || "video/mp4" },
+      });
+      if (!putRes.ok) {
+        throw new Error("Upload failed. Check your connection and try again.");
+      }
+
+      setUploadStatus("Processing video…");
+      const playbackId = await pollForPlaybackId(uploadId);
+
       commit({
         ...meta,
-        sourceUrl: reader.result as string,
+        muxPlaybackId: playbackId,
         fileName: file.name,
+        sourceUrl: undefined,
       });
-    };
-    reader.readAsDataURL(file);
+      setUploadStatus(null);
+    } catch (error) {
+      setUploadStatus(null);
+      setUploadError(error instanceof Error ? error.message : "Upload failed.");
+    }
   }
+
+  const hasVideo = Boolean(meta.muxPlaybackId || meta.sourceUrl);
 
   return (
     <div className="space-y-6">
@@ -100,32 +167,44 @@ export function AdminVideoPanel() {
           <input
             type="file"
             accept="video/*"
-            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm"
+            disabled={Boolean(uploadStatus)}
+            onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm disabled:opacity-50"
           />
           {meta.fileName && (
             <p className="text-xs text-slate-500">Current: {meta.fileName}</p>
+          )}
+          {uploadStatus && (
+            <p className="text-sm text-slate-600 dark:text-stone-400">{uploadStatus}</p>
           )}
           {uploadError && (
             <p className="text-sm text-red-700 dark:text-red-300">{uploadError}</p>
           )}
         </div>
-        {meta.sourceUrl && (
+        {meta.muxPlaybackId ? (
+          <MuxPlayer
+            playbackId={meta.muxPlaybackId}
+            className="aspect-video w-full rounded-md"
+          />
+        ) : meta.sourceUrl ? (
           <video src={meta.sourceUrl} controls className="aspect-video w-full rounded-md" />
+        ) : null}
+        {hasVideo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={Boolean(uploadStatus)}
+            onClick={() =>
+              commit({
+                title: meta.title,
+                description: meta.description,
+              })
+            }
+          >
+            Remove uploaded file
+          </Button>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() =>
-            commit({
-              title: meta.title,
-              description: meta.description,
-            })
-          }
-        >
-          Remove uploaded file
-        </Button>
       </div>
     </div>
   );

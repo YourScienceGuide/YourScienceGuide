@@ -1,5 +1,6 @@
 "use client";
 
+import MuxPlayer from "@mux/mux-player-react";
 import {
   Maximize,
   Minimize,
@@ -43,7 +44,7 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
 
   const title = meta?.title ?? MOCK_VIDEO.title;
   const description = meta?.description ?? MOCK_VIDEO.description;
-  const hasUpload = Boolean(meta?.sourceUrl);
+  const hasUpload = Boolean(meta?.muxPlaybackId || meta?.sourceUrl);
 
   return (
     <section className="space-y-3">
@@ -59,7 +60,12 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900">
-        {hasUpload && meta?.sourceUrl ? (
+        {meta?.muxPlaybackId ? (
+          <MuxPlayer
+            playbackId={meta.muxPlaybackId}
+            className="aspect-video w-full bg-stone-950"
+          />
+        ) : hasUpload && meta?.sourceUrl ? (
           <video
             src={meta.sourceUrl}
             controls
