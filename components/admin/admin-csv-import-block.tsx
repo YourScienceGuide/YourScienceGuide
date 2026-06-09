@@ -7,7 +7,6 @@ import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   ALCUMUS_CSV_HEADERS,
   buildImportPreview,
-  buildTemplateCsv,
   CHAPTER_CSV_HEADERS,
   downloadCsv,
   getCsvHeaders,
@@ -153,9 +152,22 @@ export function AdminCsvImportBlock({
   }
 
   const templateName =
-    kind === "alcumus" ? "ysg-alcumus-template.csv" : "ysg-end-of-chapter-template.csv";
+    kind === "alcumus" ? "ysg-alcumus-template.xlsx" : "ysg-end-of-chapter-template.xlsx";
   const exampleName =
     kind === "alcumus" ? "ysg-alcumus-examples.csv" : "ysg-end-of-chapter-examples.csv";
+
+  async function handleDownloadTemplate() {
+    const response = await fetch(`/api/admin/question-template?kind=${kind}`);
+    if (!response.ok) return;
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = templateName;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-4">
@@ -164,8 +176,9 @@ export function AdminCsvImportBlock({
       <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-stone-400">
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">Type</strong>{" "}
-          must be <code className="text-xs">multiple-choice</code> or{" "}
-          <code className="text-xs">free-response</code>.
+          is a dropdown in the Excel template (
+          <code className="text-xs">multiple-choice</code> or{" "}
+          <code className="text-xs">free-response</code>).
         </li>
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">
@@ -188,12 +201,8 @@ export function AdminCsvImportBlock({
       </ul>
 
       <div className="flex flex-wrap gap-3">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => downloadCsv(templateName, buildTemplateCsv(kind))}
-        >
-          Download blank template
+        <Button type="button" size="sm" onClick={handleDownloadTemplate}>
+          Download blank template (.xlsx)
         </Button>
         <Button
           type="button"
@@ -225,6 +234,11 @@ export function AdminCsvImportBlock({
           </p>
         </>
       )}
+
+      <p className="text-sm text-slate-600 dark:text-stone-400">
+        After filling in the template, save the workbook as CSV before uploading
+        below.
+      </p>
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700 dark:text-stone-300">
