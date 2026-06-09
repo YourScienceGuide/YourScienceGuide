@@ -3,15 +3,29 @@
 import { useState } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
+import {
+  courseDeleteConfirmationPhrase,
+  removeCourseFromStore,
+} from "@/lib/admin/content-store";
 import { slugifyId } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export function AdminCurriculumPanel() {
-  const { store, persist } = useContentStore();
+  const { store, persist, saving } = useContentStore();
   const [selectedCourseId, setSelectedCourseId] = useState(store.courses[0]?.id ?? "");
   const course = store.courses.find((c) => c.id === selectedCourseId);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [newCourse, setNewCourse] = useState({
     title: "",
@@ -87,6 +101,28 @@ export function AdminCurriculumPanel() {
         : c,
     );
     saveCourses(courses);
+  }
+
+  const deletePhrase = course ? courseDeleteConfirmationPhrase(course.title) : "";
+  const deletePhraseMatches =
+    deleteConfirmText.trim() === deletePhrase && deletePhrase.length > 0;
+  const canDeleteCourse = store.courses.length > 1;
+
+  function openDeleteDialog() {
+    setDeleteConfirmText("");
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleDeleteCourse() {
+    if (!course || !deletePhraseMatches || !canDeleteCourse) return;
+
+    const nextStore = removeCourseFromStore(store, course.id);
+    const ok = await persist(nextStore);
+    if (!ok) return;
+
+    setDeleteDialogOpen(false);
+    setDeleteConfirmText("");
+    setSelectedCourseId(nextStore.courses[0]?.id ?? "");
   }
 
   return (
@@ -204,6 +240,32 @@ export function AdminCurriculumPanel() {
               </Button>
             </form>
 
+            <section className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-5 dark:border-red-900/50 dark:bg-red-950/20">
+              <h3 className="font-medium text-red-900 dark:text-red-200">Danger zone</h3>
+              <p className="text-sm text-red-800/90 dark:text-red-300/90">
+                Deleting <strong>{course.title}</strong> removes all{" "}
+                {course.lessons.length} lesson
+                {course.lessons.length === 1 ? "" : "s"} and every end-of-chapter
+                question, Alcumus problem, and video linked to this course. This
+                cannot be undone.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!canDeleteCourse}
+                className="border-red-300 text-red-800 hover:bg-red-100 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-950/40"
+                onClick={openDeleteDialog}
+              >
+                Delete course…
+              </Button>
+              {!canDeleteCourse && (
+                <p className="text-xs text-red-700 dark:text-red-400">
+                  You must keep at least one course in the curriculum.
+                </p>
+              )}
+            </section>
+
             <ul className="space-y-3">
               {course.lessons.map((lesson) => (
                 <li
@@ -267,6 +329,63 @@ export function AdminCurriculumPanel() {
           </>
         )}
       </section>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {course?.title}?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-1 text-left">
+                <p>
+                  This permanently deletes the course and all lesson content tied
+                  to it, including questions, Alcumus problems, and videos.
+                </p>
+                {course && (
+                  <ul className="list-disc space-y-1 pl-5 text-sm">
+                    <li>
+                      {course.lessons.length} lesson
+                      {course.lessons.length === 1 ? "" : "s"}
+                    </li>
+                    <li>Course id: {course.id}</li>
+                  </ul>
+                )}
+                <p className="text-sm font-medium text-slate-800 dark:text-stone-200">
+                  Type the following to confirm:
+                </p>
+                <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 font-mono text-sm text-slate-800 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100">
+                  {deletePhrase}
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder={deletePhrase}
+            aria-label="Confirmation phrase"
+            autoComplete="off"
+            className="font-mono text-sm"
+          />
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!deletePhraseMatches || saving || !canDeleteCourse}
+              className="border-red-300 text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-950/40"
+              onClick={() => void handleDeleteCourse()}
+            >
+              {saving ? "Deleting…" : "Delete course permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

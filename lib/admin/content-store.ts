@@ -114,3 +114,35 @@ export function getVideoFromStore(
 ) {
   return store.videos[lessonKey(courseId, lessonId)];
 }
+
+/** Exact phrase admins must type to confirm course deletion. */
+export function courseDeleteConfirmationPhrase(courseTitle: string): string {
+  return `delete course ${courseTitle}`;
+}
+
+function stripKeysForCourse<T>(
+  record: Record<string, T>,
+  courseId: string,
+): Record<string, T> {
+  const prefix = `${courseId}/`;
+  const next: Record<string, T> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (!key.startsWith(prefix)) {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
+export function removeCourseFromStore(
+  store: AdminContentStore,
+  courseId: string,
+): AdminContentStore {
+  return {
+    ...store,
+    courses: store.courses.filter((course) => course.id !== courseId),
+    lessonQuestions: stripKeysForCourse(store.lessonQuestions, courseId),
+    alcumusByLesson: stripKeysForCourse(store.alcumusByLesson, courseId),
+    videos: stripKeysForCourse(store.videos, courseId),
+  };
+}
