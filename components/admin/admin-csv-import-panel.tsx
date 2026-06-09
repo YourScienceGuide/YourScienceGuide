@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import type { CsvImportKind } from "@/lib/admin/csv-questions";
 import { cn } from "@/lib/utils";
 

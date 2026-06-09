@@ -21,20 +21,18 @@ export type AdminContentStore = {
   videos: Record<string, LessonVideoMeta>;
 };
 
-export const ADMIN_CONTENT_KEY = "ysg-admin-content";
+/** Client event fired after content is saved or refreshed from the API. */
 export const CONTENT_UPDATED_EVENT = "ysg-content-updated";
+
 const CURRENT_STORE_VERSION = 2 as const;
 
 function cloneCourses(): Course[] {
   return JSON.parse(JSON.stringify(SEED_COURSES)) as Course[];
 }
 
-function stripLegacyVideoBlobs(store: AdminContentStore): {
-  store: AdminContentStore;
-  changed: boolean;
-} {
-  let changed = store.version !== CURRENT_STORE_VERSION;
+function stripLegacyVideoBlobs(store: AdminContentStore): AdminContentStore {
   const videos: Record<string, LessonVideoMeta> = {};
+  let changed = store.version !== CURRENT_STORE_VERSION;
 
   for (const [key, video] of Object.entries(store.videos ?? {})) {
     if (video.sourceUrl?.startsWith("data:")) {
@@ -46,30 +44,8 @@ function stripLegacyVideoBlobs(store: AdminContentStore): {
     }
   }
 
-  if (!changed) {
-    return { store, changed: false };
-  }
-
-  return {
-    store: { ...store, version: CURRENT_STORE_VERSION, videos },
-    changed: true,
-  };
-}
-
-function persistStoreSafely(store: AdminContentStore) {
-  try {
-    localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(store));
-    notifyContentUpdated();
-    return;
-  } catch (error) {
-    if (!(error instanceof DOMException && error.name === "QuotaExceededError")) {
-      throw error;
-    }
-  }
-
-  const withoutVideos = { ...store, videos: {} };
-  localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(withoutVideos));
-  notifyContentUpdated();
+  if (!changed) return store;
+  return { ...store, version: CURRENT_STORE_VERSION, videos };
 }
 
 export function createDefaultStore(): AdminContentStore {
@@ -82,39 +58,8 @@ export function createDefaultStore(): AdminContentStore {
   };
 }
 
-export function loadContentStore(): AdminContentStore {
-  if (typeof window === "undefined") {
-    return createDefaultStore();
-  }
-  try {
-    const raw = localStorage.getItem(ADMIN_CONTENT_KEY);
-    if (!raw) return createDefaultStore();
-    const parsed = JSON.parse(raw) as AdminContentStore;
-    if (!parsed.courses?.length) return createDefaultStore();
-
-    const { store, changed } = stripLegacyVideoBlobs(parsed);
-    if (changed) {
-      persistStoreSafely(store);
-    }
-    return store;
-  } catch {
-    return createDefaultStore();
-  }
-}
-
-export function saveContentStore(store: AdminContentStore) {
-  const { store: sanitized } = stripLegacyVideoBlobs(store);
-  try {
-    localStorage.setItem(ADMIN_CONTENT_KEY, JSON.stringify(sanitized));
-    notifyContentUpdated();
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "QuotaExceededError") {
-      throw new Error(
-        "Browser storage is full. Clear site data for this app or remove older lesson videos, then try again.",
-      );
-    }
-    throw error;
-  }
+export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
+  return stripLegacyVideoBlobs(store);
 }
 
 export function notifyContentUpdated() {
@@ -168,57 +113,4 @@ export function getVideoFromStore(
   lessonId: string,
 ) {
   return store.videos[lessonKey(courseId, lessonId)];
-}
-
-export function updateCourses(store: AdminContentStore, courses: Course[]) {
-  saveContentStore({ ...store, courses });
-}
-
-export function updateLessonQuestions(
-  store: AdminContentStore,
-  courseId: string,
-  lessonId: string,
-  questions: LessonQuestion[],
-) {
-  saveContentStore({
-    ...store,
-    lessonQuestions: {
-      ...store.lessonQuestions,
-      [lessonKey(courseId, lessonId)]: questions,
-    },
-  });
-}
-
-export function updateAlcumusForLesson(
-  store: AdminContentStore,
-  courseId: string,
-  lessonId: string,
-  problems: AlcumusProblem[],
-) {
-  saveContentStore({
-    ...store,
-    alcumusByLesson: {
-      ...store.alcumusByLesson,
-      [lessonKey(courseId, lessonId)]: problems,
-    },
-  });
-}
-
-export function updateVideoForLesson(
-  store: AdminContentStore,
-  courseId: string,
-  lessonId: string,
-  video: LessonVideoMeta,
-) {
-  saveContentStore({
-    ...store,
-    videos: {
-      ...store.videos,
-      [lessonKey(courseId, lessonId)]: video,
-    },
-  });
-}
-
-export function resetContentStore() {
-  saveContentStore(createDefaultStore());
 }

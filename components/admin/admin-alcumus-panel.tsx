@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { lessonKey } from "@/lib/admin/lesson-key";
-import { saveContentStore } from "@/lib/admin/content-store";
 import { decodeAssessmentPayload } from "@/lib/ai-guard/encode";
 import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import { Button } from "@/components/ui/button";
@@ -36,15 +35,13 @@ export function AdminAlcumusPanel() {
 
   function commit(next: AlcumusProblem[]) {
     setProblems(next);
-    const updated = {
+    void persist({
       ...store,
       alcumusByLesson: {
         ...store.alcumusByLesson,
         [lessonKey(courseId, lessonId)]: next,
       },
-    };
-    saveContentStore(updated);
-    persist(updated);
+    });
   }
 
   function updateProblem(id: string, patch: Partial<AlcumusProblem>) {

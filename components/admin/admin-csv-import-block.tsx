@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   ALCUMUS_CSV_HEADERS,
   buildImportPreview,
@@ -17,7 +17,7 @@ import {
 } from "@/lib/admin/csv-questions";
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import type { LessonQuestion } from "@/lib/lesson/types";
-import { getCourseFromStore, saveContentStore } from "@/lib/admin/content-store";
+import { getCourseFromStore } from "@/lib/admin/content-store";
 import { Button } from "@/components/ui/button";
 
 type AdminCsvImportBlockProps = {
@@ -84,7 +84,7 @@ export function AdminCsvImportBlock({
   showLessonPicker = true,
   onImported,
 }: AdminCsvImportBlockProps) {
-  const { store, persist } = useContentStore();
+  const { store, persist, saveError } = useContentStore();
   const [csvText, setCsvText] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -116,7 +116,7 @@ export function AdminCsvImportBlock({
     reader.readAsText(file);
   }
 
-  function handleImport() {
+  async function handleImport() {
     if (!preview || preview.importableCount === 0) return;
 
     const nextStore = {
@@ -141,8 +141,9 @@ export function AdminCsvImportBlock({
       }
     }
 
-    saveContentStore(nextStore);
-    persist(nextStore);
+    const ok = await persist(nextStore);
+    if (!ok) return;
+
     setImportMessage(
       `Imported ${preview.importableCount} ${kindLabel(preview.kind).toLowerCase()} question${preview.importableCount === 1 ? "" : "s"}.`,
     );
@@ -288,6 +289,9 @@ export function AdminCsvImportBlock({
 
       {importMessage && (
         <p className="text-sm text-emerald-700 dark:text-emerald-300">{importMessage}</p>
+      )}
+      {saveError && (
+        <p className="text-sm text-red-700 dark:text-red-300">{saveError}</p>
       )}
     </div>
   );

@@ -14,7 +14,7 @@ import {
   masteryStepLabel,
 } from "@/lib/lesson/flashcard-machine";
 import type { DeckState } from "@/lib/lesson/flashcard-types";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
 
