@@ -212,6 +212,9 @@ export function AdminCurriculumPanel() {
                 >
                   <p className="text-xs text-slate-500">
                     {lesson.unitTitle} · #{lesson.order} · id: {lesson.id}
+                    {lesson.chapter != null && lesson.section != null
+                      ? ` · CSV Ch.${lesson.chapter} Sec.${lesson.section}`
+                      : ""}
                   </p>
                   <input
                     value={lesson.title}
@@ -226,6 +229,38 @@ export function AdminCurriculumPanel() {
                     rows={2}
                     className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
                   />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs font-medium text-slate-500">
+                      CSV Chapter
+                      <input
+                        type="number"
+                        min={1}
+                        value={lesson.chapter ?? ""}
+                        onChange={(e) =>
+                          updateLesson(lesson.id, {
+                            chapter: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        placeholder="e.g. 3"
+                        className="mt-1 block w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                      />
+                    </label>
+                    <label className="text-xs font-medium text-slate-500">
+                      CSV Section
+                      <input
+                        type="number"
+                        min={1}
+                        value={lesson.section ?? ""}
+                        onChange={(e) =>
+                          updateLesson(lesson.id, {
+                            section: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        placeholder="e.g. 1"
+                        className="mt-1 block w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                      />
+                    </label>
+                  </div>
                 </li>
               ))}
             </ul>

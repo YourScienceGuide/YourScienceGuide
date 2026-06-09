@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/use-content-store";
 import { lessonKey } from "@/lib/admin/lesson-key";
@@ -86,6 +87,26 @@ export function AdminAlcumusPanel() {
           Add problem
         </Button>
       </div>
+
+      <details className="rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-900 dark:text-stone-50">
+          Bulk import Alcumus questions (CSV)
+        </summary>
+        <div className="mt-4 border-t border-sky-100 pt-4 dark:border-stone-700">
+          <AdminCsvImportBlock
+            kind="alcumus"
+            courseId={courseId}
+            lessonId={lessonId}
+            onCourseChange={(id) => {
+              setCourseId(id);
+              const first = store.courses.find((c) => c.id === id)?.lessons[0]?.id;
+              if (first) setLessonId(first);
+            }}
+            onLessonChange={setLessonId}
+            showLessonPicker={false}
+          />
+        </div>
+      </details>
 
       <ul className="space-y-4">
         {problems.map((problem) => (

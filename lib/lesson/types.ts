@@ -1,6 +1,6 @@
 export type MultipleChoiceQuestion = {
   type: "multiple-choice";
-  id: "q1";
+  id: string;
   prompt: string;
   options: string[];
   correctIndex: number;
@@ -8,14 +8,14 @@ export type MultipleChoiceQuestion = {
 
 export type ShortAnswerQuestion = {
   type: "short-answer";
-  id: "q2";
+  id: string;
   prompt: string;
   acceptedAnswers: string[];
 };
 
 export type LongAnswerQuestion = {
   type: "long-answer";
-  id: "q3";
+  id: string;
   prompt: string;
   minLength: number;
 };

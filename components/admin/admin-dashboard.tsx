@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { AdminAlcumusPanel } from "@/components/admin/admin-alcumus-panel";
 import { AdminAssignmentPanel } from "@/components/admin/admin-assignment-panel";
+import { AdminCsvImportPanel } from "@/components/admin/admin-csv-import-panel";
 import { AdminCurriculumPanel } from "@/components/admin/admin-curriculum-panel";
 import { AdminVideoPanel } from "@/components/admin/admin-video-panel";
 import { useContentStore } from "@/components/admin/use-content-store";
@@ -13,7 +14,8 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { id: "curriculum", label: "Curriculum & lessons" },
-  { id: "assignment", label: "Assignment questions" },
+  { id: "import", label: "Bulk import (CSV)" },
+  { id: "assignment", label: "End-of-chapter questions" },
   { id: "alcumus", label: "Extra practice (Alcumus)" },
   { id: "videos", label: "Lesson videos" },
 ] as const;
@@ -78,6 +80,7 @@ export function AdminDashboard() {
       </nav>
 
       {tab === "curriculum" && <AdminCurriculumPanel />}
+      {tab === "import" && <AdminCsvImportPanel />}
       {tab === "assignment" && <AdminAssignmentPanel />}
       {tab === "alcumus" && <AdminAlcumusPanel />}
       {tab === "videos" && <AdminVideoPanel />}
