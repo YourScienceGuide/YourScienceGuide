@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
 
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   getVideoFromStore,
-  saveContentStore,
   type LessonVideoMeta,
 } from "@/lib/admin/content-store";
 import { Button } from "@/components/ui/button";
@@ -67,16 +66,10 @@ export function AdminVideoPanel() {
   function commit(next: LessonVideoMeta) {
     setMeta(next);
     const key = `${courseId}/${lessonId}`;
-    const updated = {
+    void persist({
       ...store,
       videos: { ...store.videos, [key]: next },
-    };
-    try {
-      saveContentStore(updated);
-      persist(updated);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Failed to save video metadata.");
-    }
+    });
   }
 
   async function handleFile(file: File | null) {

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";

@@ -9,7 +9,7 @@ import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { Button } from "@/components/ui/button";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
 import {

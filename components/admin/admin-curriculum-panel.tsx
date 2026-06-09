@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { slugifyId } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import { Button } from "@/components/ui/button";

@@ -7,8 +7,7 @@ import { AdminAssignmentPanel } from "@/components/admin/admin-assignment-panel"
 import { AdminCsvImportPanel } from "@/components/admin/admin-csv-import-panel";
 import { AdminCurriculumPanel } from "@/components/admin/admin-curriculum-panel";
 import { AdminVideoPanel } from "@/components/admin/admin-video-panel";
-import { useContentStore } from "@/components/admin/use-content-store";
-import { loadContentStore, resetContentStore } from "@/lib/admin/content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +23,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export function AdminDashboard() {
   const [tab, setTab] = useState<TabId>("curriculum");
-  const { persist } = useContentStore();
+  const { reset, saving, saveError, source, loading } = useContentStore();
 
   return (
     <div className="space-y-8">
@@ -35,26 +34,38 @@ export function AdminDashboard() {
           </h1>
           <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
             Build courses and lessons, edit assignment and Alcumus problems, and
-            upload videos via Mux. Lesson metadata is saved in this browser.
+            upload videos via Mux. Content is stored in Supabase and shared across
+            browsers and users.
           </p>
+          <p className="text-xs text-slate-500 dark:text-stone-500">
+            Storage:{" "}
+            {loading
+              ? "Loading…"
+              : source === "supabase"
+                ? "Supabase (live)"
+                : "Seed defaults — configure Supabase env vars to persist edits"}
+          </p>
+          {saveError && (
+            <p className="text-sm text-red-700 dark:text-red-300">{saveError}</p>
+          )}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="sm"
           className="shrink-0"
+          disabled={saving}
           onClick={() => {
             if (
               window.confirm(
                 "Reset all admin content to defaults? This cannot be undone.",
               )
             ) {
-              resetContentStore();
-              persist(loadContentStore());
+              void reset();
             }
           }}
         >
-          Reset all content
+          {saving ? "Saving…" : "Reset all content"}
         </Button>
       </header>
 

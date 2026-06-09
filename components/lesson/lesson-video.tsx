@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CONTENT_UPDATED_EVENT, getVideoFromStore, loadContentStore } from "@/lib/admin/content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
+import { getVideoFromStore } from "@/lib/admin/content-store";
 import { cn } from "@/lib/utils";
 
 const MOCK_VIDEO = {
@@ -29,18 +30,8 @@ type LessonVideoProps = {
 };
 
 export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
-  const [meta, setMeta] = useState(() =>
-    getVideoFromStore(loadContentStore(), courseId, lessonId),
-  );
-
-  useEffect(() => {
-    const refresh = () => {
-      setMeta(getVideoFromStore(loadContentStore(), courseId, lessonId));
-    };
-    refresh();
-    window.addEventListener(CONTENT_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(CONTENT_UPDATED_EVENT, refresh);
-  }, [courseId, lessonId]);
+  const { store } = useContentStore();
+  const meta = getVideoFromStore(store, courseId, lessonId);
 
   const title = meta?.title ?? MOCK_VIDEO.title;
   const description = meta?.description ?? MOCK_VIDEO.description;

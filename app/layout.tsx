@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { DM_Sans } from "next/font/google";
 
+import { ContentStoreProvider } from "@/components/admin/content-store-provider";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ActiveStudentProvider } from "@/components/family/active-student-provider";
@@ -34,9 +35,11 @@ export default function RootLayout({
           <ThemeScript />
           <ThemeProvider>
             <AuthProvider>
-              <ActiveStudentProvider>
-                <AuthShell>{children}</AuthShell>
-              </ActiveStudentProvider>
+              <ContentStoreProvider>
+                <ActiveStudentProvider>
+                  <AuthShell>{children}</AuthShell>
+                </ActiveStudentProvider>
+              </ContentStoreProvider>
             </AuthProvider>
           </ThemeProvider>
         </ClerkProvider>
