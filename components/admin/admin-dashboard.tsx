@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { id: "curriculum", label: "Curriculum & lessons" },
   { id: "import", label: "Bulk import (CSV)" },
-  { id: "assignment", label: "Assignment questions" },
+  { id: "assignment", label: "End-of-chapter questions" },
   { id: "alcumus", label: "Extra practice (Alcumus)" },
   { id: "videos", label: "Lesson videos" },
 ] as const;
