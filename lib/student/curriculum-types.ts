@@ -5,6 +5,10 @@ export type CurriculumLesson = {
   title: string;
   description: string;
   order: number;
+  /** Matches the Chapter column in bulk-import CSV files. */
+  chapter?: number;
+  /** Matches the Section column in bulk-import CSV files. */
+  section?: number;
 };
 
 export type Course = {

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { lessonKey } from "@/lib/admin/lesson-key";
-import { saveContentStore } from "@/lib/admin/content-store";
 import { decodeAssessmentPayload } from "@/lib/ai-guard/encode";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { Button } from "@/components/ui/button";
@@ -57,15 +57,13 @@ export function AdminAssignmentPanel() {
 
   function commit(next: LessonQuestion[]) {
     setQuestions(next);
-    const updated = {
+    void persist({
       ...store,
       lessonQuestions: {
         ...store.lessonQuestions,
         [lessonKey(courseId, lessonId)]: next,
       },
-    };
-    saveContentStore(updated);
-    persist(updated);
+    });
   }
 
   function updateQ(index: number, patch: Partial<LessonQuestion>) {
@@ -90,8 +88,32 @@ export function AdminAssignmentPanel() {
       />
 
       <p className="text-sm text-slate-600 dark:text-stone-400">
-        Edit the three assignment questions for this lesson (multiple choice, short
-        answer, long answer).
+        Edit assignment questions for this lesson, or bulk-import end-of-chapter
+        questions from CSV below.
+      </p>
+
+      <details className="rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-900 dark:text-stone-50">
+          Bulk import end-of-chapter questions (CSV)
+        </summary>
+        <div className="mt-4 border-t border-sky-100 pt-4 dark:border-stone-700">
+          <AdminCsvImportBlock
+            kind="end-of-chapter"
+            courseId={courseId}
+            lessonId={lessonId}
+            onCourseChange={(id) => {
+              setCourseId(id);
+              const first = store.courses.find((c) => c.id === id)?.lessons[0]?.id;
+              if (first) setLessonId(first);
+            }}
+            onLessonChange={setLessonId}
+            showLessonPicker={false}
+          />
+        </div>
+      </details>
+
+      <p className="text-sm font-medium text-slate-700 dark:text-stone-300">
+        {questions.length} question{questions.length === 1 ? "" : "s"} for this lesson
       </p>
 
       <ol className="space-y-6">

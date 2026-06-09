@@ -1,5 +1,6 @@
 "use client";
 
+import MuxPlayer from "@mux/mux-player-react";
 import {
   Maximize,
   Minimize,
@@ -10,7 +11,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CONTENT_UPDATED_EVENT, getVideoFromStore, loadContentStore } from "@/lib/admin/content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
+import { getVideoFromStore } from "@/lib/admin/content-store";
 import { cn } from "@/lib/utils";
 
 const MOCK_VIDEO = {
@@ -28,22 +30,12 @@ type LessonVideoProps = {
 };
 
 export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
-  const [meta, setMeta] = useState(() =>
-    getVideoFromStore(loadContentStore(), courseId, lessonId),
-  );
-
-  useEffect(() => {
-    const refresh = () => {
-      setMeta(getVideoFromStore(loadContentStore(), courseId, lessonId));
-    };
-    refresh();
-    window.addEventListener(CONTENT_UPDATED_EVENT, refresh);
-    return () => window.removeEventListener(CONTENT_UPDATED_EVENT, refresh);
-  }, [courseId, lessonId]);
+  const { store } = useContentStore();
+  const meta = getVideoFromStore(store, courseId, lessonId);
 
   const title = meta?.title ?? MOCK_VIDEO.title;
   const description = meta?.description ?? MOCK_VIDEO.description;
-  const hasUpload = Boolean(meta?.sourceUrl);
+  const hasUpload = Boolean(meta?.muxPlaybackId || meta?.sourceUrl);
 
   return (
     <section className="space-y-3">
@@ -59,7 +51,12 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900">
-        {hasUpload && meta?.sourceUrl ? (
+        {meta?.muxPlaybackId ? (
+          <MuxPlayer
+            playbackId={meta.muxPlaybackId}
+            className="aspect-video w-full bg-stone-950"
+          />
+        ) : hasUpload && meta?.sourceUrl ? (
           <video
             src={meta.sourceUrl}
             controls

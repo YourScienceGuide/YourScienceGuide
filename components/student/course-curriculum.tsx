@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { CurriculumLessonRow } from "@/components/student/curriculum-lesson-row";
 import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";

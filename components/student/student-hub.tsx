@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useContentStore } from "@/components/admin/use-content-store";
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
 import {

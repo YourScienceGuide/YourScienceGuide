@@ -8,10 +8,10 @@ import {
   type ReactNode,
 } from "react";
 
+import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   getAlcumusFromStore,
   getLessonQuestionsFromStore,
-  loadContentStore,
 } from "@/lib/admin/content-store";
 import { decodeAssessmentPayload } from "@/lib/ai-guard/encode";
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
@@ -44,51 +44,42 @@ export function LessonAssessmentProvider({
   lessonId,
   children,
 }: LessonAssessmentProviderProps) {
-  const [lesson, setLesson] = useState<LessonQuestion[]>([]);
-  const [alcumus, setAlcumus] = useState<AlcumusProblem[]>([]);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { store, loading: contentLoading, error: contentError } = useContentStore();
+  const [seed, setSeed] = useState<AssessmentPayload | null>(null);
+  const [seedError, setSeedError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function loadSeed() {
       try {
-        const res = await fetch("/api/lesson/assessment", {
-          cache: "no-store",
-        });
+        const res = await fetch("/api/lesson/assessment", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load assessment");
         const body = (await res.json()) as { p: string };
         const data = decodeAssessmentPayload<AssessmentPayload>(body.p);
-        if (cancelled) return;
-
-        const store = loadContentStore();
-        setLesson(
-          getLessonQuestionsFromStore(store, courseId, lessonId, data.lesson),
-        );
-        setAlcumus(
-          getAlcumusFromStore(store, courseId, lessonId, data.alcumus),
-        );
-        setReady(true);
+        if (!cancelled) setSeed(data);
       } catch {
         if (!cancelled) {
-          setError("Could not load lesson questions. Please refresh.");
+          setSeedError("Could not load lesson questions. Please refresh.");
         }
       }
     }
 
-    load();
-
-    const onContentUpdate = () => {
-      load();
-    };
-    window.addEventListener("ysg-content-updated", onContentUpdate);
-
+    loadSeed();
     return () => {
       cancelled = true;
-      window.removeEventListener("ysg-content-updated", onContentUpdate);
     };
-  }, [courseId, lessonId]);
+  }, []);
+
+  const ready = !contentLoading && seed !== null;
+  const error = contentError ?? seedError;
+
+  const lesson = seed
+    ? getLessonQuestionsFromStore(store, courseId, lessonId, seed.lesson)
+    : [];
+  const alcumus = seed
+    ? getAlcumusFromStore(store, courseId, lessonId, seed.alcumus)
+    : [];
 
   return (
     <LessonAssessmentContext.Provider

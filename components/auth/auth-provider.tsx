@@ -1,25 +1,17 @@
 "use client";
 
+import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 
-import { registerAccount } from "@/lib/auth/accounts";
 import type { AuthRole } from "@/lib/auth/constants";
-import {
-  clearAuthenticated,
-  getAuthRole,
-  getAuthUsername,
-  isAuthenticated,
-  setAuthenticated,
-  validateCredentials,
-} from "@/lib/auth/session";
 import { hasActiveSubscription } from "@/lib/billing/subscription";
 
 export type SignupModalReason = "limit" | "locked" | "default";
@@ -49,29 +41,39 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function resolveRole(user: ReturnType<typeof useUser>["user"]): AuthRole | null {
+  const role = user?.publicMetadata?.role;
+  if (role === "admin" || role === "student") return role;
+  if (user) return "student";
+  return null;
+}
+
+function resolveUsername(user: ReturnType<typeof useUser>["user"]): string | null {
+  if (!user) return null;
+  return (
+    user.username ??
+    user.primaryEmailAddress?.emailAddress ??
+    user.id
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
-  const [authenticated, setAuthenticatedState] = useState(false);
-  const [role, setRole] = useState<AuthRole | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  const { user } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
+  const router = useRouter();
+
   const [subscriptionVersion, setSubscriptionVersion] = useState(0);
   const [signupModalOpen, setSignupModalOpen] = useState(false);
   const [signupModalReason, setSignupModalReason] =
     useState<SignupModalReason | null>(null);
 
-  const hydrate = useCallback(() => {
-    setAuthenticatedState(isAuthenticated());
-    setRole(getAuthRole());
-    setUsername(getAuthUsername());
-  }, []);
-
-  useEffect(() => {
-    hydrate();
-    setReady(true);
-  }, [hydrate]);
-
+  const ready = isLoaded;
+  const authenticated = !!isSignedIn;
   const isLoggedIn = authenticated;
   const isGuest = !authenticated;
+  const username = resolveUsername(user);
+  const role = resolveRole(user);
   const isAdmin = role === "admin";
 
   const hasLessonAccess = useMemo(() => {
@@ -92,32 +94,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(
-    (user: string, password: string) => {
-      const resolved = validateCredentials(user, password);
-      if (!resolved) return false;
-      setAuthenticated(resolved.role, resolved.username);
-      setAuthenticatedState(true);
-      setRole(resolved.role);
-      setUsername(resolved.username);
-      closeSignupModal();
-      return true;
+    (_user: string, _password: string) => {
+      router.push("/sign-in");
+      return false;
     },
-    [closeSignupModal],
+    [router],
   );
 
   const createAccount = useCallback(
-    (user: string, password: string) => {
-      const result = registerAccount(user, password);
-      if (!result.ok) return result;
-      const trimmed = user.trim();
-      setAuthenticated("student", trimmed);
-      setAuthenticatedState(true);
-      setRole("student");
-      setUsername(trimmed);
-      closeSignupModal();
-      return { ok: true as const };
+    (_user: string, _password: string) => {
+      router.push("/sign-up");
+      return { ok: false as const, error: "Continue on the sign-up page." };
     },
-    [closeSignupModal],
+    [router],
   );
 
   const purchaseSubscription = useCallback(() => {
@@ -125,11 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    clearAuthenticated();
-    setAuthenticatedState(false);
-    setRole(null);
-    setUsername(null);
-  }, []);
+    void clerkSignOut({ redirectUrl: "/" });
+  }, [clerkSignOut]);
 
   return (
     <AuthContext.Provider
