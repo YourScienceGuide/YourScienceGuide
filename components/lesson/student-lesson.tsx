@@ -60,7 +60,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const readings = getLessonReadings(lessonId);
   const { prev, next } = getAdjacentLessonsClient(store, courseId, lessonId);
 
-  const { lesson, ready, error } = useLessonAssessment();
+  const { lesson, alcumus, ready, error } = useLessonAssessment();
   const [state, setState] = useState<LessonMachineState | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -130,17 +130,14 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     );
   }
 
-  const currentQuestion = lesson[state.questionIndex];
-  if (!currentQuestion) {
-    return (
-      <p className="text-sm text-slate-600 dark:text-stone-400">
-        Loading lesson…
-      </p>
-    );
-  }
+  const hasAssignment = lesson.length > 0;
+  const hasExtraPractice = alcumus.length > 0;
+  const currentQuestion = hasAssignment ? lesson[state.questionIndex] : undefined;
 
-  const percent = progressPercent(state);
-  const stepLabel = lessonStepLabel(state.questionIndex, state.isComplete);
+  const percent = hasAssignment ? progressPercent(state) : 0;
+  const stepLabel = hasAssignment
+    ? lessonStepLabel(state.questionIndex, state.isComplete)
+    : "No assignment questions";
 
   return (
     <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
@@ -158,8 +155,9 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
       />
 
       <p className="text-base text-slate-600 dark:text-stone-400">
-        Complete the required readings, watch the video, then finish all three
-        assignment parts below. Extra Practice and Flashcard Review are optional.
+        {hasAssignment
+          ? "Complete the required readings, watch the video, then finish all assignment parts below. Extra Practice and Flashcard Review are optional."
+          : "Complete the required readings and watch the video. Extra Practice and Flashcard Review are optional when available."}
       </p>
 
       {textbook && readings.length > 0 && (
@@ -177,11 +175,17 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
             Your assignment
           </h2>
           <p className="text-sm text-slate-600 dark:text-stone-400">
-            Complete all three parts in order.
+            {hasAssignment
+              ? "Complete all parts in order."
+              : "Assignment questions have not been added yet."}
           </p>
         </div>
 
-        {state.isComplete ? (
+        {!hasAssignment ? (
+          <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
+            No assignment questions for this section.
+          </p>
+        ) : state.isComplete ? (
           <div className="rounded-lg border border-sky-200 bg-white p-6 text-center dark:border-stone-700 dark:bg-stone-900">
             <p className="text-lg font-medium text-slate-900 dark:text-stone-50">
               Lesson complete!
@@ -198,7 +202,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
               </Button>
             )}
           </div>
-        ) : (
+        ) : currentQuestion ? (
           <QuestionPanel
             key={currentQuestion.id}
             question={currentQuestion}
@@ -208,6 +212,10 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
             disabled={false}
             onSubmit={handleAnswer}
           />
+        ) : (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            Assignment questions could not be loaded. Please refresh the page.
+          </p>
         )}
       </section>
 
@@ -224,13 +232,20 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
               Extra Practice
             </h2>
             <p className="text-sm text-slate-600 dark:text-stone-400">
-              Optional adaptive problems—separate from your lesson questions,
-              with its own mastery progress.
+              {hasExtraPractice
+                ? "Optional adaptive problems—separate from your lesson questions, with its own mastery progress."
+                : "Extra practice has not been added for this section yet."}
             </p>
           </div>
-          <Button asChild className="shrink-0">
-            <Link href={lessonPracticePath(courseId, lessonId)}>Extra Practice</Link>
-          </Button>
+          {hasExtraPractice ? (
+            <Button asChild className="shrink-0">
+              <Link href={lessonPracticePath(courseId, lessonId)}>Extra Practice</Link>
+            </Button>
+          ) : (
+            <p className="text-sm text-slate-600 dark:text-stone-400 sm:text-right">
+              No extra practice problems for this section.
+            </p>
+          )}
         </div>
       </section>
 

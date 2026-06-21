@@ -5,7 +5,9 @@ import { useState } from "react";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   courseDeleteConfirmationPhrase,
+  lessonDeleteConfirmationPhrase,
   removeCourseFromStore,
+  removeLessonFromStore,
 } from "@/lib/admin/content-store";
 import { slugifyId } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
@@ -26,6 +28,9 @@ export function AdminCurriculumPanel() {
   const course = store.courses.find((c) => c.id === selectedCourseId);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteLessonDialogOpen, setDeleteLessonDialogOpen] = useState(false);
+  const [lessonToDelete, setLessonToDelete] = useState<CurriculumLesson | null>(null);
+  const [deleteLessonConfirmText, setDeleteLessonConfirmText] = useState("");
 
   const [newCourse, setNewCourse] = useState({
     title: "",
@@ -37,8 +42,8 @@ export function AdminCurriculumPanel() {
   const [newLesson, setNewLesson] = useState({
     title: "",
     description: "",
-    unitId: "unit-1",
-    unitTitle: "Unit 1",
+    chapterId: "chapter-1",
+    chapterTitle: "Chapter 1",
     order: (course?.lessons.length ?? 0) + 1,
   });
 
@@ -69,8 +74,8 @@ export function AdminCurriculumPanel() {
     if (!id || course.lessons.some((l) => l.id === id)) return;
     const lesson: CurriculumLesson = {
       id,
-      unitId: newLesson.unitId,
-      unitTitle: newLesson.unitTitle,
+      chapterId: newLesson.chapterId,
+      chapterTitle: newLesson.chapterTitle,
       title: newLesson.title,
       description: newLesson.description,
       order: newLesson.order,
@@ -82,8 +87,8 @@ export function AdminCurriculumPanel() {
     setNewLesson({
       title: "",
       description: "",
-      unitId: newLesson.unitId,
-      unitTitle: newLesson.unitTitle,
+      chapterId: newLesson.chapterId,
+      chapterTitle: newLesson.chapterTitle,
       order: course.lessons.length + 2,
     });
   }
@@ -107,10 +112,33 @@ export function AdminCurriculumPanel() {
   const deletePhraseMatches =
     deleteConfirmText.trim() === deletePhrase && deletePhrase.length > 0;
   const canDeleteCourse = store.courses.length > 1;
+  const deleteLessonPhrase = lessonToDelete
+    ? lessonDeleteConfirmationPhrase(lessonToDelete.title)
+    : "";
+  const deleteLessonPhraseMatches =
+    deleteLessonConfirmText.trim() === deleteLessonPhrase && deleteLessonPhrase.length > 0;
 
   function openDeleteDialog() {
     setDeleteConfirmText("");
     setDeleteDialogOpen(true);
+  }
+
+  function openDeleteLessonDialog(lesson: CurriculumLesson) {
+    setLessonToDelete(lesson);
+    setDeleteLessonConfirmText("");
+    setDeleteLessonDialogOpen(true);
+  }
+
+  async function handleDeleteLesson() {
+    if (!course || !lessonToDelete || !deleteLessonPhraseMatches) return;
+
+    const nextStore = removeLessonFromStore(store, course.id, lessonToDelete.id);
+    const ok = await persist(nextStore);
+    if (!ok) return;
+
+    setDeleteLessonDialogOpen(false);
+    setLessonToDelete(null);
+    setDeleteLessonConfirmText("");
   }
 
   async function handleDeleteCourse() {
@@ -213,15 +241,15 @@ export function AdminCurriculumPanel() {
                   className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
                 />
                 <input
-                  placeholder="Unit id"
-                  value={newLesson.unitId}
-                  onChange={(e) => setNewLesson((s) => ({ ...s, unitId: e.target.value }))}
+                  placeholder="Chapter id"
+                  value={newLesson.chapterId}
+                  onChange={(e) => setNewLesson((s) => ({ ...s, chapterId: e.target.value }))}
                   className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
                 />
                 <input
-                  placeholder="Unit title"
-                  value={newLesson.unitTitle}
-                  onChange={(e) => setNewLesson((s) => ({ ...s, unitTitle: e.target.value }))}
+                  placeholder="Chapter title"
+                  value={newLesson.chapterTitle}
+                  onChange={(e) => setNewLesson((s) => ({ ...s, chapterTitle: e.target.value }))}
                   className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
                 />
                 <textarea
@@ -272,12 +300,23 @@ export function AdminCurriculumPanel() {
                   key={lesson.id}
                   className="space-y-2 rounded-lg border border-sky-200 p-4 dark:border-stone-700"
                 >
-                  <p className="text-xs text-slate-500">
-                    {lesson.unitTitle} · #{lesson.order} · id: {lesson.id}
-                    {lesson.chapter != null && lesson.section != null
-                      ? ` · CSV Ch.${lesson.chapter} Sec.${lesson.section}`
-                      : ""}
-                  </p>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="text-xs text-slate-500">
+                      {lesson.chapterTitle} · #{lesson.order} · id: {lesson.id}
+                      {lesson.chapter != null && lesson.section != null
+                        ? ` · CSV Ch.${lesson.chapter} Sec.${lesson.section}`
+                        : ""}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 border-red-300 px-2 text-xs text-red-800 hover:bg-red-100 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-950/40"
+                      onClick={() => openDeleteLessonDialog(lesson)}
+                    >
+                      Delete lesson…
+                    </Button>
+                  </div>
                   <input
                     value={lesson.title}
                     onChange={(e) => updateLesson(lesson.id, { title: e.target.value })}
@@ -382,6 +421,71 @@ export function AdminCurriculumPanel() {
               onClick={() => void handleDeleteCourse()}
             >
               {saving ? "Deleting…" : "Delete course permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteLessonDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteLessonDialogOpen(open);
+          if (!open) {
+            setLessonToDelete(null);
+            setDeleteLessonConfirmText("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {lessonToDelete?.title}?</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-1 text-left">
+                <p>
+                  This permanently removes the lesson from{" "}
+                  <strong>{course?.title}</strong> and deletes its end-of-chapter
+                  questions, Alcumus problems, and video metadata. This cannot be
+                  undone.
+                </p>
+                {lessonToDelete && course && (
+                  <ul className="list-disc space-y-1 pl-5 text-sm">
+                    <li>Lesson id: {lessonToDelete.id}</li>
+                    <li>Course id: {course.id}</li>
+                  </ul>
+                )}
+                <p className="text-sm font-medium text-slate-800 dark:text-stone-200">
+                  Type the following to confirm:
+                </p>
+                <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 font-mono text-sm text-slate-800 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100">
+                  {deleteLessonPhrase}
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={deleteLessonConfirmText}
+            onChange={(e) => setDeleteLessonConfirmText(e.target.value)}
+            placeholder={deleteLessonPhrase}
+            aria-label="Confirmation phrase"
+            autoComplete="off"
+            className="font-mono text-sm"
+          />
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteLessonDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!deleteLessonPhraseMatches || saving}
+              className="border-red-300 text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-950/40"
+              onClick={() => void handleDeleteLesson()}
+            >
+              {saving ? "Deleting…" : "Delete lesson permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>

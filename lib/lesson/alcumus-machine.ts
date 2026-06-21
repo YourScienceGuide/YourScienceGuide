@@ -14,6 +14,29 @@ function problemsAtLevel(pool: AlcumusProblem[], level: AlcumusLevel) {
   return pool.filter((p) => p.level === level);
 }
 
+function levelsWithProblems(pool: AlcumusProblem[]): AlcumusLevel[] {
+  const levels = new Set<AlcumusLevel>();
+  for (const problem of pool) {
+    levels.add(problem.level);
+  }
+  return [...levels].sort((a, b) => a - b);
+}
+
+function resolveLevel(pool: AlcumusProblem[], preferred: AlcumusLevel): AlcumusLevel {
+  if (problemsAtLevel(pool, preferred).length > 0) {
+    return preferred;
+  }
+
+  const available = levelsWithProblems(pool);
+  if (available.length === 0) {
+    return preferred;
+  }
+
+  return available.reduce((best, level) =>
+    Math.abs(level - preferred) < Math.abs(best - preferred) ? level : best,
+  );
+}
+
 function getProblemById(pool: AlcumusProblem[], id: string) {
   return pool.find((p) => p.id === id);
 }
@@ -22,19 +45,37 @@ function pickProblem(
   pool: AlcumusProblem[],
   level: AlcumusLevel,
   excludeId?: string,
-): AlcumusProblem {
-  const candidates = problemsAtLevel(pool, level).filter(
-    (p) => p.id !== excludeId,
-  );
-  const fallback = problemsAtLevel(pool, level);
-  const list = candidates.length > 0 ? candidates : fallback;
+): AlcumusProblem | undefined {
+  if (pool.length === 0) return undefined;
+
+  const withoutExcluded = excludeId
+    ? pool.filter((problem) => problem.id !== excludeId)
+    : pool;
+  const searchPool = withoutExcluded.length > 0 ? withoutExcluded : pool;
+  const atLevel = searchPool.filter((problem) => problem.level === level);
+  const list = atLevel.length > 0 ? atLevel : searchPool;
+
   return list[Math.floor(Math.random() * list.length)];
 }
 
+function pickNextProblem(
+  pool: AlcumusProblem[],
+  level: AlcumusLevel,
+  excludeId?: string,
+): AlcumusProblem | undefined {
+  return (
+    pickProblem(pool, level, excludeId) ??
+    pickProblem(pool, level) ??
+    getProblemById(pool, excludeId ?? "") ??
+    pool[0]
+  );
+}
+
 export function createInitialAlcumusState(pool: AlcumusProblem[]): AlcumusState {
-  const problem = pickProblem(pool, 1);
+  const startLevel = resolveLevel(pool, 1);
+  const problem = pickNextProblem(pool, startLevel) ?? pool[0];
   return {
-    level: 1,
+    level: startLevel,
     problemId: problem.id,
     streak: 0,
     solved: 0,
@@ -49,7 +90,9 @@ export function getCurrentProblem(
   state: AlcumusState,
 ): AlcumusProblem {
   return (
-    getProblemById(pool, state.problemId) ?? pickProblem(pool, state.level)
+    getProblemById(pool, state.problemId) ??
+    pickNextProblem(pool, state.level) ??
+    pool[0]
   );
 }
 
@@ -70,8 +113,11 @@ export function applyAlcumusCorrect(
   pool: AlcumusProblem[],
   state: AlcumusState,
 ): AlcumusState {
-  const nextLevel = Math.min(5, state.level + 1) as AlcumusLevel;
-  const next = pickProblem(pool, nextLevel, state.problemId);
+  if (pool.length === 0) return state;
+
+  const desiredLevel = Math.min(5, state.level + 1) as AlcumusLevel;
+  const nextLevel = resolveLevel(pool, desiredLevel);
+  const next = pickNextProblem(pool, nextLevel, state.problemId) ?? pool[0];
 
   return {
     level: nextLevel,
@@ -91,8 +137,11 @@ export function applyAlcumusIncorrect(
   pool: AlcumusProblem[],
   state: AlcumusState,
 ): AlcumusState {
-  const nextLevel = Math.max(1, state.level - 1) as AlcumusLevel;
-  const next = pickProblem(pool, nextLevel, state.problemId);
+  if (pool.length === 0) return state;
+
+  const desiredLevel = Math.max(1, state.level - 1) as AlcumusLevel;
+  const nextLevel = resolveLevel(pool, desiredLevel);
+  const next = pickNextProblem(pool, nextLevel, state.problemId) ?? pool[0];
 
   return {
     level: nextLevel,

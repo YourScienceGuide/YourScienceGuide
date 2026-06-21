@@ -7,7 +7,7 @@ export const MOCK_FAMILY_STUDENTS: FamilyStudent[] = [
     displayName: "Alex",
     gradeLabel: "B+",
     gradePercent: 87,
-    courseName: "YSG Life Science · Unit 2",
+    courseName: "YSG Life Science · Chapter 2",
     courseProgress: 66,
     avatarInitials: "AR",
     preferences: {
@@ -22,7 +22,7 @@ export const MOCK_FAMILY_STUDENTS: FamilyStudent[] = [
     displayName: "Sam",
     gradeLabel: "A-",
     gradePercent: 91,
-    courseName: "YSG Physical Science · Unit 1",
+    courseName: "YSG Physical Science · Chapter 1",
     courseProgress: 42,
     avatarInitials: "SR",
     preferences: {
@@ -37,7 +37,7 @@ export const MOCK_FAMILY_STUDENTS: FamilyStudent[] = [
     displayName: "Jordan",
     gradeLabel: "B",
     gradePercent: 84,
-    courseName: "YSG Life Science · Unit 1",
+    courseName: "YSG Life Science · Chapter 1",
     courseProgress: 28,
     avatarInitials: "JR",
     preferences: {

@@ -80,7 +80,43 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
     );
   }
 
-  if (!ready || !state) {
+  if (!ready) {
+    return (
+      <p className="text-sm text-slate-600 dark:text-stone-400">
+        Loading extra practice…
+      </p>
+    );
+  }
+
+  if (alcumus.length === 0) {
+    return (
+      <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
+        <div className="space-y-6">
+          <Button variant="ghost" asChild size="sm">
+            <Link href={lessonPath(courseId, lessonId)}>
+              <ArrowLeft aria-hidden />
+              Back to lesson
+            </Link>
+          </Button>
+          <header className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
+              Extra Practice
+            </h1>
+            {lessonMeta && (
+              <p className="text-sm text-slate-500 dark:text-stone-500">
+                {lessonMeta.title}
+              </p>
+            )}
+          </header>
+          <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
+            No extra practice problems for this section.
+          </p>
+        </div>
+      </GuestLessonGuard>
+    );
+  }
+
+  if (!state) {
     return (
       <p className="text-sm text-slate-600 dark:text-stone-400">
         Loading extra practice…

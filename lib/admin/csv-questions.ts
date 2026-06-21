@@ -42,7 +42,7 @@ export type ParsedCsvRow = {
   section: number | null;
   type: CsvRowType;
   question: string;
-  options: [string, string, string, string];
+  options: string[];
   correct: number | null;
   acceptedAnswers: string[];
   hint?: string;
@@ -215,6 +215,52 @@ function parseAcceptedAnswers(raw: string): string[] {
     .filter(Boolean);
 }
 
+const MIN_MULTIPLE_CHOICE_OPTIONS = 2;
+const MAX_MULTIPLE_CHOICE_OPTIONS = 4;
+
+function parseMultipleChoiceOptions(
+  record: Record<string, string>,
+): { options?: string[]; error?: string } {
+  const raw = [
+    record["Option 1"]?.trim() ?? "",
+    record["Option 2"]?.trim() ?? "",
+    record["Option 3"]?.trim() ?? "",
+    record["Option 4"]?.trim() ?? "",
+  ];
+
+  let sawEmpty = false;
+  const options: string[] = [];
+
+  for (const option of raw) {
+    if (option) {
+      if (sawEmpty) {
+        return {
+          error:
+            "Multiple-choice options must be filled in order starting with Option 1 (no skipped columns).",
+        };
+      }
+      options.push(option);
+    } else {
+      sawEmpty = true;
+    }
+  }
+
+  if (options.length < MIN_MULTIPLE_CHOICE_OPTIONS) {
+    return {
+      error:
+        "Multiple-choice rows need at least two options (for example, True and False).",
+    };
+  }
+
+  if (options.length > MAX_MULTIPLE_CHOICE_OPTIONS) {
+    return {
+      error: `Multiple-choice rows support up to ${MAX_MULTIPLE_CHOICE_OPTIONS} options.`,
+    };
+  }
+
+  return { options };
+}
+
 function validateRow(
   rowNumber: number,
   record: Record<string, string>,
@@ -245,30 +291,25 @@ function validateRow(
     return { error: { rowNumber, message: "Section must be a number when provided." } };
   }
 
-  const options = [
-    record["Option 1"]?.trim() ?? "",
-    record["Option 2"]?.trim() ?? "",
-    record["Option 3"]?.trim() ?? "",
-    record["Option 4"]?.trim() ?? "",
-  ] as [string, string, string, string];
-
+  const optionsResult = parseMultipleChoiceOptions(record);
   const acceptedAnswers = parseAcceptedAnswers(record["Accepted Answers"] ?? "");
   const minLength = parseOptionalNumber(record["Min Length"] ?? "");
   let correct: number | null = null;
+  let options: string[] = [];
 
   if (type === "multiple-choice") {
-    if (options.some((option) => !option)) {
-      return {
-        error: { rowNumber, message: "All four options are required for multiple-choice rows." },
-      };
+    if (optionsResult.error) {
+      return { error: { rowNumber, message: optionsResult.error } };
     }
+    options = optionsResult.options ?? [];
+
     const correctRaw = record.Correct?.trim() ?? "";
     correct = Number(correctRaw);
-    if (!Number.isInteger(correct) || correct < 1 || correct > 4) {
+    if (!Number.isInteger(correct) || correct < 1 || correct > options.length) {
       return {
         error: {
           rowNumber,
-          message: "Correct must be 1–4 for multiple-choice rows (Option 1 = 1).",
+          message: `Correct must be 1–${options.length} for multiple-choice rows (Option 1 = 1).`,
         },
       };
     }
@@ -397,7 +438,7 @@ function rowToAlcumusProblem(row: ParsedCsvRow, index: number): AlcumusProblem {
     level: row.level ?? 1,
     type: "choice",
     prompt: row.question,
-    options: [...row.options],
+    options: row.options,
     correctIndex: (row.correct ?? 1) - 1,
     hint: row.hint,
   };
@@ -425,7 +466,7 @@ function rowToChapterQuestion(row: ParsedCsvRow, index: number): LessonQuestion 
     type: "multiple-choice",
     id,
     prompt: row.question,
-    options: [...row.options],
+    options: row.options,
     correctIndex: (row.correct ?? 1) - 1,
   };
 }
@@ -514,12 +555,12 @@ export function serializeExampleRow(kind: CsvImportKind, type: CsvRowType): stri
       escapeCsvField("3"),
       escapeCsvField("1"),
       escapeCsvField("multiple-choice"),
-      escapeCsvField("Which form of energy increases as a ball rolls downhill?"),
-      escapeCsvField("Thermal energy"),
-      escapeCsvField("Kinetic energy"),
-      escapeCsvField("Chemical energy"),
-      escapeCsvField("Nuclear energy"),
-      escapeCsvField("2"),
+      escapeCsvField("Photosynthesis occurs primarily in plant leaves. True or false?"),
+      escapeCsvField("True"),
+      escapeCsvField("False"),
+      "",
+      "",
+      escapeCsvField("1"),
       "",
       "",
     ].join(",");

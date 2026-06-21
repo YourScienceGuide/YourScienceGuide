@@ -20,22 +20,22 @@ export function getLesson(
   return getCourse(courseId)?.lessons.find((l) => l.id === lessonId);
 }
 
-export function getLessonsByUnit(course: Course) {
-  const units = new Map<string, { unitTitle: string; lessons: CurriculumLesson[] }>();
+export function getLessonsByChapter(course: Course) {
+  const chapters = new Map<string, { chapterTitle: string; lessons: CurriculumLesson[] }>();
   for (const lesson of course.lessons) {
-    const existing = units.get(lesson.unitId);
+    const existing = chapters.get(lesson.chapterId);
     if (existing) {
       existing.lessons.push(lesson);
     } else {
-      units.set(lesson.unitId, {
-        unitTitle: lesson.unitTitle,
+      chapters.set(lesson.chapterId, {
+        chapterTitle: lesson.chapterTitle,
         lessons: [lesson],
       });
     }
   }
-  return Array.from(units.entries()).map(([unitId, data]) => ({
-    unitId,
-    unitTitle: data.unitTitle,
+  return Array.from(chapters.entries()).map(([chapterId, data]) => ({
+    chapterId,
+    chapterTitle: data.chapterTitle,
     lessons: data.lessons,
   }));
 }

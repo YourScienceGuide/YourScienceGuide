@@ -55,8 +55,8 @@ function FormatTable({ kind }: { kind: CsvImportKind }) {
             <td className="max-w-xs px-3 py-2">Question text…</td>
             <td className="px-3 py-2">A</td>
             <td className="px-3 py-2">B</td>
-            <td className="px-3 py-2">C</td>
-            <td className="px-3 py-2">D</td>
+            <td className="px-3 py-2 text-slate-400">(optional)</td>
+            <td className="px-3 py-2 text-slate-400">(optional)</td>
             <td className="px-3 py-2">2</td>
             <td className="px-3 py-2">—</td>
             {kind === "alcumus" ? (
@@ -184,7 +184,9 @@ export function AdminCsvImportBlock({
           <strong className="font-medium text-slate-800 dark:text-stone-200">
             multiple-choice
           </strong>{" "}
-          rows need all four options and Correct (1–4).
+          rows need at least two options (Option 1 and Option 2). Options 3 and 4
+          are optional. Leave unused option columns blank and set Correct to the
+          option number (Option 1 = 1).
         </li>
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">

@@ -37,7 +37,7 @@ export function LessonNav({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-stone-500">
-            {lesson.unitTitle}
+            {lesson.chapterTitle}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
             {lesson.title}

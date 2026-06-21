@@ -10,7 +10,7 @@ export const MOCK_STUDENT = {
   name: "Alex",
   grade: "B+",
   gradePercent: 87,
-  courseName: "YSG Life Science · Unit 2",
+  courseName: "YSG Life Science · Chapter 2",
   courseProgress: 66,
 };
 

@@ -1,7 +1,7 @@
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { lessonKey } from "@/lib/admin/lesson-key";
-import type { Course } from "@/lib/student/curriculum-types";
+import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 
 export type LessonVideoMeta = {
@@ -28,6 +28,33 @@ const CURRENT_STORE_VERSION = 2 as const;
 
 function cloneCourses(): Course[] {
   return JSON.parse(JSON.stringify(SEED_COURSES)) as Course[];
+}
+
+function migrateLessonFields(lesson: CurriculumLesson): CurriculumLesson {
+  const legacy = lesson as CurriculumLesson & {
+    unitId?: string;
+    unitTitle?: string;
+  };
+
+  const chapterId =
+    legacy.chapterId ?? legacy.unitId?.replace(/^unit-/, "chapter-") ?? "chapter-1";
+  const legacyTitle = legacy.chapterTitle ?? legacy.unitTitle ?? "Chapter 1";
+  const chapterTitle = legacy.unitTitle && !legacy.chapterTitle
+    ? legacyTitle.replace(/^Unit\b/i, "Chapter")
+    : legacyTitle;
+
+  return {
+    ...lesson,
+    chapterId,
+    chapterTitle,
+  };
+}
+
+function migrateCourses(courses: Course[]): Course[] {
+  return courses.map((course) => ({
+    ...course,
+    lessons: course.lessons.map(migrateLessonFields),
+  }));
 }
 
 function stripLegacyVideoBlobs(store: AdminContentStore): AdminContentStore {
@@ -59,7 +86,10 @@ export function createDefaultStore(): AdminContentStore {
 }
 
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
-  return stripLegacyVideoBlobs(store);
+  return stripLegacyVideoBlobs({
+    ...store,
+    courses: migrateCourses(store.courses),
+  });
 }
 
 export function notifyContentUpdated() {
@@ -120,6 +150,31 @@ export function courseDeleteConfirmationPhrase(courseTitle: string): string {
   return `delete course ${courseTitle}`;
 }
 
+/** Exact phrase admins must type to confirm lesson deletion. */
+export function lessonDeleteConfirmationPhrase(lessonTitle: string): string {
+  return `delete lesson ${lessonTitle}`;
+}
+
+/** Exact phrase admins must type to confirm deleting all assignment questions for a lesson. */
+export function assignmentQuestionsDeleteAllPhrase(lessonTitle: string): string {
+  return `delete all assignment questions for ${lessonTitle}`;
+}
+
+/** Exact phrase admins must type to confirm deleting one assignment question. */
+export function assignmentQuestionDeletePhrase(questionNumber: number): string {
+  return `delete assignment question ${questionNumber}`;
+}
+
+/** Exact phrase admins must type to confirm deleting all extra practice for a lesson. */
+export function alcumusProblemsDeleteAllPhrase(lessonTitle: string): string {
+  return `delete all extra practice for ${lessonTitle}`;
+}
+
+/** Exact phrase admins must type to confirm deleting one extra practice problem. */
+export function alcumusProblemDeletePhrase(problemNumber: number): string {
+  return `delete extra practice problem ${problemNumber}`;
+}
+
 function stripKeysForCourse<T>(
   record: Record<string, T>,
   courseId: string,
@@ -132,6 +187,35 @@ function stripKeysForCourse<T>(
     }
   }
   return next;
+}
+
+function stripLessonKey<T>(
+  record: Record<string, T>,
+  key: string,
+): Record<string, T> {
+  if (!(key in record)) return record;
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
+export function removeLessonFromStore(
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+): AdminContentStore {
+  const key = lessonKey(courseId, lessonId);
+  return {
+    ...store,
+    courses: store.courses.map((course) =>
+      course.id === courseId
+        ? { ...course, lessons: course.lessons.filter((lesson) => lesson.id !== lessonId) }
+        : course,
+    ),
+    lessonQuestions: stripLessonKey(store.lessonQuestions, key),
+    alcumusByLesson: stripLessonKey(store.alcumusByLesson, key),
+    videos: stripLessonKey(store.videos, key),
+  };
 }
 
 export function removeCourseFromStore(

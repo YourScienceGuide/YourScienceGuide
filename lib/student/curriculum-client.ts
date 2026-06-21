@@ -5,7 +5,7 @@ import {
   getLessonFromStore,
 } from "@/lib/admin/content-store";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
-import { getLessonsByUnit as getLessonsByUnitBase } from "@/lib/student/curriculum";
+import { getLessonsByChapter as getLessonsByChapterBase } from "@/lib/student/curriculum";
 
 export function getCoursesClient(store: AdminContentStore): Course[] {
   return getCoursesFromStore(store);
@@ -26,8 +26,8 @@ export function getLessonClient(
   return getLessonFromStore(store, courseId, lessonId);
 }
 
-export function getLessonsByUnitClient(course: Course) {
-  return getLessonsByUnitBase(course);
+export function getLessonsByChapterClient(course: Course) {
+  return getLessonsByChapterBase(course);
 }
 
 export function getAdjacentLessonsClient(

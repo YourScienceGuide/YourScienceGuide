@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   try {
-    const store = await loadContentStoreFromDatabase();
+    const { store } = await loadContentStoreFromDatabase();
     return NextResponse.json(store, {
       headers: { "Cache-Control": "no-store" },
     });

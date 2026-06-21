@@ -1,7 +1,7 @@
 export type CurriculumLesson = {
   id: string;
-  unitId: string;
-  unitTitle: string;
+  chapterId: string;
+  chapterTitle: string;
   title: string;
   description: string;
   order: number;

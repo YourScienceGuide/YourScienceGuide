@@ -6,7 +6,7 @@ import { CurriculumLessonRow } from "@/components/student/curriculum-lesson-row"
 import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
-import { getCourseClient, getLessonsByUnitClient } from "@/lib/student/curriculum-client";
+import { getCourseClient, getLessonsByChapterClient } from "@/lib/student/curriculum-client";
 import { getTextbook } from "@/lib/student/textbook";
 import { lessonProgressPercent, loadLessonProgress } from "@/lib/student/lesson-progress";
 import {
@@ -26,7 +26,7 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
   const { percent, statuses } = useCourseProgress(
     course ?? { id: courseId, title: "", subject: "", description: "", lessons: [] },
   );
-  const units = course ? getLessonsByUnitClient(course) : [];
+  const chapters = course ? getLessonsByChapterClient(course) : [];
   const completedCount = course
     ? course.lessons.filter((l) => statuses[l.id] === "complete").length
     : 0;
@@ -70,13 +70,13 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
       )}
 
       <div className="space-y-10">
-        {units.map(({ unitId, unitTitle, lessons }) => (
-          <section key={unitId} aria-labelledby={`unit-${unitId}`}>
+        {chapters.map(({ chapterId, chapterTitle, lessons }) => (
+          <section key={chapterId} aria-labelledby={`chapter-${chapterId}`}>
             <h2
-              id={`unit-${unitId}`}
+              id={`chapter-${chapterId}`}
               className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-stone-500"
             >
-              {unitTitle}
+              {chapterTitle}
             </h2>
             <ol className="space-y-2">
               {lessons.map((lesson) => {
