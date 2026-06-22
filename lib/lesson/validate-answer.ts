@@ -1,4 +1,8 @@
+import {
+  checkFillInBlankQuestion,
+} from "@/lib/lesson/fill-in-blank";
 import type {
+  FillInBlankQuestion,
   LessonQuestion,
   LongAnswerQuestion,
   MultipleChoiceQuestion,
@@ -33,9 +37,20 @@ export function checkLongAnswer(
   return value.trim().length >= question.minLength;
 }
 
+export function checkFillInBlank(
+  question: FillInBlankQuestion,
+  values: string[],
+): { correct: boolean; spellingHint: boolean } {
+  return checkFillInBlankQuestion(question.blankAnswers, values);
+}
+
 export function validateAnswer(
   question: LessonQuestion,
-  payload: { selectedIndex?: number | null; text?: string },
+  payload: {
+    selectedIndex?: number | null;
+    text?: string;
+    blanks?: string[];
+  },
 ): boolean {
   switch (question.type) {
     case "multiple-choice":
@@ -47,5 +62,7 @@ export function validateAnswer(
       return checkShortAnswer(question, payload.text ?? "");
     case "long-answer":
       return checkLongAnswer(question, payload.text ?? "");
+    case "fill-in-the-blank":
+      return checkFillInBlank(question, payload.blanks ?? []).correct;
   }
 }

@@ -12,7 +12,7 @@ const IMPORT_KINDS: { id: CsvImportKind; label: string; description: string }[] 
     id: "end-of-chapter",
     label: "End-of-chapter (assignment)",
     description:
-      "Required lesson assignment questions — multiple-choice, short-answer, and long-answer.",
+      "Required lesson assignment questions — multiple-choice, fill-in-the-blank, short-answer, and long-answer.",
   },
   {
     id: "alcumus",

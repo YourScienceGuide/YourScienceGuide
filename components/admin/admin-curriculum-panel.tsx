@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { AdminTextbookSection } from "@/components/admin/admin-textbook-section";
 import {
   courseDeleteConfirmationPhrase,
   lessonDeleteConfirmationPhrase,
@@ -215,6 +216,8 @@ export function AdminCurriculumPanel() {
 
         {course && (
           <>
+            <AdminTextbookSection courseId={course.id} courseTitle={course.title} />
+
             <form
               onSubmit={handleAddLesson}
               className="space-y-3 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900"

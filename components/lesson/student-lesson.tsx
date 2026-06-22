@@ -8,13 +8,16 @@ import { useContentStore } from "@/components/admin/content-store-provider";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";
+import { QuestionHistorySection } from "@/components/student/question-history-section";
+import { useQuestionAttemptRecorder } from "@/components/student/use-question-attempt-recorder";
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import {
   getAdjacentLessonsClient,
   getCourseClient,
   getLessonClient,
+  getTextbookClient,
 } from "@/lib/student/curriculum-client";
-import { getLessonReadings, getTextbook } from "@/lib/student/textbook";
+import { getLessonReadings } from "@/lib/student/textbook";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonToast } from "@/components/lesson/lesson-toast";
@@ -56,11 +59,12 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const guestCompletionRecorded = useRef(false);
   const course = getCourseClient(store, courseId);
   const lessonMeta = getLessonClient(store, courseId, lessonId);
-  const textbook = getTextbook(courseId);
+  const textbook = getTextbookClient(store, courseId);
   const readings = getLessonReadings(lessonId);
   const { prev, next } = getAdjacentLessonsClient(store, courseId, lessonId);
 
   const { lesson, alcumus, ready, error } = useLessonAssessment();
+  const { recordAssignmentAttempt } = useQuestionAttemptRecorder(courseId, lessonId);
   const [state, setState] = useState<LessonMachineState | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -211,6 +215,9 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
             feedbackTone={state.feedbackTone}
             disabled={false}
             onSubmit={handleAnswer}
+            onAnswerChecked={(result) => {
+              void recordAssignmentAttempt(result);
+            }}
           />
         ) : (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
@@ -248,6 +255,13 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
           )}
         </div>
       </section>
+
+      <QuestionHistorySection
+        courseId={courseId}
+        lessonId={lessonId}
+        title="Your question history"
+        description="Assignment and extra practice attempts for this lesson."
+      />
 
       <section
         className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"

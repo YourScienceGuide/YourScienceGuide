@@ -24,9 +24,12 @@ const BIOLOGY_TEXTBOOK: Textbook = {
   coverAlt: "Cover of Life Science: A Biological Approach, Second Edition",
 };
 
-const TEXTBOOKS: Record<string, Textbook> = {
+/** Default companion textbooks bundled with the seed curriculum. */
+export const SEED_TEXTBOOKS: Record<string, Textbook> = {
   "biology-year-1": BIOLOGY_TEXTBOOK,
 };
+
+const TEXTBOOKS: Record<string, Textbook> = SEED_TEXTBOOKS;
 
 const LESSON_READINGS: Record<string, TextbookReading[]> = {
   "scientific-method": [
@@ -75,4 +78,21 @@ export function getLessonReadings(lessonId: string): TextbookReading[] {
 
 export function getTextbookDisplayTitle(textbook: Textbook): string {
   return `${textbook.title}: ${textbook.subtitle}`;
+}
+
+export function buildTextbookCoverAlt(title: string, subtitle: string): string {
+  const fullTitle = subtitle.trim() ? `${title}: ${subtitle}` : title;
+  return `Cover of ${fullTitle}`;
+}
+
+export function createEmptyTextbook(): Textbook {
+  return {
+    title: "",
+    subtitle: "",
+    authors: "",
+    edition: "",
+    publisher: "",
+    coverSrc: "",
+    coverAlt: "",
+  };
 }

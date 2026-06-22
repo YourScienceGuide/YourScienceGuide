@@ -1,5 +1,4 @@
-import Image from "next/image";
-
+import { TextbookCover } from "@/components/student/textbook-cover";
 import type { Textbook } from "@/lib/student/textbook";
 import { getTextbookDisplayTitle } from "@/lib/student/textbook";
 
@@ -24,14 +23,7 @@ export function TextbookCard({ textbook }: TextbookCardProps) {
 
       <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start">
         <div className="mx-auto shrink-0 sm:mx-0">
-          <Image
-            src={textbook.coverSrc}
-            alt={textbook.coverAlt}
-            width={160}
-            height={220}
-            className="rounded-md border border-stone-200 shadow-md dark:border-stone-600"
-            priority
-          />
+          <TextbookCover src={textbook.coverSrc} alt={textbook.coverAlt} />
         </div>
 
         <div className="min-w-0 flex-1 space-y-2 text-center sm:text-left">

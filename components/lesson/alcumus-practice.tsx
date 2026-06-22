@@ -6,6 +6,7 @@ import { AssessmentProtected } from "@/components/ai-guard/assessment-protected"
 import { CanvasText } from "@/components/ai-guard/canvas-text";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonToast } from "@/components/lesson/lesson-toast";
+import { useQuestionAttemptRecorder } from "@/components/student/use-question-attempt-recorder";
 import { Button } from "@/components/ui/button";
 import { toDisplayEncoding } from "@/lib/ai-guard/encode";
 import { cn } from "@/lib/utils";
@@ -23,12 +24,20 @@ import { shuffleMultipleChoice } from "@/lib/lesson/shuffle-multiple-choice";
 import type { MultipleChoiceQuestion } from "@/lib/lesson/types";
 
 type AlcumusPracticeProps = {
+  courseId: string;
+  lessonId: string;
   state: AlcumusState;
   onStateChange: (state: AlcumusState) => void;
 };
 
-export function AlcumusPractice({ state, onStateChange }: AlcumusPracticeProps) {
+export function AlcumusPractice({
+  courseId,
+  lessonId,
+  state,
+  onStateChange,
+}: AlcumusPracticeProps) {
   const { alcumus } = useLessonAssessment();
+  const { recordAlcumusAttempt } = useQuestionAttemptRecorder(courseId, lessonId);
 
   const dismissToast = useCallback(() => {
     onStateChange(clearAlcumusToast(state));
@@ -36,13 +45,20 @@ export function AlcumusPractice({ state, onStateChange }: AlcumusPracticeProps) 
 
   const handleSubmit = useCallback(
     (correct: boolean) => {
+      const problem = getCurrentProblem(alcumus, state);
+      void recordAlcumusAttempt({
+        questionId: problem.id,
+        questionType: problem.type,
+        prompt: problem.prompt,
+        isCorrect: correct,
+      });
       onStateChange(
         correct
           ? applyAlcumusCorrect(alcumus, state)
           : applyAlcumusIncorrect(alcumus, state),
       );
     },
-    [alcumus, onStateChange, state],
+    [alcumus, onStateChange, recordAlcumusAttempt, state],
   );
 
   const problem = getCurrentProblem(alcumus, state);

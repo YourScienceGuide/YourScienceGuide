@@ -20,9 +20,19 @@ export type LongAnswerQuestion = {
   minLength: number;
 };
 
+export type FillInBlankQuestion = {
+  type: "fill-in-the-blank";
+  id: string;
+  /** Sentence with blanks marked as four or more underscores (________). */
+  prompt: string;
+  /** Accepted answers per blank; each inner list allows spelling variants. */
+  blankAnswers: string[][];
+};
+
 export type LessonQuestion =
   | MultipleChoiceQuestion
   | ShortAnswerQuestion
-  | LongAnswerQuestion;
+  | LongAnswerQuestion
+  | FillInBlankQuestion;
 
 export const LESSON_QUESTION_COUNT = 3;

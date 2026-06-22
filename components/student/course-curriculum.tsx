@@ -6,8 +6,7 @@ import { CurriculumLessonRow } from "@/components/student/curriculum-lesson-row"
 import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
-import { getCourseClient, getLessonsByChapterClient } from "@/lib/student/curriculum-client";
-import { getTextbook } from "@/lib/student/textbook";
+import { getCourseClient, getLessonsByChapterClient, getTextbookClient } from "@/lib/student/curriculum-client";
 import { lessonProgressPercent, loadLessonProgress } from "@/lib/student/lesson-progress";
 import {
   GUEST_LESSON_LIMIT,
@@ -22,7 +21,7 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
   const { isGuest } = useAuth();
   const { store } = useContentStore();
   const course = getCourseClient(store, courseId);
-  const textbook = getTextbook(courseId);
+  const textbook = getTextbookClient(store, courseId);
   const { percent, statuses } = useCourseProgress(
     course ?? { id: courseId, title: "", subject: "", description: "", lessons: [] },
   );

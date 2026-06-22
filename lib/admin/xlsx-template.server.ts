@@ -13,15 +13,19 @@ const TEMPLATE_DATA_ROWS = 100;
 function applyTypeDropdown(
   worksheet: ExcelJS.Worksheet,
   validationSheetName: string,
+  typeCount: number,
 ) {
   for (let row = 2; row <= TEMPLATE_DATA_ROWS + 1; row += 1) {
     worksheet.getCell(`${TYPE_COLUMN}${row}`).dataValidation = {
       type: "list",
       allowBlank: false,
-      formulae: [`'${validationSheetName}'!$A$1:$A$2`],
+      formulae: [`'${validationSheetName}'!$A$1:$A$${typeCount}`],
       showErrorMessage: true,
       errorTitle: "Invalid type",
-      error: 'Choose "multiple-choice" or "free-response".',
+      error:
+        typeCount === 3
+          ? 'Choose "multiple-choice", "free-response", or "fill-in-the-blank".'
+          : 'Choose "multiple-choice" or "free-response".',
     };
   }
 }
@@ -34,6 +38,11 @@ export async function buildQuestionTemplateXlsx(
   validationSheet.state = "veryHidden";
   validationSheet.getCell("A1").value = "multiple-choice";
   validationSheet.getCell("A2").value = "free-response";
+
+  const typeCount = kind === "end-of-chapter" ? 3 : 2;
+  if (kind === "end-of-chapter") {
+    validationSheet.getCell("A3").value = "fill-in-the-blank";
+  }
 
   const worksheet = workbook.addWorksheet("Questions");
   const headers = getCsvHeaders(kind);
@@ -48,7 +57,7 @@ export async function buildQuestionTemplateXlsx(
     column.width = Math.max(header.length + 2, 14);
   });
 
-  applyTypeDropdown(worksheet, validationSheet.name);
+  applyTypeDropdown(worksheet, validationSheet.name, typeCount);
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

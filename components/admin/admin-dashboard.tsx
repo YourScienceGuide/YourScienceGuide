@@ -34,15 +34,15 @@ export function AdminDashboard() {
           </h1>
           <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
             Build courses and lessons, edit assignment and Alcumus problems, and
-            upload videos via Mux. Content is stored in Supabase and shared across
-            browsers and users.
+            upload videos via Mux. Content is stored in Supabase tables and shared
+            across browsers and users.
           </p>
           <p className="text-xs text-slate-500 dark:text-stone-500">
             Storage:{" "}
             {loading
               ? "Loading…"
               : source === "supabase"
-                ? "Supabase (live)"
+                ? "Supabase CMS tables (live)"
                 : "Seed defaults — configure Supabase env vars to persist edits"}
           </p>
           {saveError && (

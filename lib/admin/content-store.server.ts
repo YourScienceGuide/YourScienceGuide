@@ -2,11 +2,17 @@ import "server-only";
 
 import {
   createDefaultStore,
+  sanitizeContentStore,
   type AdminContentStore,
 } from "@/lib/admin/content-store";
-import { createSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/server";
-
-const GLOBAL_CONTENT_ID = "global";
+import {
+  cmsHasContent,
+  loadCmsAsStore,
+  loadLegacyContentBlob,
+  seedDefaultCms,
+} from "@/lib/cms/load-cms";
+import { resetCmsToDefault, saveCmsFromStore } from "@/lib/cms/save-cms";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export type ContentStoreSource = "supabase" | "default";
 
@@ -30,7 +36,8 @@ function isSupabaseConnectivityError(error: unknown): boolean {
     /ENOTFOUND/i.test(message) ||
     /ECONNREFUSED/i.test(message) ||
     /ETIMEDOUT/i.test(message) ||
-    /network error/i.test(message)
+    /network error/i.test(message) ||
+    /Failed to load CMS/i.test(message)
   );
 }
 
@@ -42,23 +49,13 @@ function connectivityFallback(reason: unknown): ContentStoreLoadResult {
   return { store: createDefaultStore(), source: "default" };
 }
 
-function normalizeStore(data: unknown): AdminContentStore {
-  if (!data || typeof data !== "object") {
-    return createDefaultStore();
-  }
+async function migrateLegacyBlobIfNeeded(): Promise<AdminContentStore | null> {
+  const legacy = await loadLegacyContentBlob();
+  if (!legacy) return null;
 
-  const parsed = data as Partial<AdminContentStore>;
-  if (!Array.isArray(parsed.courses) || parsed.courses.length === 0) {
-    return createDefaultStore();
-  }
-
-  return {
-    version: parsed.version === 1 ? 1 : 2,
-    courses: parsed.courses,
-    lessonQuestions: parsed.lessonQuestions ?? {},
-    alcumusByLesson: parsed.alcumusByLesson ?? {},
-    videos: parsed.videos ?? {},
-  };
+  console.info("Migrating legacy content_store JSON blob into normalized CMS tables…");
+  await saveCmsFromStore(legacy);
+  return loadCmsAsStore();
 }
 
 export async function loadContentStoreFromDatabase(): Promise<ContentStoreLoadResult> {
@@ -66,34 +63,24 @@ export async function loadContentStoreFromDatabase(): Promise<ContentStoreLoadRe
     return { store: createDefaultStore(), source: "default" };
   }
 
-  const supabase = createSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("content_store")
-    .select("data")
-    .eq("id", GLOBAL_CONTENT_ID)
-    .maybeSingle();
+  try {
+    if (await cmsHasContent()) {
+      return { store: await loadCmsAsStore(), source: "supabase" };
+    }
 
-  if (error) {
+    const migrated = await migrateLegacyBlobIfNeeded();
+    if (migrated) {
+      return { store: migrated, source: "supabase" };
+    }
+
+    const store = await seedDefaultCms();
+    return { store, source: "supabase" };
+  } catch (error) {
     if (isSupabaseConnectivityError(error)) {
       return connectivityFallback(error);
     }
-    throw new Error(`Failed to load content store: ${error.message}`);
+    throw error;
   }
-
-  if (!data?.data) {
-    const defaultStore = createDefaultStore();
-    try {
-      await saveContentStoreToDatabase(defaultStore);
-      return { store: defaultStore, source: "supabase" };
-    } catch (saveError) {
-      if (isSupabaseConnectivityError(saveError)) {
-        return connectivityFallback(saveError);
-      }
-      throw saveError;
-    }
-  }
-
-  return { store: normalizeStore(data.data), source: "supabase" };
 }
 
 export async function saveContentStoreToDatabase(
@@ -103,22 +90,9 @@ export async function saveContentStoreToDatabase(
     throw new Error("Supabase is not configured");
   }
 
-  const supabase = createSupabaseAdmin();
-  const normalized = normalizeStore(store);
-  const { error } = await supabase.from("content_store").upsert(
-    {
-      id: GLOBAL_CONTENT_ID,
-      data: normalized,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" },
-  );
-
-  if (error) {
-    throw new Error(`Failed to save content store: ${error.message}`);
-  }
-
-  return normalized;
+  const sanitized = sanitizeContentStore(store);
+  await saveCmsFromStore(sanitized);
+  return loadCmsAsStore();
 }
 
 export async function resetContentStoreInDatabase(): Promise<AdminContentStore> {
@@ -126,5 +100,7 @@ export async function resetContentStoreInDatabase(): Promise<AdminContentStore> 
   if (!isSupabaseConfigured()) {
     return defaultStore;
   }
-  return saveContentStoreToDatabase(defaultStore);
+
+  await resetCmsToDefault(defaultStore);
+  return loadCmsAsStore();
 }

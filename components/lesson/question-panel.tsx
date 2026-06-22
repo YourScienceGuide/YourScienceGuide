@@ -8,9 +8,14 @@ import { Button } from "@/components/ui/button";
 import { toDisplayEncoding } from "@/lib/ai-guard/encode";
 import { cn } from "@/lib/utils";
 import type { Difficulty } from "@/lib/lesson/state-machine";
+import {
+  countBlanks,
+  FILL_IN_BLANK_SPELLING_HINT,
+  splitPromptOnBlanks,
+} from "@/lib/lesson/fill-in-blank";
 import { shuffleMultipleChoice } from "@/lib/lesson/shuffle-multiple-choice";
 import type { LessonQuestion } from "@/lib/lesson/types";
-import { validateAnswer } from "@/lib/lesson/validate-answer";
+import { checkFillInBlank, validateAnswer } from "@/lib/lesson/validate-answer";
 
 type QuestionPanelProps = {
   question: LessonQuestion;
@@ -19,6 +24,12 @@ type QuestionPanelProps = {
   feedbackTone: "success" | "retry" | null;
   disabled: boolean;
   onSubmit: (correct: boolean) => void;
+  onAnswerChecked?: (result: {
+    questionId: string;
+    questionType: string;
+    prompt: string;
+    isCorrect: boolean;
+  }) => void;
 };
 
 export function QuestionPanel({
@@ -28,11 +39,24 @@ export function QuestionPanel({
   feedbackTone,
   disabled,
   onSubmit,
+  onAnswerChecked,
 }: QuestionPanelProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [textAnswer, setTextAnswer] = useState("");
   const [longAnswer, setLongAnswer] = useState("");
+  const [blankAnswers, setBlankAnswers] = useState<string[]>([]);
+  const [localFeedback, setLocalFeedback] = useState<string | null>(null);
+  const [localFeedbackTone, setLocalFeedbackTone] = useState<
+    "success" | "retry" | null
+  >(null);
   const [parentSubmitted, setParentSubmitted] = useState(false);
+
+  const blankCount =
+    question.type === "fill-in-the-blank" ? countBlanks(question.prompt) : 0;
+  const promptParts =
+    question.type === "fill-in-the-blank"
+      ? splitPromptOnBlanks(question.prompt)
+      : [];
 
   const shuffledMc = useMemo(
     () =>
@@ -47,10 +71,20 @@ export function QuestionPanel({
     return { ...question, ...shuffledMc };
   }, [question, shuffledMc]);
 
+  function notifyChecked(isCorrect: boolean) {
+    onAnswerChecked?.({
+      questionId: question.id,
+      questionType: question.type,
+      prompt: question.prompt,
+      isCorrect,
+    });
+  }
+
   function handleCheck(
     payload: { selectedIndex?: number | null; text?: string },
   ) {
     const correct = validateAnswer(questionForValidation, payload);
+    notifyChecked(correct);
     onSubmit(correct);
   }
 
@@ -58,10 +92,28 @@ export function QuestionPanel({
     setSelectedIndex(null);
     setTextAnswer("");
     setLongAnswer("");
+    setBlankAnswers(Array(blankCount).fill(""));
+    setLocalFeedback(null);
+    setLocalFeedbackTone(null);
     setParentSubmitted(false);
   }
 
+  function updateBlankAnswer(index: number, value: string) {
+    setBlankAnswers((current) => {
+      const next = [...current];
+      while (next.length < blankCount) next.push("");
+      next[index] = value;
+      return next;
+    });
+  }
+
   const mcOptions = shuffledMc?.options ?? [];
+  const displayFeedback = localFeedback ?? feedback;
+  const displayFeedbackTone = localFeedbackTone ?? feedbackTone;
+  const blanksComplete =
+    blankCount > 0 &&
+    blankAnswers.length >= blankCount &&
+    blankAnswers.slice(0, blankCount).every((value) => value.trim() !== "");
 
   return (
     <article
@@ -69,10 +121,32 @@ export function QuestionPanel({
       data-question-slot={difficulty}
     >
       <AssessmentProtected className="space-y-6">
-        <CanvasText
-          encoded={toDisplayEncoding(question.prompt)}
-          variant="body"
-        />
+        {question.type === "fill-in-the-blank" ? (
+          <p className="text-base leading-loose text-slate-900 dark:text-stone-50">
+            {promptParts.map((part, index) => (
+              <span key={`${question.id}-part-${index}`}>
+                {part ? (
+                  <span className="whitespace-pre-wrap">{part}</span>
+                ) : null}
+                {index < blankCount ? (
+                  <input
+                    type="text"
+                    value={blankAnswers[index] ?? ""}
+                    onChange={(e) => updateBlankAnswer(index, e.target.value)}
+                    disabled={disabled}
+                    aria-label={`Blank ${index + 1}`}
+                    className="mx-1 inline-block min-w-[7rem] max-w-[12rem] align-baseline rounded-sm border-0 border-b-2 border-sky-400 bg-sky-50/80 px-2 py-0.5 text-base text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:opacity-60 dark:border-stone-400 dark:bg-stone-900/60 dark:text-stone-100"
+                  />
+                ) : null}
+              </span>
+            ))}
+          </p>
+        ) : (
+          <CanvasText
+            encoded={toDisplayEncoding(question.prompt)}
+            variant="body"
+          />
+        )}
 
         {question.type === "multiple-choice" && (
           <fieldset className="space-y-2" disabled={disabled}>
@@ -148,17 +222,17 @@ export function QuestionPanel({
         </div>
       )}
 
-      {feedback && (
+      {displayFeedback && (
         <p
           role="alert"
           className={cn(
             "text-sm font-medium",
-            feedbackTone === "retry"
+            displayFeedbackTone === "retry"
               ? "text-amber-700 dark:text-amber-300"
               : "text-emerald-700 dark:text-emerald-300",
           )}
         >
-          {feedback}
+          {displayFeedback}
         </p>
       )}
 
@@ -172,10 +246,34 @@ export function QuestionPanel({
                 text: longAnswer,
               });
               if (correct) setParentSubmitted(true);
+              notifyChecked(correct);
               onSubmit(correct);
             }}
           >
             Submit for Parent Review
+          </Button>
+        ) : question.type === "fill-in-the-blank" ? (
+          <Button
+            type="button"
+            disabled={disabled || !blanksComplete}
+            onClick={() => {
+              const result = checkFillInBlank(
+                question,
+                blankAnswers.slice(0, blankCount),
+              );
+              if (result.spellingHint) {
+                setLocalFeedback(FILL_IN_BLANK_SPELLING_HINT);
+                setLocalFeedbackTone("retry");
+                notifyChecked(false);
+                return;
+              }
+              setLocalFeedback(null);
+              setLocalFeedbackTone(null);
+              notifyChecked(result.correct);
+              onSubmit(result.correct);
+            }}
+          >
+            Check answer
           </Button>
         ) : (
           <Button

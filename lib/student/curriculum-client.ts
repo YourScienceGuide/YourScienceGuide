@@ -3,8 +3,10 @@ import {
   getCourseFromStore,
   getCoursesFromStore,
   getLessonFromStore,
+  getTextbookFromStore,
 } from "@/lib/admin/content-store";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
+import type { Textbook } from "@/lib/student/textbook";
 import { getLessonsByChapter as getLessonsByChapterBase } from "@/lib/student/curriculum";
 
 export function getCoursesClient(store: AdminContentStore): Course[] {
@@ -43,4 +45,11 @@ export function getAdjacentLessonsClient(
     prev: index > 0 ? course.lessons[index - 1] : undefined,
     next: index < course.lessons.length - 1 ? course.lessons[index + 1] : undefined,
   };
+}
+
+export function getTextbookClient(
+  store: AdminContentStore,
+  courseId: string,
+): Textbook | undefined {
+  return getTextbookFromStore(store, courseId);
 }

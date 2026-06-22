@@ -177,8 +177,14 @@ export function AdminCsvImportBlock({
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">Type</strong>{" "}
           is a dropdown in the Excel template (
-          <code className="text-xs">multiple-choice</code> or{" "}
-          <code className="text-xs">free-response</code>).
+          <code className="text-xs">multiple-choice</code>,{" "}
+          <code className="text-xs">free-response</code>
+          {kind === "end-of-chapter" ? (
+            <>
+              , or <code className="text-xs">fill-in-the-blank</code>
+            </>
+          ) : null}
+          ).
         </li>
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">
@@ -196,6 +202,17 @@ export function AdminCsvImportBlock({
             ? "rows need Accepted Answers."
             : "rows need Accepted Answers and/or Min Length."}
         </li>
+        {kind === "end-of-chapter" && (
+          <li>
+            <strong className="font-medium text-slate-800 dark:text-stone-200">
+              fill-in-the-blank
+            </strong>{" "}
+            rows use <code className="text-xs">________</code> in the Question for each
+            blank. Put one accepted answer per blank in Accepted Answers, separated by{" "}
+            <code className="text-xs">|</code> (comma-separate spelling variants within a
+            blank).
+          </li>
+        )}
         <li>
           Chapter and Section route rows to matching lessons. Leave both blank to use
           the fallback lesson{showLessonPicker ? " below" : " selected above"}.
@@ -210,12 +227,16 @@ export function AdminCsvImportBlock({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() =>
-            downloadCsv(
-              exampleName,
-              `${getCsvHeaders(kind).join(",")}\n${serializeExampleRow(kind, "multiple-choice")}\n${serializeExampleRow(kind, "free-response")}\n`,
-            )
-          }
+          onClick={() => {
+            const rows = [
+              serializeExampleRow(kind, "multiple-choice"),
+              serializeExampleRow(kind, "free-response"),
+            ];
+            if (kind === "end-of-chapter") {
+              rows.push(serializeExampleRow(kind, "fill-in-the-blank"));
+            }
+            downloadCsv(exampleName, `${getCsvHeaders(kind).join(",")}\n${rows.join("\n")}\n`);
+          }}
         >
           Download example rows
         </Button>

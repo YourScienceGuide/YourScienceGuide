@@ -1,4 +1,5 @@
 import { lessonKey } from "@/lib/admin/lesson-key";
+import { countBlanks } from "@/lib/lesson/fill-in-blank";
 import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import type { Course } from "@/lib/student/curriculum-types";
@@ -34,7 +35,7 @@ export const CHAPTER_CSV_HEADERS = [
   "Min Length",
 ] as const;
 
-export type CsvRowType = "multiple-choice" | "free-response";
+export type CsvRowType = "multiple-choice" | "free-response" | "fill-in-the-blank";
 
 export type ParsedCsvRow = {
   rowNumber: number;
@@ -45,6 +46,7 @@ export type ParsedCsvRow = {
   options: string[];
   correct: number | null;
   acceptedAnswers: string[];
+  blankAnswers: string[][];
   hint?: string;
   level?: AlcumusLevel;
   minLength?: number;
@@ -204,6 +206,16 @@ function parseRowType(raw: string): CsvRowType | null {
   ) {
     return "free-response";
   }
+  if (
+    normalized === "fill-in-the-blank" ||
+    normalized === "fill in the blank" ||
+    normalized === "fill-in-blank" ||
+    normalized === "fill in blank" ||
+    normalized === "fib" ||
+    normalized === "blank"
+  ) {
+    return "fill-in-the-blank";
+  }
   return null;
 }
 
@@ -261,6 +273,37 @@ function parseMultipleChoiceOptions(
   return { options };
 }
 
+function parseFillInBlankAnswers(
+  raw: string,
+  blankCount: number,
+): { blankAnswers?: string[][]; error?: string } {
+  const parts = raw
+    .split(/[|]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length !== blankCount) {
+    return {
+      error: `Fill-in-the-blank rows need ${blankCount} accepted answer group(s) in Accepted Answers (one per blank, separated by |).`,
+    };
+  }
+
+  const blankAnswers = parts.map((part) =>
+    part
+      .split(",")
+      .map((answer) => answer.trim())
+      .filter(Boolean),
+  );
+
+  if (blankAnswers.some((answers) => answers.length === 0)) {
+    return {
+      error: "Each blank needs at least one accepted answer (comma-separate spelling variants).",
+    };
+  }
+
+  return { blankAnswers };
+}
+
 function validateRow(
   rowNumber: number,
   record: Record<string, string>,
@@ -277,7 +320,16 @@ function validateRow(
       error: {
         rowNumber,
         message:
-          'Type must be "multiple-choice" or "free-response".',
+          'Type must be "multiple-choice", "free-response", or "fill-in-the-blank".',
+      },
+    };
+  }
+
+  if (type === "fill-in-the-blank" && kind === "alcumus") {
+    return {
+      error: {
+        rowNumber,
+        message: "Fill-in-the-blank is only supported for end-of-chapter imports.",
       },
     };
   }
@@ -296,6 +348,29 @@ function validateRow(
   const minLength = parseOptionalNumber(record["Min Length"] ?? "");
   let correct: number | null = null;
   let options: string[] = [];
+  let blankAnswers: string[][] = [];
+
+  if (type === "fill-in-the-blank") {
+    const blankCount = countBlanks(question);
+    if (blankCount === 0) {
+      return {
+        error: {
+          rowNumber,
+          message:
+            'Fill-in-the-blank questions must include at least one blank marked with ________ (four or more underscores).',
+        },
+      };
+    }
+
+    const parsedBlanks = parseFillInBlankAnswers(
+      record["Accepted Answers"] ?? "",
+      blankCount,
+    );
+    if (parsedBlanks.error) {
+      return { error: { rowNumber, message: parsedBlanks.error } };
+    }
+    blankAnswers = parsedBlanks.blankAnswers ?? [];
+  }
 
   if (type === "multiple-choice") {
     if (optionsResult.error) {
@@ -359,6 +434,7 @@ function validateRow(
       options,
       correct,
       acceptedAnswers,
+      blankAnswers,
       hint: hint || undefined,
       level,
       minLength: minLength ?? undefined,
@@ -446,6 +522,14 @@ function rowToAlcumusProblem(row: ParsedCsvRow, index: number): AlcumusProblem {
 
 function rowToChapterQuestion(row: ParsedCsvRow, index: number): LessonQuestion {
   const id = `chapter-${Date.now()}-${row.rowNumber}-${index}`;
+  if (row.type === "fill-in-the-blank") {
+    return {
+      type: "fill-in-the-blank",
+      id,
+      prompt: row.question,
+      blankAnswers: row.blankAnswers,
+    };
+  }
   if (row.type === "free-response") {
     if (row.minLength) {
       return {
@@ -547,6 +631,24 @@ export function serializeExampleRow(kind: CsvImportKind, type: CsvRowType): stri
       escapeCsvField("58.8; 58.8 J"),
       escapeCsvField("Use gravitational potential energy."),
       escapeCsvField("2"),
+    ].join(",");
+  }
+
+  if (kind === "end-of-chapter" && type === "fill-in-the-blank") {
+    return [
+      escapeCsvField("3"),
+      escapeCsvField("1"),
+      escapeCsvField("fill-in-the-blank"),
+      escapeCsvField(
+        "The ________ is the powerhouse of the cell because it produces ATP.",
+      ),
+      "",
+      "",
+      "",
+      "",
+      "",
+      escapeCsvField("mitochondria"),
+      "",
     ].join(",");
   }
 

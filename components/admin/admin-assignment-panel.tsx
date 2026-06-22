@@ -279,6 +279,32 @@ export function AdminAssignmentPanel() {
                   />
                 </label>
               )}
+
+              {q.type === "fill-in-the-blank" && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">
+                    Use ________ in the prompt for each blank. Edit accepted answers
+                    below (one group per blank, comma-separated variants).
+                  </p>
+                  {q.blankAnswers.map((answers, blankIndex) => (
+                    <label key={blankIndex} className="block text-xs text-slate-500">
+                      Blank {blankIndex + 1} answers
+                      <input
+                        value={answers.join(", ")}
+                        onChange={(e) => {
+                          const blankAnswers = q.blankAnswers.map((group, i) =>
+                            i === blankIndex
+                              ? e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+                              : group,
+                          );
+                          updateQ(index, { blankAnswers });
+                        }}
+                        className="mt-1 block w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
             </li>
           ))}
         </ol>

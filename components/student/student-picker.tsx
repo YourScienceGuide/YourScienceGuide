@@ -6,6 +6,10 @@ import { cn } from "@/lib/utils";
 export function StudentPicker() {
   const { students, selectStudent } = useActiveStudent();
 
+  if (students.length === 0) {
+    return null;
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <header className="space-y-2 text-center sm:text-left">

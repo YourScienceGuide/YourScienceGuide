@@ -8,6 +8,7 @@ import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
+import { QuestionHistorySection } from "@/components/student/question-history-section";
 import { Button } from "@/components/ui/button";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { getLessonClient } from "@/lib/student/curriculum-client";
@@ -159,7 +160,19 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
         </p>
       </header>
 
-      <AlcumusPractice state={state} onStateChange={onStateChange} />
+      <AlcumusPractice
+        courseId={courseId}
+        lessonId={lessonId}
+        state={state}
+        onStateChange={onStateChange}
+      />
+
+      <QuestionHistorySection
+        courseId={courseId}
+        lessonId={lessonId}
+        title="Your question history"
+        description="Extra practice and assignment attempts for this lesson."
+      />
     </div>
     </GuestLessonGuard>
   );

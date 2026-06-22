@@ -3,6 +3,7 @@ import type { LessonQuestion } from "@/lib/lesson/types";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import { SEED_COURSES } from "@/lib/student/curriculum-seed";
+import { SEED_TEXTBOOKS, type Textbook } from "@/lib/student/textbook";
 
 export type LessonVideoMeta = {
   title: string;
@@ -19,6 +20,8 @@ export type AdminContentStore = {
   lessonQuestions: Record<string, LessonQuestion[]>;
   alcumusByLesson: Record<string, AlcumusProblem[]>;
   videos: Record<string, LessonVideoMeta>;
+  /** Companion textbooks keyed by course id. */
+  textbooks?: Record<string, Textbook>;
 };
 
 /** Client event fired after content is saved or refreshed from the API. */
@@ -75,6 +78,13 @@ function stripLegacyVideoBlobs(store: AdminContentStore): AdminContentStore {
   return { ...store, version: CURRENT_STORE_VERSION, videos };
 }
 
+function ensureTextbooks(store: AdminContentStore): AdminContentStore {
+  if (store.textbooks !== undefined) {
+    return store;
+  }
+  return { ...store, textbooks: { ...SEED_TEXTBOOKS } };
+}
+
 export function createDefaultStore(): AdminContentStore {
   return {
     version: CURRENT_STORE_VERSION,
@@ -82,14 +92,17 @@ export function createDefaultStore(): AdminContentStore {
     lessonQuestions: {},
     alcumusByLesson: {},
     videos: {},
+    textbooks: { ...SEED_TEXTBOOKS },
   };
 }
 
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
-  return stripLegacyVideoBlobs({
-    ...store,
-    courses: migrateCourses(store.courses),
-  });
+  return ensureTextbooks(
+    stripLegacyVideoBlobs({
+      ...store,
+      courses: migrateCourses(store.courses),
+    }),
+  );
 }
 
 export function notifyContentUpdated() {
@@ -143,6 +156,36 @@ export function getVideoFromStore(
   lessonId: string,
 ) {
   return store.videos[lessonKey(courseId, lessonId)];
+}
+
+export function getTextbookFromStore(
+  store: AdminContentStore,
+  courseId: string,
+): Textbook | undefined {
+  return store.textbooks?.[courseId];
+}
+
+export function setTextbookInStore(
+  store: AdminContentStore,
+  courseId: string,
+  textbook: Textbook,
+): AdminContentStore {
+  return {
+    ...store,
+    textbooks: {
+      ...(store.textbooks ?? {}),
+      [courseId]: textbook,
+    },
+  };
+}
+
+export function removeTextbookFromStore(
+  store: AdminContentStore,
+  courseId: string,
+): AdminContentStore {
+  const textbooks = { ...(store.textbooks ?? {}) };
+  delete textbooks[courseId];
+  return { ...store, textbooks };
 }
 
 /** Exact phrase admins must type to confirm course deletion. */
@@ -222,11 +265,15 @@ export function removeCourseFromStore(
   store: AdminContentStore,
   courseId: string,
 ): AdminContentStore {
+  const textbooks = { ...(store.textbooks ?? {}) };
+  delete textbooks[courseId];
+
   return {
     ...store,
     courses: store.courses.filter((course) => course.id !== courseId),
     lessonQuestions: stripKeysForCourse(store.lessonQuestions, courseId),
     alcumusByLesson: stripKeysForCourse(store.alcumusByLesson, courseId),
     videos: stripKeysForCourse(store.videos, courseId),
+    textbooks,
   };
 }
