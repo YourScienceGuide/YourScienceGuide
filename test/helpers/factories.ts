@@ -42,9 +42,12 @@ export function makeFillInBlank(
   };
 }
 
+type ChapterChoice = Extract<ChapterQuestion, { type: "multiple-choice" }>;
+type ChapterShortAnswer = Extract<ChapterQuestion, { type: "short-answer" }>;
+
 export function makeChapterChoice(
-  overrides: Partial<ChapterQuestion> = {},
-): ChapterQuestion {
+  overrides: Partial<ChapterChoice> = {},
+): ChapterChoice {
   return {
     type: "multiple-choice",
     id: "p1",
@@ -57,8 +60,8 @@ export function makeChapterChoice(
 }
 
 export function makeChapterNumeric(
-  overrides: Partial<ChapterQuestion> = {},
-): ChapterQuestion {
+  overrides: Partial<ChapterShortAnswer> = {},
+): ChapterShortAnswer {
   return {
     type: "short-answer",
     id: "p2",

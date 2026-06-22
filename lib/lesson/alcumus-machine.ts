@@ -1,8 +1,7 @@
 import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
-import { checkFillInBlank } from "@/lib/lesson/fill-in-blank";
 import { getQuestionHint } from "@/lib/lesson/question-hint";
-import { validateAnswer } from "@/lib/lesson/validate-answer";
+import { checkFillInBlank, validateAnswer } from "@/lib/lesson/validate-answer";
 
 export type AlcumusState = {
   level: AlcumusLevel;
