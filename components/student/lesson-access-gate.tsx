@@ -33,8 +33,8 @@ function NoLessonAccessPrompt() {
         </h1>
         <p className="text-base text-slate-600 dark:text-stone-400">
           Your account is set up, but course access requires an active
-          subscription. Choose a monthly or annual plan in the parent portal to
-          start learning.
+          subscription. Online payments are not available yet—subscription
+          billing will be added in a future release.
         </p>
       </header>
       <div className="flex flex-wrap justify-center gap-3 sm:justify-start">

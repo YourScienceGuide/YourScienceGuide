@@ -1,38 +1,18 @@
 "use client";
 
-import { useState } from "react";
-
 import { useAuth } from "@/components/auth/auth-provider";
-import { SubscriptionCheckoutForm } from "@/components/parent/subscription-checkout-form";
 import { Button } from "@/components/ui/button";
 import {
-  activateSubscription,
+  BILLING_CHECKOUT_ENABLED,
+  BILLING_UNAVAILABLE_MESSAGE,
   getSubscription,
   SUBSCRIPTION_PLANS,
-  type SubscriptionPlan,
 } from "@/lib/billing/subscription";
 import { cn } from "@/lib/utils";
 
-type CheckoutStep = "plans" | "checkout";
-
 export function BillingSection() {
-  const { username, hasLessonAccess, purchaseSubscription } = useAuth();
+  const { username, hasLessonAccess } = useAuth();
   const subscription = getSubscription(username);
-  const [step, setStep] = useState<CheckoutStep>("plans");
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(
-    null,
-  );
-  const [justPurchased, setJustPurchased] = useState(false);
-
-  function handleCheckoutSuccess(payment: { cardLast4: string }) {
-    if (!username || !selectedPlan) return;
-    activateSubscription(username, selectedPlan, payment);
-    purchaseSubscription();
-    setStep("plans");
-    setSelectedPlan(null);
-    setJustPurchased(true);
-    window.setTimeout(() => setJustPurchased(false), 4000);
-  }
 
   if (hasLessonAccess && subscription) {
     return (
@@ -78,32 +58,12 @@ export function BillingSection() {
               Active
             </span>
           </div>
-          <div className="mt-8 border-t border-sky-100 pt-6 dark:border-stone-800">
-            <Button type="button" variant="ghost">
-              Update payment method
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === "checkout" && selectedPlan) {
-    return (
-      <div className="space-y-8">
-        <SectionHeader
-          title="Checkout"
-          description="Enter payment details to activate your subscription."
-        />
-        <div className="max-w-lg rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
-          <SubscriptionCheckoutForm
-            plan={selectedPlan}
-            onBack={() => {
-              setStep("plans");
-              setSelectedPlan(null);
-            }}
-            onSuccess={handleCheckoutSuccess}
-          />
+          {!BILLING_CHECKOUT_ENABLED && (
+            <p className="mt-6 border-t border-sky-100 pt-6 text-sm text-slate-600 dark:border-stone-800 dark:text-stone-400">
+              {BILLING_UNAVAILABLE_MESSAGE} Payment method changes will be
+              available when billing launches.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -113,18 +73,15 @@ export function BillingSection() {
     <div className="space-y-8">
       <SectionHeader
         title="Get access"
-        description="Choose a plan, then complete checkout to unlock all courses and lessons."
+        description="Preview planned pricing. Checkout is not open yet."
       />
 
-      {justPurchased && (
-        <p
-          role="status"
-          className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
-        >
-          Payment successful. Your students can now open lessons from the Student
-          area.
-        </p>
-      )}
+      <div
+        role="status"
+        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+      >
+        {BILLING_UNAVAILABLE_MESSAGE}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {(["monthly", "annual"] as const).map((planId) => {
@@ -134,7 +91,7 @@ export function BillingSection() {
             <div
               key={planId}
               className={cn(
-                "relative flex flex-col rounded-lg border bg-white p-6 dark:bg-stone-900",
+                "relative flex flex-col rounded-lg border bg-white p-6 opacity-90 dark:bg-stone-900",
                 isAnnual
                   ? "border-sky-400 ring-1 ring-sky-200 dark:border-stone-500 dark:ring-stone-700"
                   : "border-sky-200 dark:border-stone-700",
@@ -162,12 +119,9 @@ export function BillingSection() {
                 type="button"
                 className="mt-6 w-full"
                 variant={isAnnual ? "default" : "outline"}
-                onClick={() => {
-                  setSelectedPlan(planId);
-                  setStep("checkout");
-                }}
+                disabled
               >
-                Continue to checkout
+                Coming in a future release
               </Button>
             </div>
           );
@@ -175,8 +129,9 @@ export function BillingSection() {
       </div>
 
       <p className="text-sm text-slate-500 dark:text-stone-500">
-        Mock checkout — card details are validated locally only and are not sent
-        to a payment processor.
+        Lesson access for new accounts will require a paid subscription once
+        billing is live. Demo accounts configured by your administrator may
+        already have access.
       </p>
     </div>
   );

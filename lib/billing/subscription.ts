@@ -3,6 +3,12 @@ import {
   MOCK_USERNAME,
 } from "@/lib/auth/constants";
 
+/** When false, checkout is disabled and local mock payments cannot grant access. */
+export const BILLING_CHECKOUT_ENABLED = false;
+
+export const BILLING_UNAVAILABLE_MESSAGE =
+  "Online payments are not available yet. Subscription billing will be added in a future release.";
+
 export type SubscriptionPlan = "monthly" | "annual";
 
 export type SubscriptionRecord = {
@@ -60,6 +66,7 @@ export function hasActiveSubscription(username: string | null): boolean {
   if (!username) return false;
   const key = accountKey(username);
   if (DEMO_SUBSCRIBED.has(key)) return true;
+  if (!BILLING_CHECKOUT_ENABLED) return false;
   return Boolean(readStore()[key]);
 }
 
@@ -75,6 +82,7 @@ export function getSubscription(
       expiresOn: "August 15, 2026",
     };
   }
+  if (!BILLING_CHECKOUT_ENABLED) return null;
   return readStore()[key] ?? null;
 }
 
@@ -83,6 +91,10 @@ export function activateSubscription(
   plan: SubscriptionPlan,
   payment?: { cardLast4: string },
 ): SubscriptionRecord {
+  if (!BILLING_CHECKOUT_ENABLED) {
+    throw new Error(BILLING_UNAVAILABLE_MESSAGE);
+  }
+
   const key = accountKey(username);
   const now = new Date();
   const expires = addMonths(now, plan === "monthly" ? 1 : 12);
