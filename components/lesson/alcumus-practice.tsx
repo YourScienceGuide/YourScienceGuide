@@ -18,6 +18,7 @@ import {
 import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
 
 type AlcumusPracticeProps = {
+  studentScope: string;
   courseId: string;
   lessonId: string;
   state: AlcumusState;
@@ -25,6 +26,7 @@ type AlcumusPracticeProps = {
 };
 
 export function AlcumusPractice({
+  studentScope,
   courseId,
   lessonId,
   state,
@@ -70,6 +72,7 @@ export function AlcumusPractice({
 
       <QuestionPanel
         key={problem.id}
+        studentScope={studentScope}
         courseId={courseId}
         lessonId={lessonId}
         question={problem}

@@ -15,6 +15,7 @@ import {
   readActiveStudentId,
   writeActiveStudentId,
 } from "@/lib/family/active-student";
+import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import {
   FAMILY_STUDENTS_UPDATED_EVENT,
   MAX_FAMILY_STUDENTS,
@@ -136,11 +137,13 @@ export function ActiveStudentProvider({
   const selectStudent = useCallback((studentId: string) => {
     writeActiveStudentId(studentId);
     setActiveStudentId(studentId);
+    notifyProgressUpdated();
   }, []);
 
   const clearStudent = useCallback(() => {
     clearActiveStudentId();
     setActiveStudentId(null);
+    notifyProgressUpdated();
   }, []);
 
   const addStudent = useCallback(

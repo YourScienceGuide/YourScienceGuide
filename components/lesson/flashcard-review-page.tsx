@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AnkiFlashcardReview } from "@/components/lesson/anki-flashcard-review";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
+import { useStudentScope } from "@/components/student/use-student-scope";
 import { Button } from "@/components/ui/button";
 import {
   createInitialDeckState,
@@ -18,14 +19,24 @@ import { useContentStore } from "@/components/admin/content-store-provider";
 import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
 
-function flashcardStorageKey(courseId: string, lessonId: string) {
-  return `ysg-flashcard-deck-state-${courseId}-${lessonId}`;
+function flashcardStorageKey(
+  studentScope: string,
+  courseId: string,
+  lessonId: string,
+) {
+  return `ysg-flashcard-deck-state-${studentScope}-${courseId}-${lessonId}`;
 }
 
-function loadPersistedState(courseId: string, lessonId: string): DeckState | null {
+function loadPersistedState(
+  studentScope: string,
+  courseId: string,
+  lessonId: string,
+): DeckState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(flashcardStorageKey(courseId, lessonId));
+    const raw = sessionStorage.getItem(
+      flashcardStorageKey(studentScope, courseId, lessonId),
+    );
     if (!raw) return null;
     const parsed = JSON.parse(raw) as DeckState;
     if (!parsed.entries?.length || !parsed.currentCardId) return null;
@@ -45,30 +56,32 @@ export function FlashcardReviewPage({
   lessonId,
 }: FlashcardReviewPageProps) {
   const { store } = useContentStore();
+  const studentScope = useStudentScope();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const [state, setState] = useState<DeckState | null>(null);
 
   useEffect(() => {
-    if (!state) {
+    if (!state && studentScope) {
       setState(
-        loadPersistedState(courseId, lessonId) ?? createInitialDeckState(),
+        loadPersistedState(studentScope, courseId, lessonId) ??
+          createInitialDeckState(),
       );
     }
-  }, [state, courseId, lessonId]);
+  }, [state, studentScope, courseId, lessonId]);
 
   useEffect(() => {
-    if (!state) return;
+    if (!state || !studentScope) return;
     sessionStorage.setItem(
-      flashcardStorageKey(courseId, lessonId),
+      flashcardStorageKey(studentScope, courseId, lessonId),
       JSON.stringify(state),
     );
-  }, [state, courseId, lessonId]);
+  }, [state, studentScope, courseId, lessonId]);
 
   const onStateChange = useCallback((next: DeckState) => {
     setState(next);
   }, []);
 
-  if (!state) {
+  if (!state || !studentScope) {
     return (
       <p className="text-sm text-slate-600 dark:text-stone-400">
         Loading flashcards…

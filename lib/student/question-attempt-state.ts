@@ -5,7 +5,8 @@ import {
 
 type LessonAttemptStore = Record<string, QuestionAttemptRecord>;
 
-type AttemptStore = Record<string, LessonAttemptStore>;
+/** studentScope -> lessonKey -> questionId */
+type AttemptStore = Record<string, Record<string, LessonAttemptStore>>;
 
 const STORAGE_KEY = "ysg-assignment-question-attempts";
 
@@ -30,15 +31,17 @@ function writeStore(store: AttemptStore) {
 }
 
 export function loadQuestionAttemptRecord(
+  studentScope: string,
   courseId: string,
   lessonId: string,
   questionId: string,
 ): QuestionAttemptRecord | null {
   const store = readStore();
-  return store[lessonKey(courseId, lessonId)]?.[questionId] ?? null;
+  return store[studentScope]?.[lessonKey(courseId, lessonId)]?.[questionId] ?? null;
 }
 
 export function saveQuestionAttemptRecord(
+  studentScope: string,
   courseId: string,
   lessonId: string,
   questionId: string,
@@ -46,17 +49,25 @@ export function saveQuestionAttemptRecord(
 ) {
   const store = readStore();
   const key = lessonKey(courseId, lessonId);
-  const lesson = store[key] ?? {};
+  const byStudent = store[studentScope] ?? {};
+  const lesson = byStudent[key] ?? {};
   lesson[questionId] = record;
-  store[key] = lesson;
+  byStudent[key] = lesson;
+  store[studentScope] = byStudent;
   writeStore(store);
 }
 
 export function getResolvedQuestionAttemptState(
+  studentScope: string,
   courseId: string,
   lessonId: string,
   questionId: string,
 ) {
-  const record = loadQuestionAttemptRecord(courseId, lessonId, questionId);
+  const record = loadQuestionAttemptRecord(
+    studentScope,
+    courseId,
+    lessonId,
+    questionId,
+  );
   return getQuestionAttemptState(record);
 }

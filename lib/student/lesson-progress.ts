@@ -10,7 +10,8 @@ export type StoredLessonProgress = Pick<
   "questionIndex" | "completedCount" | "isComplete"
 >;
 
-type ProgressStore = Record<string, Record<string, StoredLessonProgress>>;
+/** studentScope -> courseId -> lessonId */
+type ProgressStore = Record<string, Record<string, Record<string, StoredLessonProgress>>>;
 
 const STORAGE_KEY = "ysg-lesson-progress";
 
@@ -31,26 +32,30 @@ function writeStore(store: ProgressStore) {
 }
 
 export function loadLessonProgress(
+  studentScope: string,
   courseId: string,
   lessonId: string,
 ): StoredLessonProgress | null {
   const store = readStore();
-  return store[courseId]?.[lessonId] ?? null;
+  return store[studentScope]?.[courseId]?.[lessonId] ?? null;
 }
 
 export function saveLessonProgress(
+  studentScope: string,
   courseId: string,
   lessonId: string,
   state: LessonMachineState,
 ) {
   const store = readStore();
-  const course = store[courseId] ?? {};
+  const byCourse = store[studentScope] ?? {};
+  const course = byCourse[courseId] ?? {};
   course[lessonId] = {
     questionIndex: state.questionIndex,
     completedCount: state.completedCount,
     isComplete: state.isComplete,
   };
-  store[courseId] = course;
+  byCourse[courseId] = course;
+  store[studentScope] = byCourse;
   writeStore(store);
 }
 
@@ -96,10 +101,13 @@ export function lessonProgressPercent(
   } as LessonMachineState);
 }
 
-export function getCourseCompletionPercent(course: Course): number {
+export function getCourseCompletionPercent(
+  course: Course,
+  studentScope: string,
+): number {
   if (course.lessons.length === 0) return 0;
   const store = readStore();
-  const courseProgress = store[course.id] ?? {};
+  const courseProgress = store[studentScope]?.[course.id] ?? {};
   let total = 0;
   for (const lesson of course.lessons) {
     const status = getLessonStatus(courseProgress[lesson.id]);
@@ -111,9 +119,12 @@ export function getCourseCompletionPercent(course: Course): number {
   return Math.round(total / course.lessons.length);
 }
 
-export function getLessonStatusesForCourse(course: Course) {
+export function getLessonStatusesForCourse(
+  course: Course,
+  studentScope: string,
+) {
   const store = readStore();
-  const courseProgress = store[course.id] ?? {};
+  const courseProgress = store[studentScope]?.[course.id] ?? {};
   return Object.fromEntries(
     course.lessons.map((lesson) => [
       lesson.id,

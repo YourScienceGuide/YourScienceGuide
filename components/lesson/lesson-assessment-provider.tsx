@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { useStudentScope } from "@/components/student/use-student-scope";
 import { getQuestionBankFromStore } from "@/lib/admin/content-store";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import {
@@ -41,15 +42,16 @@ export function LessonAssessmentProvider({
   children,
 }: LessonAssessmentProviderProps) {
   const { store, loading: contentLoading, error: contentError } = useContentStore();
+  const studentScope = useStudentScope();
   const key = lessonKey(courseId, lessonId);
-  const ready = !contentLoading;
+  const ready = !contentLoading && studentScope !== null;
 
   const bank = ready ? getQuestionBankFromStore(store, courseId, lessonId) : [];
 
   const lesson = useMemo(() => {
-    if (!ready || bank.length === 0) return [];
-    return getOrCreateAssignmentQuestions(courseId, lessonId, bank);
-  }, [ready, bank, courseId, lessonId]);
+    if (!ready || !studentScope || bank.length === 0) return [];
+    return getOrCreateAssignmentQuestions(studentScope, courseId, lessonId, bank);
+  }, [ready, studentScope, bank, courseId, lessonId]);
 
   const practice = useMemo(() => {
     if (!ready || bank.length === 0) return [];

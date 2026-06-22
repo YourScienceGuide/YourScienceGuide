@@ -5,7 +5,8 @@ import {
 } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 
-type SelectionStore = Record<string, string[]>;
+/** studentScope -> lesson assignment key -> selected question ids */
+type SelectionStore = Record<string, Record<string, string[]>>;
 
 const STORAGE_KEY = "ysg-assignment-selection";
 
@@ -45,29 +46,34 @@ function resolveFromStoredIds(
 }
 
 export function getOrCreateAssignmentQuestions(
+  studentScope: string,
   courseId: string,
   lessonId: string,
   bank: ChapterQuestion[],
 ): LessonQuestion[] {
-  const key = assignmentSeed(courseId, lessonId);
+  const lessonAssignmentKey = assignmentSeed(courseId, lessonId);
+  const selectionSeed = `${studentScope}/${lessonAssignmentKey}`;
   const validEasy = new Set(easyIds(bank));
   const store = readStore();
-  const stored = store[key];
+  const byStudent = store[studentScope] ?? {};
+  const stored = byStudent[lessonAssignmentKey];
 
   if (stored) {
     const filtered = stored.filter((id) => validEasy.has(id));
     const resolved = resolveFromStoredIds(bank, filtered);
     if (resolved && resolved.length > 0) {
       if (filtered.length !== stored.length) {
-        store[key] = filtered;
+        byStudent[lessonAssignmentKey] = filtered;
+        store[studentScope] = byStudent;
         writeStore(store);
       }
       return resolved;
     }
   }
 
-  const selected = selectAssignmentQuestions(bank, key);
-  store[key] = selected.map((q) => q.id);
+  const selected = selectAssignmentQuestions(bank, selectionSeed);
+  byStudent[lessonAssignmentKey] = selected.map((q) => q.id);
+  store[studentScope] = byStudent;
   writeStore(store);
   return selected;
 }

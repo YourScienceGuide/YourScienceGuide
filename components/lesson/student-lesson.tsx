@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { useStudentScope } from "@/components/student/use-student-scope";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";
@@ -55,6 +56,7 @@ type StudentLessonProps = {
 
 export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const { isGuest, openSignupModal } = useAuth();
+  const studentScope = useStudentScope();
   const { store } = useContentStore();
   const guestCompletionRecorded = useRef(false);
   const course = getCourseClient(store, courseId);
@@ -69,20 +71,20 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !studentScope) return;
     guestCompletionRecorded.current = false;
-    const stored = loadLessonProgress(courseId, lessonId);
+    const stored = loadLessonProgress(studentScope, courseId, lessonId);
     const restored = storedToMachineState(stored);
     const base = restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE;
     setState(withAssignmentCount(base, lesson.length));
     setHydrated(true);
-  }, [courseId, lessonId, ready, lesson.length]);
+  }, [courseId, lessonId, ready, studentScope, lesson.length]);
 
   useEffect(() => {
-    if (!state || !hydrated) return;
-    saveLessonProgress(courseId, lessonId, state);
+    if (!state || !hydrated || !studentScope) return;
+    saveLessonProgress(studentScope, courseId, lessonId, state);
     notifyProgressUpdated();
-  }, [courseId, lessonId, state, hydrated]);
+  }, [courseId, lessonId, state, hydrated, studentScope]);
 
   useEffect(() => {
     if (!isGuest || !hydrated || !state?.isComplete) return;
@@ -129,7 +131,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     );
   }
 
-  if (!ready || !state) {
+  if (!ready || !state || !studentScope) {
     return (
       <p className="text-sm text-slate-600 dark:text-stone-400">
         Loading lesson…
@@ -212,7 +214,8 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
           </div>
         ) : currentQuestion ? (
           <QuestionPanel
-            key={currentQuestion.id}
+            key={`${studentScope}-${currentQuestion.id}`}
+            studentScope={studentScope}
             courseId={courseId}
             lessonId={lessonId}
             question={currentQuestion}

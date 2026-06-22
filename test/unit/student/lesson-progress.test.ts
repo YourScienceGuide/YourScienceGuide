@@ -8,23 +8,44 @@ import {
   saveLessonProgress,
   storedToMachineState,
 } from "@/lib/student/lesson-progress";
+import { GUEST_STUDENT_SCOPE } from "@/lib/student/student-scope";
 
 describe("lesson progress (localStorage)", () => {
   const courseId = "biology-year-1";
   const lessonId = "scientific-method";
+  const studentA = "student-a";
+  const studentB = "student-b";
 
-  it("persists and loads progress", () => {
-    expect(loadLessonProgress(courseId, lessonId)).toBeNull();
+  it("persists and loads progress per student", () => {
+    expect(loadLessonProgress(studentA, courseId, lessonId)).toBeNull();
 
-    saveLessonProgress(courseId, lessonId, {
+    saveLessonProgress(studentA, courseId, lessonId, {
       ...INITIAL_LESSON_STATE,
       completedCount: 1,
       questionIndex: 1,
     });
 
-    const stored = loadLessonProgress(courseId, lessonId);
-    expect(stored?.completedCount).toBe(1);
-    expect(stored?.questionIndex).toBe(1);
+    expect(loadLessonProgress(studentA, courseId, lessonId)?.completedCount).toBe(1);
+    expect(loadLessonProgress(studentB, courseId, lessonId)).toBeNull();
+  });
+
+  it("isolates guest progress from family students", () => {
+    saveLessonProgress(studentA, courseId, lessonId, {
+      ...INITIAL_LESSON_STATE,
+      completedCount: 1,
+      questionIndex: 1,
+    });
+    saveLessonProgress(GUEST_STUDENT_SCOPE, courseId, lessonId, {
+      ...INITIAL_LESSON_STATE,
+      completedCount: 2,
+      questionIndex: 2,
+      isComplete: false,
+    });
+
+    expect(
+      loadLessonProgress(GUEST_STUDENT_SCOPE, courseId, lessonId)?.completedCount,
+    ).toBe(2);
+    expect(loadLessonProgress(studentA, courseId, lessonId)?.completedCount).toBe(1);
   });
 
   it("derives lesson status from stored state", () => {

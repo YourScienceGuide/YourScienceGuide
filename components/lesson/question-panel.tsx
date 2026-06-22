@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type QuestionPanelProps = {
+  studentScope: string;
   courseId: string;
   lessonId: string;
   question: LessonQuestion;
@@ -49,6 +50,7 @@ type QuestionPanelProps = {
 };
 
 export function QuestionPanel({
+  studentScope,
   courseId,
   lessonId,
   question,
@@ -75,8 +77,13 @@ export function QuestionPanel({
   const attemptState = useMemo(() => {
     void attemptVersion;
     if (!limited) return { attemptsUsed: 0, isLocked: false };
-    return getResolvedQuestionAttemptState(courseId, lessonId, question.id);
-  }, [attemptVersion, courseId, lessonId, limited, question.id]);
+    return getResolvedQuestionAttemptState(
+      studentScope,
+      courseId,
+      lessonId,
+      question.id,
+    );
+  }, [attemptVersion, studentScope, courseId, lessonId, limited, question.id]);
 
   const isLocked = limited && attemptState.isLocked;
   const disabled = disabledExternal || isLocked;
@@ -126,9 +133,20 @@ export function QuestionPanel({
 
   function handleWrongAnswer(message: string, countsAsAttempt = true) {
     if (countsAsAttempt && limited) {
-      const previous = loadQuestionAttemptRecord(courseId, lessonId, question.id);
+      const previous = loadQuestionAttemptRecord(
+        studentScope,
+        courseId,
+        lessonId,
+        question.id,
+      );
       const next = afterQuestionAttempt(previous, maxAttempts, false);
-      saveQuestionAttemptRecord(courseId, lessonId, question.id, next);
+      saveQuestionAttemptRecord(
+        studentScope,
+        courseId,
+        lessonId,
+        question.id,
+        next,
+      );
       setAttemptVersion((v) => v + 1);
 
       if (next.exhaustedOnDay) {
@@ -146,9 +164,20 @@ export function QuestionPanel({
 
   function handleCorrectAnswer() {
     if (limited) {
-      const previous = loadQuestionAttemptRecord(courseId, lessonId, question.id);
+      const previous = loadQuestionAttemptRecord(
+        studentScope,
+        courseId,
+        lessonId,
+        question.id,
+      );
       const next = afterQuestionAttempt(previous, maxAttempts, true);
-      saveQuestionAttemptRecord(courseId, lessonId, question.id, next);
+      saveQuestionAttemptRecord(
+        studentScope,
+        courseId,
+        lessonId,
+        question.id,
+        next,
+      );
       setAttemptVersion((v) => v + 1);
     }
     setFeedback(null);

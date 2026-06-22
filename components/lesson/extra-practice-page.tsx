@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
+import { useStudentScope } from "@/components/student/use-student-scope";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { QuestionHistorySection } from "@/components/student/question-history-section";
 import { Button } from "@/components/ui/button";
@@ -20,18 +21,19 @@ import {
   type AlcumusState,
 } from "@/lib/lesson/alcumus-machine";
 
-function alcumusStorageKey(courseId: string, lessonId: string) {
-  return `ysg-alcumus-state-${courseId}-${lessonId}`;
+function alcumusStorageKey(studentScope: string, courseId: string, lessonId: string) {
+  return `ysg-alcumus-state-${studentScope}-${courseId}-${lessonId}`;
 }
 
 function loadPersistedState(
+  studentScope: string,
   courseId: string,
   lessonId: string,
   pool: { id: string }[],
 ): AlcumusState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(alcumusStorageKey(courseId, lessonId));
+    const raw = sessionStorage.getItem(alcumusStorageKey(studentScope, courseId, lessonId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AlcumusState;
     if (!pool.some((p) => p.id === parsed.problemId)) return null;
@@ -48,26 +50,27 @@ type ExtraPracticePageProps = {
 
 export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps) {
   const { store } = useContentStore();
+  const studentScope = useStudentScope();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const { practice, ready, error } = useLessonAssessment();
   const [state, setState] = useState<AlcumusState | null>(null);
 
   useEffect(() => {
-    if (ready && practice.length > 0 && !state) {
+    if (ready && practice.length > 0 && !state && studentScope) {
       setState(
-        loadPersistedState(courseId, lessonId, practice) ??
+        loadPersistedState(studentScope, courseId, lessonId, practice) ??
           createInitialAlcumusState(practice),
       );
     }
-  }, [ready, practice, state, courseId, lessonId]);
+  }, [ready, practice, state, studentScope, courseId, lessonId]);
 
   useEffect(() => {
-    if (!state) return;
+    if (!state || !studentScope) return;
     sessionStorage.setItem(
-      alcumusStorageKey(courseId, lessonId),
+      alcumusStorageKey(studentScope, courseId, lessonId),
       JSON.stringify(state),
     );
-  }, [state, courseId, lessonId]);
+  }, [state, studentScope, courseId, lessonId]);
 
   const onStateChange = useCallback((next: AlcumusState) => {
     setState(next);
@@ -117,7 +120,7 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
     );
   }
 
-  if (!state) {
+  if (!state || !studentScope) {
     return (
       <p className="text-sm text-slate-600 dark:text-stone-400">
         Loading extra practice…
@@ -161,6 +164,7 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
       </header>
 
       <AlcumusPractice
+        studentScope={studentScope}
         courseId={courseId}
         lessonId={lessonId}
         state={state}
