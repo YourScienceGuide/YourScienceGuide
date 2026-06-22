@@ -8,8 +8,9 @@ import {
   type LessonVideoMeta,
 } from "@/lib/admin/content-store";
 import {
+  payloadToChapterQuestion,
   payloadToAlcumusProblem,
-  payloadToLessonQuestion,
+  chapterQuestionToPayload,
   type AlcumusProblemRow,
   type AssignmentQuestionRow,
   type CourseRow,
@@ -19,8 +20,11 @@ import {
 } from "@/lib/cms/question-payload";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import type { Textbook } from "@/lib/student/textbook";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
+import {
+  alcumusProblemToChapterQuestion,
+} from "@/lib/lesson/chapter-questions";
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
-import type { LessonQuestion } from "@/lib/lesson/types";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function cmsHasContent(): Promise<boolean> {
@@ -99,29 +103,36 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     videos[lessonKey(row.course_id, row.lesson_id)] = meta;
   }
 
-  const lessonQuestions: Record<string, LessonQuestion[]> = {};
+  const questionBank: Record<string, ChapterQuestion[]> = {};
+  const bankByKey = new Map<string, Map<string, ChapterQuestion>>();
+
   for (const row of (questionsResult.data ?? []) as AssignmentQuestionRow[]) {
     const key = lessonKey(row.course_id, row.lesson_id);
-    const question = payloadToLessonQuestion(row);
+    const question = payloadToChapterQuestion(row);
     if (!question) continue;
-    const list = lessonQuestions[key] ?? [];
-    list.push(question);
-    lessonQuestions[key] = list;
+    if (!bankByKey.has(key)) bankByKey.set(key, new Map());
+    bankByKey.get(key)!.set(question.id, question);
   }
 
-  const alcumusByLesson: Record<string, AlcumusProblem[]> = {};
   for (const row of (alcumusResult.data ?? []) as AlcumusProblemRow[]) {
     const key = lessonKey(row.course_id, row.lesson_id);
-    const list = alcumusByLesson[key] ?? [];
-    list.push(payloadToAlcumusProblem(row));
-    alcumusByLesson[key] = list;
+    const converted = alcumusProblemToChapterQuestion(payloadToAlcumusProblem(row));
+    if (!converted) continue;
+    if (!bankByKey.has(key)) bankByKey.set(key, new Map());
+    const map = bankByKey.get(key)!;
+    if (!map.has(converted.id)) {
+      map.set(converted.id, converted);
+    }
+  }
+
+  for (const [key, map] of bankByKey) {
+    questionBank[key] = [...map.values()];
   }
 
   return sanitizeContentStore({
-    version: 2,
+    version: 3,
     courses,
-    lessonQuestions,
-    alcumusByLesson,
+    questionBank,
     videos,
     textbooks,
   });
@@ -174,10 +185,11 @@ export async function loadLegacyContentBlob(): Promise<AdminContentStore | null>
   }
 
   return sanitizeContentStore({
-    version: parsed.version === 1 ? 1 : 2,
+    version: parsed.version === 1 ? 1 : parsed.version === 2 ? 2 : 3,
     courses: parsed.courses,
-    lessonQuestions: parsed.lessonQuestions ?? {},
-    alcumusByLesson: parsed.alcumusByLesson ?? {},
+    questionBank: parsed.questionBank ?? {},
+    lessonQuestions: parsed.lessonQuestions,
+    alcumusByLesson: parsed.alcumusByLesson,
     videos: parsed.videos ?? {},
     textbooks: parsed.textbooks,
   });

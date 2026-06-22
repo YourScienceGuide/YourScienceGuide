@@ -1,5 +1,6 @@
 import type { LessonMachineState } from "@/lib/lesson/state-machine";
 import { progressPercent } from "@/lib/lesson/state-machine";
+import { MAX_END_OF_CHAPTER_QUESTIONS } from "@/lib/lesson/types";
 import type { Course } from "@/lib/student/curriculum";
 
 export type LessonStatus = "not_started" | "in_progress" | "complete";
@@ -81,10 +82,18 @@ export function storedToMachineState(
 
 export function lessonProgressPercent(
   progress: StoredLessonProgress | null | undefined,
+  assignmentCount = MAX_END_OF_CHAPTER_QUESTIONS,
 ): number {
   if (!progress) return 0;
   if (progress.isComplete) return 100;
-  return progressPercent(progress as LessonMachineState);
+  return progressPercent({
+    ...progress,
+    assignmentCount,
+    difficulty: 1,
+    feedback: null,
+    feedbackTone: null,
+    toast: null,
+  } as LessonMachineState);
 }
 
 export function getCourseCompletionPercent(course: Course): number {

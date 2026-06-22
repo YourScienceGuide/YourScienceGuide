@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { AdminAlcumusPanel } from "@/components/admin/admin-alcumus-panel";
 import { AdminAssignmentPanel } from "@/components/admin/admin-assignment-panel";
 import { AdminCsvImportPanel } from "@/components/admin/admin-csv-import-panel";
 import { AdminCurriculumPanel } from "@/components/admin/admin-curriculum-panel";
@@ -14,8 +13,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { id: "curriculum", label: "Curriculum & lessons" },
   { id: "import", label: "Bulk import (CSV)" },
-  { id: "assignment", label: "End-of-chapter questions" },
-  { id: "alcumus", label: "Extra practice (Alcumus)" },
+  { id: "assignment", label: "Chapter questions" },
   { id: "videos", label: "Lesson videos" },
 ] as const;
 
@@ -33,9 +31,9 @@ export function AdminDashboard() {
             Admin
           </h1>
           <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
-            Build courses and lessons, edit assignment and Alcumus problems, and
-            upload videos via Mux. Content is stored in Supabase tables and shared
-            across browsers and users.
+            Build courses and lessons, manage the unified chapter question bank
+            (assignment + extra practice), and upload videos via Mux. Content is stored
+            in Supabase tables and shared across browsers and users.
           </p>
           <p className="text-xs text-slate-500 dark:text-stone-500">
             Storage:{" "}
@@ -93,7 +91,6 @@ export function AdminDashboard() {
       {tab === "curriculum" && <AdminCurriculumPanel />}
       {tab === "import" && <AdminCsvImportPanel />}
       {tab === "assignment" && <AdminAssignmentPanel />}
-      {tab === "alcumus" && <AdminAlcumusPanel />}
       {tab === "videos" && <AdminVideoPanel />}
     </div>
   );

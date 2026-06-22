@@ -7,15 +7,18 @@ import {
   clearToast,
   INITIAL_LESSON_STATE,
   progressPercent,
+  withAssignmentCount,
 } from "@/lib/lesson/state-machine";
 
 describe("lesson state machine", () => {
+  const threeQuestionState = withAssignmentCount(INITIAL_LESSON_STATE, 3);
+
   it("starts at zero progress", () => {
-    expect(progressPercent(INITIAL_LESSON_STATE)).toBe(0);
+    expect(progressPercent(threeQuestionState)).toBe(0);
   });
 
   it("advances on correct answers", () => {
-    const afterFirst = applyCorrectAnswer(INITIAL_LESSON_STATE);
+    const afterFirst = applyCorrectAnswer(threeQuestionState);
     expect(afterFirst.completedCount).toBe(1);
     expect(afterFirst.questionIndex).toBe(1);
     expect(afterFirst.difficulty).toBe(2);
@@ -23,7 +26,7 @@ describe("lesson state machine", () => {
   });
 
   it("completes lesson on final correct answer", () => {
-    let state = INITIAL_LESSON_STATE;
+    let state = threeQuestionState;
     state = applyCorrectAnswer(state);
     state = applyCorrectAnswer(state);
     state = applyCorrectAnswer(state);
@@ -34,18 +37,18 @@ describe("lesson state machine", () => {
   });
 
   it("shows retry feedback on incorrect answer without advancing", () => {
-    const state = applyIncorrectAnswer(INITIAL_LESSON_STATE);
+    const state = applyIncorrectAnswer(threeQuestionState);
     expect(state.feedbackTone).toBe("retry");
     expect(state.completedCount).toBe(0);
     expect(state.questionIndex).toBe(0);
   });
 
   it("clears toast and feedback", () => {
-    const withToast = { ...INITIAL_LESSON_STATE, toast: "Hi" };
+    const withToast = { ...threeQuestionState, toast: "Hi" };
     expect(clearToast(withToast).toast).toBeNull();
 
     const withFeedback = {
-      ...INITIAL_LESSON_STATE,
+      ...threeQuestionState,
       feedback: "Oops",
       feedbackTone: "retry" as const,
     };

@@ -3,8 +3,7 @@ import "server-only";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import { type AdminContentStore } from "@/lib/admin/content-store";
 import {
-  alcumusProblemToPayload,
-  lessonQuestionToPayload,
+  chapterQuestionToPayload,
 } from "@/lib/cms/question-payload";
 import { resolveTextbookCoverUrl } from "@/lib/cms/textbook-covers.server";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
@@ -98,8 +97,7 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
 
     for (const lesson of course.lessons) {
       const key = lessonKey(course.id, lesson.id);
-      await syncAssignmentQuestions(course.id, lesson.id, store.lessonQuestions[key] ?? []);
-      await syncAlcumusProblems(course.id, lesson.id, store.alcumusByLesson[key] ?? []);
+      await syncChapterQuestionBank(course.id, lesson.id, store.questionBank[key] ?? []);
       await syncLessonVideo(course.id, lesson.id, store.videos[key]);
     }
   }
@@ -151,20 +149,30 @@ async function deleteLessonsNotInList(courseId: string, lessonIds: string[]): Pr
   }
 }
 
-async function syncAssignmentQuestions(
+async function syncChapterQuestionBank(
   courseId: string,
   lessonId: string,
-  questions: AdminContentStore["lessonQuestions"][string],
+  questions: AdminContentStore["questionBank"][string],
 ): Promise<void> {
   const supabase = createSupabaseAdmin();
-  const { error: deleteError } = await supabase
+  const { error: deleteAssignmentError } = await supabase
     .from("assignment_questions")
     .delete()
     .eq("course_id", courseId)
     .eq("lesson_id", lessonId);
 
-  if (deleteError) {
-    throw new Error(`Failed to clear assignment questions: ${deleteError.message}`);
+  if (deleteAssignmentError) {
+    throw new Error(`Failed to clear chapter questions: ${deleteAssignmentError.message}`);
+  }
+
+  const { error: deleteAlcumusError } = await supabase
+    .from("alcumus_problems")
+    .delete()
+    .eq("course_id", courseId)
+    .eq("lesson_id", lessonId);
+
+  if (deleteAlcumusError) {
+    throw new Error(`Failed to clear legacy Alcumus rows: ${deleteAlcumusError.message}`);
   }
 
   if (!questions?.length) return;
@@ -176,49 +184,13 @@ async function syncAssignmentQuestions(
     sort_order: index,
     question_type: question.type,
     prompt: question.prompt,
-    payload: lessonQuestionToPayload(question),
+    payload: chapterQuestionToPayload(question),
     updated_at: now(),
   }));
 
   const { error: insertError } = await supabase.from("assignment_questions").insert(rows);
   if (insertError) {
-    throw new Error(`Failed to save assignment questions: ${insertError.message}`);
-  }
-}
-
-async function syncAlcumusProblems(
-  courseId: string,
-  lessonId: string,
-  problems: AdminContentStore["alcumusByLesson"][string],
-): Promise<void> {
-  const supabase = createSupabaseAdmin();
-  const { error: deleteError } = await supabase
-    .from("alcumus_problems")
-    .delete()
-    .eq("course_id", courseId)
-    .eq("lesson_id", lessonId);
-
-  if (deleteError) {
-    throw new Error(`Failed to clear Alcumus problems: ${deleteError.message}`);
-  }
-
-  if (!problems?.length) return;
-
-  const rows = problems.map((problem) => ({
-    course_id: courseId,
-    lesson_id: lessonId,
-    id: problem.id,
-    level: problem.level,
-    problem_type: problem.type,
-    prompt: problem.prompt,
-    hint: problem.hint ?? null,
-    payload: alcumusProblemToPayload(problem),
-    updated_at: now(),
-  }));
-
-  const { error: insertError } = await supabase.from("alcumus_problems").insert(rows);
-  if (insertError) {
-    throw new Error(`Failed to save Alcumus problems: ${insertError.message}`);
+    throw new Error(`Failed to save chapter questions: ${insertError.message}`);
   }
 }
 

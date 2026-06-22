@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   alcumusProblemToPayload,
+  chapterQuestionToPayload,
   lessonQuestionToPayload,
   payloadToAlcumusProblem,
+  payloadToChapterQuestion,
   payloadToLessonQuestion,
 } from "@/lib/cms/question-payload";
 import {
-  makeAlcumusChoice,
-  makeAlcumusNumeric,
+  makeChapterChoice,
   makeFillInBlank,
   makeMultipleChoice,
   makeShortAnswer,
@@ -59,8 +60,30 @@ describe("CMS question payload round-trip", () => {
     ).toEqual(fib);
   });
 
-  it("round-trips alcumus choice and numeric problems", () => {
-    const choice = makeAlcumusChoice();
+  it("round-trips chapter questions with difficulty", () => {
+    const original = makeChapterChoice({ difficulty: 4 });
+    const payload = chapterQuestionToPayload(original);
+    const restored = payloadToChapterQuestion({
+      course_id: "c",
+      lesson_id: "l",
+      question_id: original.id,
+      sort_order: 0,
+      question_type: original.type,
+      prompt: original.prompt,
+      payload,
+    });
+    expect(restored).toEqual(original);
+  });
+
+  it("round-trips legacy alcumus choice and numeric problems", () => {
+    const choice = {
+      id: "p1",
+      level: 3 as const,
+      type: "choice" as const,
+      prompt: "2+2?",
+      options: ["3", "4"],
+      correctIndex: 1,
+    };
     expect(
       payloadToAlcumusProblem({
         course_id: "c",
@@ -78,7 +101,13 @@ describe("CMS question payload round-trip", () => {
       correctIndex: choice.correctIndex,
     });
 
-    const numeric = makeAlcumusNumeric();
+    const numeric = {
+      id: "p2",
+      level: 4 as const,
+      type: "numeric" as const,
+      prompt: "pi?",
+      acceptedAnswers: ["3.14"],
+    };
     expect(
       payloadToAlcumusProblem({
         course_id: "c",

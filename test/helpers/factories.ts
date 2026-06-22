@@ -1,4 +1,5 @@
-import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import type { AdminContentStore } from "@/lib/admin/content-store";
 import type { Course } from "@/lib/student/curriculum-types";
@@ -41,13 +42,13 @@ export function makeFillInBlank(
   };
 }
 
-export function makeAlcumusChoice(
-  overrides: Partial<AlcumusProblem> = {},
-): AlcumusProblem {
+export function makeChapterChoice(
+  overrides: Partial<ChapterQuestion> = {},
+): ChapterQuestion {
   return {
+    type: "multiple-choice",
     id: "p1",
-    level: 1,
-    type: "choice",
+    difficulty: 3,
     prompt: "2 + 2 = ?",
     options: ["3", "4"],
     correctIndex: 1,
@@ -55,17 +56,41 @@ export function makeAlcumusChoice(
   };
 }
 
-export function makeAlcumusNumeric(
-  overrides: Partial<AlcumusProblem> = {},
-): AlcumusProblem {
+export function makeChapterNumeric(
+  overrides: Partial<ChapterQuestion> = {},
+): ChapterQuestion {
   return {
+    type: "short-answer",
     id: "p2",
-    level: 2,
-    type: "numeric",
+    difficulty: 4,
     prompt: "Enter pi to two decimals",
     acceptedAnswers: ["3.14"],
     ...overrides,
   };
+}
+
+/** @deprecated Use makeChapterChoice */
+export function makeAlcumusChoice(
+  overrides: Partial<{ id: string; level: AlcumusLevel; correctIndex: number }> = {},
+): ChapterQuestion {
+  const { level, ...rest } = overrides;
+  return makeChapterChoice({
+    id: rest.id,
+    correctIndex: rest.correctIndex,
+    difficulty: level ?? 3,
+  });
+}
+
+/** @deprecated Use makeChapterNumeric */
+export function makeAlcumusNumeric(
+  overrides: Partial<{ id: string; level: AlcumusLevel; acceptedAnswers: string[] }> = {},
+): ChapterQuestion {
+  const { level, acceptedAnswers, ...rest } = overrides;
+  return makeChapterNumeric({
+    id: rest.id,
+    acceptedAnswers,
+    difficulty: level ?? 4,
+  });
 }
 
 export function makeCourse(overrides: Partial<Course> = {}): Course {

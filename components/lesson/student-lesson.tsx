@@ -36,10 +36,10 @@ import {
 } from "@/lib/student/paths";
 import {
   applyCorrectAnswer,
-  applyIncorrectAnswer,
   clearToast,
   INITIAL_LESSON_STATE,
   progressPercent,
+  withAssignmentCount,
   type LessonMachineState,
 } from "@/lib/lesson/state-machine";
 import { lessonStepLabel } from "@/lib/lesson/progress-labels";
@@ -63,18 +63,20 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const readings = getLessonReadings(lessonId);
   const { prev, next } = getAdjacentLessonsClient(store, courseId, lessonId);
 
-  const { lesson, alcumus, ready, error } = useLessonAssessment();
+  const { lesson, practice, ready, error } = useLessonAssessment();
   const { recordAssignmentAttempt } = useQuestionAttemptRecorder(courseId, lessonId);
   const [state, setState] = useState<LessonMachineState | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    if (!ready) return;
     guestCompletionRecorded.current = false;
     const stored = loadLessonProgress(courseId, lessonId);
     const restored = storedToMachineState(stored);
-    setState(restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE);
+    const base = restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE;
+    setState(withAssignmentCount(base, lesson.length));
     setHydrated(true);
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, ready, lesson.length]);
 
   useEffect(() => {
     if (!state || !hydrated) return;
@@ -104,9 +106,10 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   }, []);
 
   const handleAnswer = useCallback((correct: boolean) => {
+    if (!correct) return;
     setState((s) => {
       if (!s) return s;
-      return correct ? applyCorrectAnswer(s) : applyIncorrectAnswer(s);
+      return applyCorrectAnswer(s);
     });
   }, []);
 
@@ -135,12 +138,12 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   }
 
   const hasAssignment = lesson.length > 0;
-  const hasExtraPractice = alcumus.length > 0;
+  const hasExtraPractice = practice.length > 0;
   const currentQuestion = hasAssignment ? lesson[state.questionIndex] : undefined;
 
   const percent = hasAssignment ? progressPercent(state) : 0;
   const stepLabel = hasAssignment
-    ? lessonStepLabel(state.questionIndex, state.isComplete)
+    ? lessonStepLabel(state.questionIndex, state.assignmentCount, state.isComplete)
     : "No assignment questions";
 
   return (
@@ -195,7 +198,8 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
               Lesson complete!
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-stone-400">
-              You finished all three lesson questions. Try Extra Practice or
+              You finished all {state.assignmentCount} assignment question
+              {state.assignmentCount === 1 ? "" : "s"}. Try Extra Practice or
               Flashcard Review, or continue to the next lesson.
             </p>
             {next && (
@@ -209,10 +213,10 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
         ) : currentQuestion ? (
           <QuestionPanel
             key={currentQuestion.id}
+            courseId={courseId}
+            lessonId={lessonId}
             question={currentQuestion}
             difficulty={state.difficulty}
-            feedback={state.feedback}
-            feedbackTone={state.feedbackTone}
             disabled={false}
             onSubmit={handleAnswer}
             onAnswerChecked={(result) => {
@@ -240,7 +244,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
             </h2>
             <p className="text-sm text-slate-600 dark:text-stone-400">
               {hasExtraPractice
-                ? "Optional adaptive problems—separate from your lesson questions, with its own mastery progress."
+                ? "Optional harder problems from this chapter—leftover easy questions plus challenge items, with adaptive difficulty."
                 : "Extra practice has not been added for this section yet."}
             </p>
           </div>

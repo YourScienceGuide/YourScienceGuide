@@ -1,6 +1,6 @@
-import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
-
 export type CourseRow = {
   id: string;
   title: string;
@@ -63,22 +63,54 @@ export type AlcumusProblemRow = {
 };
 
 export function lessonQuestionToPayload(question: LessonQuestion): Record<string, unknown> {
+  const hint = question.hint?.trim();
+  const withHint = (payload: Record<string, unknown>) =>
+    hint ? { ...payload, hint } : payload;
+
   switch (question.type) {
     case "multiple-choice":
-      return { options: question.options, correctIndex: question.correctIndex };
+      return withHint({ options: question.options, correctIndex: question.correctIndex });
     case "short-answer":
-      return { acceptedAnswers: question.acceptedAnswers };
+      return withHint({ acceptedAnswers: question.acceptedAnswers });
     case "long-answer":
-      return { minLength: question.minLength };
+      return withHint({ minLength: question.minLength });
     case "fill-in-the-blank":
-      return { blankAnswers: question.blankAnswers };
+      return withHint({ blankAnswers: question.blankAnswers });
     default:
-      return {};
+      return hint ? { hint } : {};
   }
+}
+
+function readDifficulty(payload: Record<string, unknown>): AlcumusLevel {
+  const level = payload.difficulty;
+  if (typeof level === "number" && level >= 1 && level <= 5) {
+    return level as AlcumusLevel;
+  }
+  return 1;
+}
+
+export function chapterQuestionToPayload(question: ChapterQuestion): Record<string, unknown> {
+  return {
+    ...lessonQuestionToPayload(question),
+    difficulty: question.difficulty,
+  };
+}
+
+export function payloadToChapterQuestion(row: AssignmentQuestionRow): ChapterQuestion | null {
+  const lesson = payloadToLessonQuestion(row);
+  if (!lesson) return null;
+  return {
+    ...lesson,
+    difficulty: readDifficulty(row.payload),
+  };
 }
 
 export function payloadToLessonQuestion(row: AssignmentQuestionRow): LessonQuestion | null {
   const { question_type: type, question_id: id, prompt, payload } = row;
+  const hint =
+    typeof payload.hint === "string" && payload.hint.trim()
+      ? payload.hint.trim()
+      : undefined;
 
   switch (type) {
     case "multiple-choice":
@@ -86,6 +118,7 @@ export function payloadToLessonQuestion(row: AssignmentQuestionRow): LessonQuest
         type,
         id,
         prompt,
+        hint,
         options: Array.isArray(payload.options) ? (payload.options as string[]) : [],
         correctIndex: typeof payload.correctIndex === "number" ? payload.correctIndex : 0,
       };
@@ -94,6 +127,7 @@ export function payloadToLessonQuestion(row: AssignmentQuestionRow): LessonQuest
         type,
         id,
         prompt,
+        hint,
         acceptedAnswers: Array.isArray(payload.acceptedAnswers)
           ? (payload.acceptedAnswers as string[])
           : [],
@@ -103,6 +137,7 @@ export function payloadToLessonQuestion(row: AssignmentQuestionRow): LessonQuest
         type,
         id,
         prompt,
+        hint,
         minLength: typeof payload.minLength === "number" ? payload.minLength : 1,
       };
     case "fill-in-the-blank":
@@ -110,6 +145,7 @@ export function payloadToLessonQuestion(row: AssignmentQuestionRow): LessonQuest
         type,
         id,
         prompt,
+        hint,
         blankAnswers: Array.isArray(payload.blankAnswers)
           ? (payload.blankAnswers as string[][])
           : [],

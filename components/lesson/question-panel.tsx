@@ -1,28 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AssessmentProtected } from "@/components/ai-guard/assessment-protected";
 import { CanvasText } from "@/components/ai-guard/canvas-text";
 import { Button } from "@/components/ui/button";
 import { toDisplayEncoding } from "@/lib/ai-guard/encode";
-import { cn } from "@/lib/utils";
-import type { Difficulty } from "@/lib/lesson/state-machine";
 import {
   countBlanks,
   FILL_IN_BLANK_SPELLING_HINT,
   splitPromptOnBlanks,
 } from "@/lib/lesson/fill-in-blank";
+import {
+  afterQuestionAttempt,
+  attemptsRemaining,
+  getMaxAttempts,
+} from "@/lib/lesson/question-attempt-limits";
+import {
+  getQuestionHint,
+  LOCKED_UNTIL_TOMORROW_MESSAGE,
+} from "@/lib/lesson/question-hint";
 import { shuffleMultipleChoice } from "@/lib/lesson/shuffle-multiple-choice";
+import type { Difficulty } from "@/lib/lesson/state-machine";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { checkFillInBlank, validateAnswer } from "@/lib/lesson/validate-answer";
+import {
+  getResolvedQuestionAttemptState,
+  loadQuestionAttemptRecord,
+  saveQuestionAttemptRecord,
+} from "@/lib/student/question-attempt-state";
+import { cn } from "@/lib/utils";
 
 type QuestionPanelProps = {
+  courseId: string;
+  lessonId: string;
   question: LessonQuestion;
   difficulty: Difficulty;
-  feedback: string | null;
-  feedbackTone: "success" | "retry" | null;
-  disabled: boolean;
+  disabled?: boolean;
+  /** Extra practice skips per-day attempt limits. */
+  skipAttemptLimits?: boolean;
   onSubmit: (correct: boolean) => void;
   onAnswerChecked?: (result: {
     questionId: string;
@@ -33,11 +49,12 @@ type QuestionPanelProps = {
 };
 
 export function QuestionPanel({
+  courseId,
+  lessonId,
   question,
   difficulty,
-  feedback,
-  feedbackTone,
-  disabled,
+  disabled: disabledExternal = false,
+  skipAttemptLimits = false,
   onSubmit,
   onAnswerChecked,
 }: QuestionPanelProps) {
@@ -45,11 +62,27 @@ export function QuestionPanel({
   const [textAnswer, setTextAnswer] = useState("");
   const [longAnswer, setLongAnswer] = useState("");
   const [blankAnswers, setBlankAnswers] = useState<string[]>([]);
-  const [localFeedback, setLocalFeedback] = useState<string | null>(null);
-  const [localFeedbackTone, setLocalFeedbackTone] = useState<
-    "success" | "retry" | null
-  >(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<"success" | "retry" | null>(
+    null,
+  );
   const [parentSubmitted, setParentSubmitted] = useState(false);
+  const [attemptVersion, setAttemptVersion] = useState(0);
+
+  const maxAttempts = skipAttemptLimits ? null : getMaxAttempts(question);
+  const limited = maxAttempts !== null;
+
+  const attemptState = useMemo(() => {
+    void attemptVersion;
+    if (!limited) return { attemptsUsed: 0, isLocked: false };
+    return getResolvedQuestionAttemptState(courseId, lessonId, question.id);
+  }, [attemptVersion, courseId, lessonId, limited, question.id]);
+
+  const isLocked = limited && attemptState.isLocked;
+  const disabled = disabledExternal || isLocked;
+  const remaining = limited
+    ? attemptsRemaining(attemptState.attemptsUsed, maxAttempts)
+    : null;
 
   const blankCount =
     question.type === "fill-in-the-blank" ? countBlanks(question.prompt) : 0;
@@ -71,6 +104,17 @@ export function QuestionPanel({
     return { ...question, ...shuffledMc };
   }, [question, shuffledMc]);
 
+  useEffect(() => {
+    setSelectedIndex(null);
+    setTextAnswer("");
+    setLongAnswer("");
+    setBlankAnswers(Array(blankCount).fill(""));
+    setFeedback(null);
+    setFeedbackTone(null);
+    setParentSubmitted(false);
+    setAttemptVersion((v) => v + 1);
+  }, [question.id, blankCount]);
+
   function notifyChecked(isCorrect: boolean) {
     onAnswerChecked?.({
       questionId: question.id,
@@ -80,12 +124,37 @@ export function QuestionPanel({
     });
   }
 
-  function handleCheck(
-    payload: { selectedIndex?: number | null; text?: string },
-  ) {
-    const correct = validateAnswer(questionForValidation, payload);
-    notifyChecked(correct);
-    onSubmit(correct);
+  function handleWrongAnswer(message: string, countsAsAttempt = true) {
+    if (countsAsAttempt && limited) {
+      const previous = loadQuestionAttemptRecord(courseId, lessonId, question.id);
+      const next = afterQuestionAttempt(previous, maxAttempts, false);
+      saveQuestionAttemptRecord(courseId, lessonId, question.id, next);
+      setAttemptVersion((v) => v + 1);
+
+      if (next.exhaustedOnDay) {
+        setFeedback(LOCKED_UNTIL_TOMORROW_MESSAGE);
+        setFeedbackTone("retry");
+        notifyChecked(false);
+        return;
+      }
+    }
+
+    setFeedback(message);
+    setFeedbackTone("retry");
+    notifyChecked(false);
+  }
+
+  function handleCorrectAnswer() {
+    if (limited) {
+      const previous = loadQuestionAttemptRecord(courseId, lessonId, question.id);
+      const next = afterQuestionAttempt(previous, maxAttempts, true);
+      saveQuestionAttemptRecord(courseId, lessonId, question.id, next);
+      setAttemptVersion((v) => v + 1);
+    }
+    setFeedback(null);
+    setFeedbackTone(null);
+    notifyChecked(true);
+    onSubmit(true);
   }
 
   function resetInputs() {
@@ -93,8 +162,10 @@ export function QuestionPanel({
     setTextAnswer("");
     setLongAnswer("");
     setBlankAnswers(Array(blankCount).fill(""));
-    setLocalFeedback(null);
-    setLocalFeedbackTone(null);
+    if (!isLocked) {
+      setFeedback(null);
+      setFeedbackTone(null);
+    }
     setParentSubmitted(false);
   }
 
@@ -108,8 +179,6 @@ export function QuestionPanel({
   }
 
   const mcOptions = shuffledMc?.options ?? [];
-  const displayFeedback = localFeedback ?? feedback;
-  const displayFeedbackTone = localFeedbackTone ?? feedbackTone;
   const blanksComplete =
     blankCount > 0 &&
     blankAnswers.length >= blankCount &&
@@ -222,17 +291,25 @@ export function QuestionPanel({
         </div>
       )}
 
-      {displayFeedback && (
+      {limited && !isLocked && remaining !== null && (
+        <p className="text-xs text-slate-500 dark:text-stone-500">
+          {remaining === 1
+            ? "1 try remaining today"
+            : `${remaining} tries remaining today`}
+        </p>
+      )}
+
+      {feedback && (
         <p
           role="alert"
           className={cn(
             "text-sm font-medium",
-            displayFeedbackTone === "retry"
+            feedbackTone === "retry"
               ? "text-amber-700 dark:text-amber-300"
               : "text-emerald-700 dark:text-emerald-300",
           )}
         >
-          {displayFeedback}
+          {feedback}
         </p>
       )}
 
@@ -261,16 +338,15 @@ export function QuestionPanel({
                 question,
                 blankAnswers.slice(0, blankCount),
               );
-              if (result.spellingHint) {
-                setLocalFeedback(FILL_IN_BLANK_SPELLING_HINT);
-                setLocalFeedbackTone("retry");
-                notifyChecked(false);
+              if (result.correct) {
+                handleCorrectAnswer();
                 return;
               }
-              setLocalFeedback(null);
-              setLocalFeedbackTone(null);
-              notifyChecked(result.correct);
-              onSubmit(result.correct);
+              if (result.spellingHint) {
+                handleWrongAnswer(FILL_IN_BLANK_SPELLING_HINT);
+                return;
+              }
+              handleWrongAnswer(getQuestionHint(question));
             }}
           >
             Check answer
@@ -284,11 +360,16 @@ export function QuestionPanel({
               (question.type === "short-answer" && textAnswer.trim() === "")
             }
             onClick={() => {
-              if (question.type === "multiple-choice") {
-                handleCheck({ selectedIndex });
-              } else {
-                handleCheck({ text: textAnswer });
+              const correct =
+                question.type === "multiple-choice"
+                  ? validateAnswer(questionForValidation, { selectedIndex })
+                  : validateAnswer(questionForValidation, { text: textAnswer });
+
+              if (correct) {
+                handleCorrectAnswer();
+                return;
               }
+              handleWrongAnswer(getQuestionHint(question));
             }}
           >
             Check answer

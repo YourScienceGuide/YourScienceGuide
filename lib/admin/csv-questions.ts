@@ -1,27 +1,12 @@
 import { lessonKey } from "@/lib/admin/lesson-key";
 import { countBlanks } from "@/lib/lesson/fill-in-blank";
-import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
-import type { LessonQuestion } from "@/lib/lesson/types";
+import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import type { Course } from "@/lib/student/curriculum-types";
 
-export type CsvImportKind = "alcumus" | "end-of-chapter";
+export type CsvImportKind = "chapter" | "end-of-chapter" | "alcumus";
 
-export const ALCUMUS_CSV_HEADERS = [
-  "Chapter",
-  "Section",
-  "Type",
-  "Question",
-  "Option 1",
-  "Option 2",
-  "Option 3",
-  "Option 4",
-  "Correct",
-  "Accepted Answers",
-  "Hint",
-  "Level",
-] as const;
-
-export const CHAPTER_CSV_HEADERS = [
+export const CHAPTER_QUESTION_CSV_HEADERS = [
   "Chapter",
   "Section",
   "Type",
@@ -33,7 +18,15 @@ export const CHAPTER_CSV_HEADERS = [
   "Correct",
   "Accepted Answers",
   "Min Length",
+  "Hint",
+  "Level",
 ] as const;
+
+/** @deprecated Use CHAPTER_QUESTION_CSV_HEADERS */
+export const ALCUMUS_CSV_HEADERS = CHAPTER_QUESTION_CSV_HEADERS;
+
+/** @deprecated Use CHAPTER_QUESTION_CSV_HEADERS */
+export const CHAPTER_CSV_HEADERS = CHAPTER_QUESTION_CSV_HEADERS;
 
 export type CsvRowType = "multiple-choice" | "free-response" | "fill-in-the-blank";
 
@@ -61,20 +54,29 @@ export type CsvImportPreview = {
   kind: CsvImportKind;
   rows: ParsedCsvRow[];
   errors: CsvRowError[];
-  alcumusByLessonKey: Record<string, AlcumusProblem[]>;
-  chapterQuestionsByLessonKey: Record<string, LessonQuestion[]>;
+  questionBankByLessonKey: Record<string, ChapterQuestion[]>;
+  /** @deprecated Use questionBankByLessonKey */
+  alcumusByLessonKey: Record<string, never>;
+  /** @deprecated Use questionBankByLessonKey */
+  chapterQuestionsByLessonKey: Record<string, never>;
   importableCount: number;
 };
+
+function normalizeImportKind(kind: CsvImportKind): "chapter" | "legacy-end" | "legacy-alcumus" {
+  if (kind === "alcumus") return "legacy-alcumus";
+  if (kind === "end-of-chapter") return "legacy-end";
+  return "chapter";
+}
+
+export function getCsvHeaders(_kind: CsvImportKind = "chapter"): readonly string[] {
+  return CHAPTER_QUESTION_CSV_HEADERS;
+}
 
 function escapeCsvField(value: string): string {
   if (/[",\n\r]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
-}
-
-export function getCsvHeaders(kind: CsvImportKind): readonly string[] {
-  return kind === "alcumus" ? ALCUMUS_CSV_HEADERS : CHAPTER_CSV_HEADERS;
 }
 
 export function buildTemplateCsv(kind: CsvImportKind): string {
@@ -309,6 +311,7 @@ function validateRow(
   record: Record<string, string>,
   kind: CsvImportKind,
 ): { row?: ParsedCsvRow; error?: CsvRowError } {
+  const importKind = normalizeImportKind(kind);
   const question = record.Question?.trim() ?? "";
   if (!question) {
     return { error: { rowNumber, message: "Question is required." } };
@@ -325,11 +328,11 @@ function validateRow(
     };
   }
 
-  if (type === "fill-in-the-blank" && kind === "alcumus") {
+  if (type === "fill-in-the-blank" && importKind === "legacy-alcumus") {
     return {
       error: {
         rowNumber,
-        message: "Fill-in-the-blank is only supported for end-of-chapter imports.",
+        message: "Fill-in-the-blank is not supported in legacy Alcumus CSV imports.",
       },
     };
   }
@@ -391,15 +394,15 @@ function validateRow(
   }
 
   if (type === "free-response") {
-    if (kind === "alcumus" && acceptedAnswers.length === 0) {
+    if (importKind === "legacy-alcumus" && acceptedAnswers.length === 0) {
       return {
         error: {
           rowNumber,
-          message: "Accepted Answers is required for free-response Alcumus rows.",
+          message: "Accepted Answers is required for free-response rows.",
         },
       };
     }
-    if (kind === "end-of-chapter" && acceptedAnswers.length === 0 && !minLength) {
+    if (importKind !== "legacy-alcumus" && acceptedAnswers.length === 0 && !minLength) {
       return {
         error: {
           rowNumber,
@@ -413,13 +416,18 @@ function validateRow(
     }
   }
 
-  let level: AlcumusLevel | undefined;
-  if (kind === "alcumus" && (record.Level ?? "").trim()) {
-    const parsedLevel = Number(record.Level);
+  let level: AlcumusLevel;
+  const levelRaw = (record.Level ?? "").trim();
+  if (levelRaw) {
+    const parsedLevel = Number(levelRaw);
     if (!Number.isInteger(parsedLevel) || parsedLevel < 1 || parsedLevel > 5) {
       return { error: { rowNumber, message: "Level must be a whole number from 1 to 5." } };
     }
     level = parsedLevel as AlcumusLevel;
+  } else if (importKind === "legacy-alcumus") {
+    level = 3;
+  } else {
+    level = 1;
   }
 
   const hint = record.Hint?.trim();
@@ -497,37 +505,19 @@ function findLessonId(
   return fallbackLessonId;
 }
 
-function rowToAlcumusProblem(row: ParsedCsvRow, index: number): AlcumusProblem {
-  const id = `csv-${Date.now()}-${row.rowNumber}-${index}`;
-  if (row.type === "free-response") {
-    return {
-      id,
-      level: row.level ?? 1,
-      type: "numeric",
-      prompt: row.question,
-      acceptedAnswers: row.acceptedAnswers,
-      hint: row.hint,
-    };
-  }
-  return {
-    id,
-    level: row.level ?? 1,
-    type: "choice",
-    prompt: row.question,
-    options: row.options,
-    correctIndex: (row.correct ?? 1) - 1,
-    hint: row.hint,
-  };
-}
-
-function rowToChapterQuestion(row: ParsedCsvRow, index: number): LessonQuestion {
+function rowToChapterQuestion(row: ParsedCsvRow, index: number): ChapterQuestion {
   const id = `chapter-${Date.now()}-${row.rowNumber}-${index}`;
+  const hint = row.hint;
+  const difficulty = row.level ?? 1;
+
   if (row.type === "fill-in-the-blank") {
     return {
       type: "fill-in-the-blank",
       id,
       prompt: row.question,
       blankAnswers: row.blankAnswers,
+      hint,
+      difficulty,
     };
   }
   if (row.type === "free-response") {
@@ -537,6 +527,8 @@ function rowToChapterQuestion(row: ParsedCsvRow, index: number): LessonQuestion 
         id,
         prompt: row.question,
         minLength: row.minLength,
+        hint,
+        difficulty,
       };
     }
     return {
@@ -544,6 +536,8 @@ function rowToChapterQuestion(row: ParsedCsvRow, index: number): LessonQuestion 
       id,
       prompt: row.question,
       acceptedAnswers: row.acceptedAnswers,
+      hint,
+      difficulty,
     };
   }
   return {
@@ -552,6 +546,8 @@ function rowToChapterQuestion(row: ParsedCsvRow, index: number): LessonQuestion 
     prompt: row.question,
     options: row.options,
     correctIndex: (row.correct ?? 1) - 1,
+    hint,
+    difficulty,
   };
 }
 
@@ -562,8 +558,7 @@ export function buildImportPreview(
   fallbackLessonId: string,
 ): CsvImportPreview {
   const { rows, errors } = parseQuestionCsv(csvText, kind);
-  const alcumusByLessonKey: Record<string, AlcumusProblem[]> = {};
-  const chapterQuestionsByLessonKey: Record<string, LessonQuestion[]> = {};
+  const questionBankByLessonKey: Record<string, ChapterQuestion[]> = {};
   let importableCount = 0;
 
   rows.forEach((row, index) => {
@@ -577,13 +572,8 @@ export function buildImportPreview(
     }
 
     const key = lessonKey(course.id, lessonId);
-    if (kind === "alcumus") {
-      if (!alcumusByLessonKey[key]) alcumusByLessonKey[key] = [];
-      alcumusByLessonKey[key].push(rowToAlcumusProblem(row, index));
-    } else {
-      if (!chapterQuestionsByLessonKey[key]) chapterQuestionsByLessonKey[key] = [];
-      chapterQuestionsByLessonKey[key].push(rowToChapterQuestion(row, index));
-    }
+    if (!questionBankByLessonKey[key]) questionBankByLessonKey[key] = [];
+    questionBankByLessonKey[key].push(rowToChapterQuestion(row, index));
     importableCount += 1;
   });
 
@@ -591,50 +581,18 @@ export function buildImportPreview(
     kind,
     rows,
     errors,
-    alcumusByLessonKey,
-    chapterQuestionsByLessonKey,
+    questionBankByLessonKey,
+    alcumusByLessonKey: {},
+    chapterQuestionsByLessonKey: {},
     importableCount,
   };
 }
 
 export function serializeExampleRow(kind: CsvImportKind, type: CsvRowType): string {
-  if (kind === "alcumus" && type === "multiple-choice") {
-    return [
-      escapeCsvField("3"),
-      escapeCsvField("1"),
-      escapeCsvField("multiple-choice"),
-      escapeCsvField(
-        "A child is swinging on a playground swing. At the highest point, energy is mostly:",
-      ),
-      escapeCsvField("Kinetic energy"),
-      escapeCsvField("Gravitational potential energy"),
-      escapeCsvField("Thermal energy"),
-      escapeCsvField("Chemical energy"),
-      escapeCsvField("2"),
-      "",
-      escapeCsvField("Think about height and motion."),
-      escapeCsvField("1"),
-    ].join(",");
-  }
+  const level =
+    kind === "alcumus" ? "4" : kind === "end-of-chapter" ? "1" : "2";
 
-  if (kind === "alcumus" && type === "free-response") {
-    return [
-      escapeCsvField("3"),
-      escapeCsvField("1"),
-      escapeCsvField("free-response"),
-      escapeCsvField("How many joules of energy are stored in a 2 kg object at 3 m height? (g = 9.8)"),
-      "",
-      "",
-      "",
-      "",
-      "",
-      escapeCsvField("58.8; 58.8 J"),
-      escapeCsvField("Use gravitational potential energy."),
-      escapeCsvField("2"),
-    ].join(",");
-  }
-
-  if (kind === "end-of-chapter" && type === "fill-in-the-blank") {
+  if (type === "fill-in-the-blank") {
     return [
       escapeCsvField("3"),
       escapeCsvField("1"),
@@ -649,10 +607,12 @@ export function serializeExampleRow(kind: CsvImportKind, type: CsvRowType): stri
       "",
       escapeCsvField("mitochondria"),
       "",
+      escapeCsvField("Think about organelles."),
+      escapeCsvField(level),
     ].join(",");
   }
 
-  if (kind === "end-of-chapter" && type === "multiple-choice") {
+  if (type === "multiple-choice") {
     return [
       escapeCsvField("3"),
       escapeCsvField("1"),
@@ -665,6 +625,8 @@ export function serializeExampleRow(kind: CsvImportKind, type: CsvRowType): stri
       escapeCsvField("1"),
       "",
       "",
+      escapeCsvField("Recall where chlorophyll is found."),
+      escapeCsvField(level),
     ].join(",");
   }
 
@@ -680,9 +642,13 @@ export function serializeExampleRow(kind: CsvImportKind, type: CsvRowType): stri
     "",
     escapeCsvField("kinetic; potential; gravitational"),
     escapeCsvField("40"),
+    escapeCsvField("Name both forms of mechanical energy."),
+    escapeCsvField(level),
   ].join(",");
 }
 
 export function kindLabel(kind: CsvImportKind): string {
-  return kind === "alcumus" ? "Extra practice (Alcumus)" : "End-of-chapter";
+  if (kind === "alcumus") return "Extra practice (legacy Alcumus CSV)";
+  if (kind === "end-of-chapter") return "End-of-chapter (legacy CSV)";
+  return "Chapter questions";
 }

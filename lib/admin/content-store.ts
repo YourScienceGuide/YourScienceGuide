@@ -1,4 +1,6 @@
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
+import { mergeLegacyQuestionBank } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
@@ -15,19 +17,52 @@ export type LessonVideoMeta = {
 };
 
 export type AdminContentStore = {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   courses: Course[];
-  lessonQuestions: Record<string, LessonQuestion[]>;
-  alcumusByLesson: Record<string, AlcumusProblem[]>;
+  /** Unified chapter question bank keyed by courseId/lessonId. */
+  questionBank: Record<string, ChapterQuestion[]>;
+  /** @deprecated Migrated into questionBank on load. */
+  lessonQuestions?: Record<string, LessonQuestion[]>;
+  /** @deprecated Migrated into questionBank on load. */
+  alcumusByLesson?: Record<string, AlcumusProblem[]>;
   videos: Record<string, LessonVideoMeta>;
   /** Companion textbooks keyed by course id. */
   textbooks?: Record<string, Textbook>;
 };
 
+const CURRENT_STORE_VERSION = 3 as const;
+
 /** Client event fired after content is saved or refreshed from the API. */
 export const CONTENT_UPDATED_EVENT = "ysg-content-updated";
 
-const CURRENT_STORE_VERSION = 2 as const;
+function normalizeQuestionBank(store: AdminContentStore): Record<string, ChapterQuestion[]> {
+  const hasLegacy =
+    Boolean(store.lessonQuestions && Object.keys(store.lessonQuestions).length > 0) ||
+    Boolean(store.alcumusByLesson && Object.keys(store.alcumusByLesson).length > 0);
+
+  if (store.questionBank && Object.keys(store.questionBank).length > 0) {
+    return store.questionBank;
+  }
+
+  if (!hasLegacy) {
+    return store.questionBank ?? {};
+  }
+
+  const keys = new Set([
+    ...Object.keys(store.lessonQuestions ?? {}),
+    ...Object.keys(store.alcumusByLesson ?? {}),
+  ]);
+
+  const questionBank: Record<string, ChapterQuestion[]> = {};
+  for (const key of keys) {
+    questionBank[key] = mergeLegacyQuestionBank(
+      store.lessonQuestions?.[key],
+      store.alcumusByLesson?.[key],
+    );
+  }
+
+  return questionBank;
+}
 
 function cloneCourses(): Course[] {
   return JSON.parse(JSON.stringify(SEED_COURSES)) as Course[];
@@ -89,18 +124,22 @@ export function createDefaultStore(): AdminContentStore {
   return {
     version: CURRENT_STORE_VERSION,
     courses: cloneCourses(),
-    lessonQuestions: {},
-    alcumusByLesson: {},
+    questionBank: {},
     videos: {},
     textbooks: { ...SEED_TEXTBOOKS },
   };
 }
 
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
+  const questionBank = normalizeQuestionBank(store);
   return ensureTextbooks(
     stripLegacyVideoBlobs({
       ...store,
+      version: CURRENT_STORE_VERSION,
       courses: migrateCourses(store.courses),
+      questionBank,
+      lessonQuestions: undefined,
+      alcumusByLesson: undefined,
     }),
   );
 }
@@ -130,24 +169,39 @@ export function getLessonFromStore(
   return getCourseFromStore(store, courseId)?.lessons.find((l) => l.id === lessonId);
 }
 
+export function getQuestionBankFromStore(
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+): ChapterQuestion[] {
+  const key = lessonKey(courseId, lessonId);
+  return store.questionBank[key] ?? [];
+}
+
+/** @deprecated Use getQuestionBankFromStore and chapter split helpers. */
 export function getLessonQuestionsFromStore(
   store: AdminContentStore,
   courseId: string,
   lessonId: string,
   seedFallback: LessonQuestion[],
 ): LessonQuestion[] {
-  const key = lessonKey(courseId, lessonId);
-  return store.lessonQuestions[key] ?? seedFallback;
+  const bank = getQuestionBankFromStore(store, courseId, lessonId);
+  if (bank.length > 0) {
+    return bank.filter((q) => q.difficulty <= 2).map(({ difficulty: _d, ...q }) => q);
+  }
+  return seedFallback;
 }
 
+/** @deprecated Use getQuestionBankFromStore and chapter split helpers. */
 export function getAlcumusFromStore(
   store: AdminContentStore,
   courseId: string,
   lessonId: string,
   seedFallback: AlcumusProblem[],
 ): AlcumusProblem[] {
-  const key = lessonKey(courseId, lessonId);
-  return store.alcumusByLesson[key] ?? seedFallback;
+  const bank = getQuestionBankFromStore(store, courseId, lessonId);
+  if (bank.length > 0) return [];
+  return seedFallback;
 }
 
 export function getVideoFromStore(
@@ -198,22 +252,32 @@ export function lessonDeleteConfirmationPhrase(lessonTitle: string): string {
   return `delete lesson ${lessonTitle}`;
 }
 
-/** Exact phrase admins must type to confirm deleting all assignment questions for a lesson. */
+/** Exact phrase admins must type to confirm deleting all chapter questions for a lesson. */
+export function chapterQuestionsDeleteAllPhrase(lessonTitle: string): string {
+  return `delete all chapter questions for ${lessonTitle}`;
+}
+
+/** Exact phrase admins must type to confirm deleting one chapter question. */
+export function chapterQuestionDeletePhrase(questionNumber: number): string {
+  return `delete chapter question ${questionNumber}`;
+}
+
+/** @deprecated Use chapterQuestionsDeleteAllPhrase */
 export function assignmentQuestionsDeleteAllPhrase(lessonTitle: string): string {
-  return `delete all assignment questions for ${lessonTitle}`;
+  return chapterQuestionsDeleteAllPhrase(lessonTitle);
 }
 
-/** Exact phrase admins must type to confirm deleting one assignment question. */
+/** @deprecated Use chapterQuestionDeletePhrase */
 export function assignmentQuestionDeletePhrase(questionNumber: number): string {
-  return `delete assignment question ${questionNumber}`;
+  return chapterQuestionDeletePhrase(questionNumber);
 }
 
-/** Exact phrase admins must type to confirm deleting all extra practice for a lesson. */
+/** @deprecated Extra practice is derived from the chapter bank. */
 export function alcumusProblemsDeleteAllPhrase(lessonTitle: string): string {
   return `delete all extra practice for ${lessonTitle}`;
 }
 
-/** Exact phrase admins must type to confirm deleting one extra practice problem. */
+/** @deprecated Extra practice is derived from the chapter bank. */
 export function alcumusProblemDeletePhrase(problemNumber: number): string {
   return `delete extra practice problem ${problemNumber}`;
 }
@@ -255,8 +319,7 @@ export function removeLessonFromStore(
         ? { ...course, lessons: course.lessons.filter((lesson) => lesson.id !== lessonId) }
         : course,
     ),
-    lessonQuestions: stripLessonKey(store.lessonQuestions, key),
-    alcumusByLesson: stripLessonKey(store.alcumusByLesson, key),
+    questionBank: stripLessonKey(store.questionBank, key),
     videos: stripLessonKey(store.videos, key),
   };
 }
@@ -271,8 +334,7 @@ export function removeCourseFromStore(
   return {
     ...store,
     courses: store.courses.filter((course) => course.id !== courseId),
-    lessonQuestions: stripKeysForCourse(store.lessonQuestions, courseId),
-    alcumusByLesson: stripKeysForCourse(store.alcumusByLesson, courseId),
+    questionBank: stripKeysForCourse(store.questionBank, courseId),
     videos: stripKeysForCourse(store.videos, courseId),
     textbooks,
   };

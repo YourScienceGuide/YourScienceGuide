@@ -10,7 +10,13 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 export const dynamic = "force-dynamic";
 
 function parseKind(value: string | null): CsvImportKind | null {
-  if (value === "alcumus" || value === "end-of-chapter") return value;
+  if (
+    value === "chapter" ||
+    value === "alcumus" ||
+    value === "end-of-chapter"
+  ) {
+    return value;
+  }
   return null;
 }
 
@@ -23,7 +29,7 @@ export async function GET(request: Request) {
   const kind = parseKind(new URL(request.url).searchParams.get("kind"));
   if (!kind) {
     return NextResponse.json(
-      { error: 'Query param "kind" must be "alcumus" or "end-of-chapter".' },
+      { error: 'Query param "kind" must be "chapter", "alcumus", or "end-of-chapter".' },
       { status: 400 },
     );
   }

@@ -53,10 +53,13 @@ describe("lesson progress (localStorage)", () => {
   it("computes percent from stored progress", () => {
     expect(lessonProgressPercent(null)).toBe(0);
     expect(
-      lessonProgressPercent({ questionIndex: 1, completedCount: 1, isComplete: false }),
+      lessonProgressPercent(
+        { questionIndex: 1, completedCount: 1, isComplete: false },
+        3,
+      ),
     ).toBe(33);
     expect(
-      lessonProgressPercent({ questionIndex: 2, completedCount: 3, isComplete: true }),
+      lessonProgressPercent({ questionIndex: 2, completedCount: 3, isComplete: true }, 3),
     ).toBe(100);
   });
 });

@@ -4,6 +4,7 @@ export type MultipleChoiceQuestion = {
   prompt: string;
   options: string[];
   correctIndex: number;
+  hint?: string;
 };
 
 export type ShortAnswerQuestion = {
@@ -11,6 +12,7 @@ export type ShortAnswerQuestion = {
   id: string;
   prompt: string;
   acceptedAnswers: string[];
+  hint?: string;
 };
 
 export type LongAnswerQuestion = {
@@ -18,6 +20,7 @@ export type LongAnswerQuestion = {
   id: string;
   prompt: string;
   minLength: number;
+  hint?: string;
 };
 
 export type FillInBlankQuestion = {
@@ -27,6 +30,7 @@ export type FillInBlankQuestion = {
   prompt: string;
   /** Accepted answers per blank; each inner list allows spelling variants. */
   blankAnswers: string[][];
+  hint?: string;
 };
 
 export type LessonQuestion =
@@ -35,4 +39,7 @@ export type LessonQuestion =
   | LongAnswerQuestion
   | FillInBlankQuestion;
 
-export const LESSON_QUESTION_COUNT = 3;
+export const MAX_END_OF_CHAPTER_QUESTIONS = 4;
+
+/** @deprecated Use dynamic assignment length from chapter bank split. */
+export const LESSON_QUESTION_COUNT = MAX_END_OF_CHAPTER_QUESTIONS;

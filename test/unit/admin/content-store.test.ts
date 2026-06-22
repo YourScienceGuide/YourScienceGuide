@@ -21,7 +21,7 @@ describe("content store", () => {
     const store = createDefaultStore();
     expect(store.courses.length).toBeGreaterThan(0);
     expect(store.textbooks?.["biology-year-1"]).toBeDefined();
-    expect(store.version).toBe(2);
+    expect(store.version).toBe(3);
   });
 
   it("migrates legacy unit fields to chapters", () => {
@@ -45,8 +45,7 @@ describe("content store", () => {
           ],
         },
       ],
-      lessonQuestions: {},
-      alcumusByLesson: {},
+      questionBank: {},
       videos: {},
     });
 
@@ -77,13 +76,12 @@ describe("content store", () => {
     const lessonId = "scientific-method";
     const key = lessonKey(courseId, lessonId);
     const store = makeStore({
-      lessonQuestions: { [key]: [] },
-      alcumusByLesson: { [key]: [] },
+      questionBank: { [key]: [] },
       videos: { [key]: { title: "V", description: "" } },
     });
 
     const afterLesson = removeLessonFromStore(store, courseId, lessonId);
-    expect(afterLesson.lessonQuestions[key]).toBeUndefined();
+    expect(afterLesson.questionBank[key]).toBeUndefined();
     expect(afterLesson.courses[0].lessons.some((l) => l.id === lessonId)).toBe(
       false,
     );
@@ -96,7 +94,7 @@ describe("content store", () => {
   it("builds admin delete confirmation phrases", () => {
     expect(courseDeleteConfirmationPhrase("Biology")).toBe("delete course Biology");
     expect(lessonDeleteConfirmationPhrase("Cells")).toBe("delete lesson Cells");
-    expect(assignmentQuestionsDeleteAllPhrase("Cells")).toContain("assignment");
-    expect(assignmentQuestionDeletePhrase(2)).toBe("delete assignment question 2");
+    expect(assignmentQuestionsDeleteAllPhrase("Cells")).toContain("chapter");
+    expect(assignmentQuestionDeletePhrase(2)).toBe("delete chapter question 2");
   });
 });

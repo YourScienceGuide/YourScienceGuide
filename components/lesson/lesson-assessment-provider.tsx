@@ -3,17 +3,24 @@
 import {
   createContext,
   useContext,
+  useMemo,
   type ReactNode,
 } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { getQuestionBankFromStore } from "@/lib/admin/content-store";
 import { lessonKey } from "@/lib/admin/lesson-key";
-import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import {
+  selectPracticeQuestions,
+  type ChapterQuestion,
+} from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
+import { getOrCreateAssignmentQuestions } from "@/lib/student/assignment-selection";
 
 type LessonAssessmentContextValue = {
+  bank: ChapterQuestion[];
   lesson: LessonQuestion[];
-  alcumus: AlcumusProblem[];
+  practice: ChapterQuestion[];
   ready: boolean;
   error: string | null;
 };
@@ -36,12 +43,22 @@ export function LessonAssessmentProvider({
   const { store, loading: contentLoading, error: contentError } = useContentStore();
   const key = lessonKey(courseId, lessonId);
   const ready = !contentLoading;
-  const lesson = ready ? (store.lessonQuestions[key] ?? []) : [];
-  const alcumus = ready ? (store.alcumusByLesson[key] ?? []) : [];
+
+  const bank = ready ? getQuestionBankFromStore(store, courseId, lessonId) : [];
+
+  const lesson = useMemo(() => {
+    if (!ready || bank.length === 0) return [];
+    return getOrCreateAssignmentQuestions(courseId, lessonId, bank);
+  }, [ready, bank, courseId, lessonId]);
+
+  const practice = useMemo(() => {
+    if (!ready || bank.length === 0) return [];
+    return selectPracticeQuestions(bank, lesson);
+  }, [ready, bank, lesson]);
 
   return (
     <LessonAssessmentContext.Provider
-      value={{ lesson, alcumus, ready, error: contentError }}
+      value={{ bank, lesson, practice, ready, error: contentError }}
     >
       {children}
     </LessonAssessmentContext.Provider>
@@ -54,4 +71,10 @@ export function useLessonAssessment() {
     throw new Error("useLessonAssessment must be used within LessonAssessmentProvider");
   }
   return ctx;
+}
+
+/** @deprecated Use practice from useLessonAssessment(). */
+export function useLessonAssessmentLegacy() {
+  const { lesson, practice, ...rest } = useLessonAssessment();
+  return { ...rest, lesson, alcumus: practice };
 }

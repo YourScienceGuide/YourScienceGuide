@@ -49,17 +49,17 @@ type ExtraPracticePageProps = {
 export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps) {
   const { store } = useContentStore();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
-  const { alcumus, ready, error } = useLessonAssessment();
+  const { practice, ready, error } = useLessonAssessment();
   const [state, setState] = useState<AlcumusState | null>(null);
 
   useEffect(() => {
-    if (ready && alcumus.length > 0 && !state) {
+    if (ready && practice.length > 0 && !state) {
       setState(
-        loadPersistedState(courseId, lessonId, alcumus) ??
-          createInitialAlcumusState(alcumus),
+        loadPersistedState(courseId, lessonId, practice) ??
+          createInitialAlcumusState(practice),
       );
     }
-  }, [ready, alcumus, state, courseId, lessonId]);
+  }, [ready, practice, state, courseId, lessonId]);
 
   useEffect(() => {
     if (!state) return;
@@ -89,7 +89,7 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
     );
   }
 
-  if (alcumus.length === 0) {
+  if (practice.length === 0) {
     return (
       <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
         <div className="space-y-6">
@@ -155,8 +155,8 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
           </p>
         )}
         <p className="text-base text-slate-600 dark:text-stone-400">
-          Adaptive problems that adjust to your skill—like AoPS Alcumus. Progress
-          here is separate from your lesson assignment.
+          Harder chapter problems and any easy questions not chosen for your
+          assignment. Difficulty adapts as you work—like AoPS Alcumus.
         </p>
       </header>
 

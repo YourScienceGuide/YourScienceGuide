@@ -1,4 +1,8 @@
-import type { AlcumusLevel, AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
+import { checkFillInBlank } from "@/lib/lesson/fill-in-blank";
+import { getQuestionHint } from "@/lib/lesson/question-hint";
+import { validateAnswer } from "@/lib/lesson/validate-answer";
 
 export type AlcumusState = {
   level: AlcumusLevel;
@@ -10,19 +14,19 @@ export type AlcumusState = {
   toast: string | null;
 };
 
-function problemsAtLevel(pool: AlcumusProblem[], level: AlcumusLevel) {
-  return pool.filter((p) => p.level === level);
+function problemsAtLevel(pool: ChapterQuestion[], level: AlcumusLevel) {
+  return pool.filter((p) => p.difficulty === level);
 }
 
-function levelsWithProblems(pool: AlcumusProblem[]): AlcumusLevel[] {
+function levelsWithProblems(pool: ChapterQuestion[]): AlcumusLevel[] {
   const levels = new Set<AlcumusLevel>();
   for (const problem of pool) {
-    levels.add(problem.level);
+    levels.add(problem.difficulty);
   }
   return [...levels].sort((a, b) => a - b);
 }
 
-function resolveLevel(pool: AlcumusProblem[], preferred: AlcumusLevel): AlcumusLevel {
+function resolveLevel(pool: ChapterQuestion[], preferred: AlcumusLevel): AlcumusLevel {
   if (problemsAtLevel(pool, preferred).length > 0) {
     return preferred;
   }
@@ -37,32 +41,32 @@ function resolveLevel(pool: AlcumusProblem[], preferred: AlcumusLevel): AlcumusL
   );
 }
 
-function getProblemById(pool: AlcumusProblem[], id: string) {
+function getProblemById(pool: ChapterQuestion[], id: string) {
   return pool.find((p) => p.id === id);
 }
 
 function pickProblem(
-  pool: AlcumusProblem[],
+  pool: ChapterQuestion[],
   level: AlcumusLevel,
   excludeId?: string,
-): AlcumusProblem | undefined {
+): ChapterQuestion | undefined {
   if (pool.length === 0) return undefined;
 
   const withoutExcluded = excludeId
     ? pool.filter((problem) => problem.id !== excludeId)
     : pool;
   const searchPool = withoutExcluded.length > 0 ? withoutExcluded : pool;
-  const atLevel = searchPool.filter((problem) => problem.level === level);
+  const atLevel = searchPool.filter((problem) => problem.difficulty === level);
   const list = atLevel.length > 0 ? atLevel : searchPool;
 
   return list[Math.floor(Math.random() * list.length)];
 }
 
 function pickNextProblem(
-  pool: AlcumusProblem[],
+  pool: ChapterQuestion[],
   level: AlcumusLevel,
   excludeId?: string,
-): AlcumusProblem | undefined {
+): ChapterQuestion | undefined {
   return (
     pickProblem(pool, level, excludeId) ??
     pickProblem(pool, level) ??
@@ -71,8 +75,8 @@ function pickNextProblem(
   );
 }
 
-export function createInitialAlcumusState(pool: AlcumusProblem[]): AlcumusState {
-  const startLevel = resolveLevel(pool, 1);
+export function createInitialAlcumusState(pool: ChapterQuestion[]): AlcumusState {
+  const startLevel = resolveLevel(pool, 3);
   const problem = pickNextProblem(pool, startLevel) ?? pool[0];
   return {
     level: startLevel,
@@ -86,9 +90,9 @@ export function createInitialAlcumusState(pool: AlcumusProblem[]): AlcumusState 
 }
 
 export function getCurrentProblem(
-  pool: AlcumusProblem[],
+  pool: ChapterQuestion[],
   state: AlcumusState,
-): AlcumusProblem {
+): ChapterQuestion {
   return (
     getProblemById(pool, state.problemId) ??
     pickNextProblem(pool, state.level) ??
@@ -96,21 +100,26 @@ export function getCurrentProblem(
   );
 }
 
-export function checkAlcumusAnswer(
-  problem: AlcumusProblem,
-  payload: { selectedIndex?: number | null; text?: string },
+export function checkPracticeAnswer(
+  question: ChapterQuestion,
+  payload: {
+    selectedIndex?: number | null;
+    text?: string;
+    longAnswer?: string;
+    blankAnswers?: string[];
+  },
 ): boolean {
-  if (problem.type === "choice") {
-    return payload.selectedIndex === problem.correctIndex;
+  if (question.type === "fill-in-the-blank") {
+    return checkFillInBlank(question, payload.blankAnswers ?? []).correct;
   }
-  const normalized = (payload.text ?? "").trim().toLowerCase().replace(/\s+/g, "");
-  return (problem.acceptedAnswers ?? []).some(
-    (a) => a.trim().toLowerCase().replace(/\s+/g, "") === normalized,
-  );
+  return validateAnswer(question, {
+    selectedIndex: payload.selectedIndex,
+    text: payload.text ?? payload.longAnswer,
+  });
 }
 
 export function applyAlcumusCorrect(
-  pool: AlcumusProblem[],
+  pool: ChapterQuestion[],
   state: AlcumusState,
 ): AlcumusState {
   if (pool.length === 0) return state;
@@ -134,11 +143,12 @@ export function applyAlcumusCorrect(
 }
 
 export function applyAlcumusIncorrect(
-  pool: AlcumusProblem[],
+  pool: ChapterQuestion[],
   state: AlcumusState,
 ): AlcumusState {
   if (pool.length === 0) return state;
 
+  const problem = getCurrentProblem(pool, state);
   const desiredLevel = Math.max(1, state.level - 1) as AlcumusLevel;
   const nextLevel = resolveLevel(pool, desiredLevel);
   const next = pickNextProblem(pool, nextLevel, state.problemId) ?? pool[0];
@@ -148,7 +158,7 @@ export function applyAlcumusIncorrect(
     problemId: next.id,
     streak: 0,
     solved: state.solved,
-    feedback: "Let's try a different approach...",
+    feedback: getQuestionHint(problem),
     feedbackTone: "retry",
     toast: null,
   };
@@ -181,4 +191,12 @@ export function masteryPercent(state: AlcumusState): number {
 
 export function masteryStepLabel(state: AlcumusState): string {
   return `Level ${state.level} · ${LEVEL_LABELS[state.level]}`;
+}
+
+/** @deprecated Use checkPracticeAnswer */
+export function checkAlcumusAnswer(
+  problem: ChapterQuestion,
+  payload: { selectedIndex?: number | null; text?: string },
+): boolean {
+  return checkPracticeAnswer(problem, payload);
 }

@@ -5,17 +5,15 @@ import { useMemo, useState } from "react";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import {
-  ALCUMUS_CSV_HEADERS,
+  CHAPTER_QUESTION_CSV_HEADERS,
   buildImportPreview,
-  CHAPTER_CSV_HEADERS,
   downloadCsv,
   getCsvHeaders,
   kindLabel,
   serializeExampleRow,
   type CsvImportKind,
 } from "@/lib/admin/csv-questions";
-import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
-import type { LessonQuestion } from "@/lib/lesson/types";
+import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import { getCourseFromStore } from "@/lib/admin/content-store";
 import { Button } from "@/components/ui/button";
 
@@ -29,8 +27,8 @@ type AdminCsvImportBlockProps = {
   onImported?: () => void;
 };
 
-function FormatTable({ kind }: { kind: CsvImportKind }) {
-  const headers = kind === "alcumus" ? ALCUMUS_CSV_HEADERS : CHAPTER_CSV_HEADERS;
+function FormatTable() {
+  const headers = CHAPTER_QUESTION_CSV_HEADERS;
 
   return (
     <div className="overflow-x-auto rounded-md border border-sky-100 bg-sky-50/50 dark:border-stone-700 dark:bg-stone-950">
@@ -59,14 +57,9 @@ function FormatTable({ kind }: { kind: CsvImportKind }) {
             <td className="px-3 py-2 text-slate-400">(optional)</td>
             <td className="px-3 py-2">2</td>
             <td className="px-3 py-2">—</td>
-            {kind === "alcumus" ? (
-              <>
-                <td className="px-3 py-2">Hint…</td>
-                <td className="px-3 py-2">1</td>
-              </>
-            ) : (
-              <td className="px-3 py-2">40</td>
-            )}
+            <td className="px-3 py-2">40</td>
+            <td className="px-3 py-2">Hint…</td>
+            <td className="px-3 py-2">2</td>
           </tr>
         </tbody>
       </table>
@@ -94,10 +87,7 @@ export function AdminCsvImportBlock({
     return buildImportPreview(csvText, kind, course, lessonId);
   }, [csvText, course, kind, lessonId]);
 
-  const lessonBuckets =
-    preview?.kind === "alcumus"
-      ? preview.alcumusByLessonKey
-      : preview?.chapterQuestionsByLessonKey;
+  const lessonBuckets = preview?.questionBankByLessonKey;
 
   function handleFileChange(file: File | null) {
     setImportMessage(null);
@@ -120,24 +110,14 @@ export function AdminCsvImportBlock({
 
     const nextStore = {
       ...store,
-      alcumusByLesson: { ...store.alcumusByLesson },
-      lessonQuestions: { ...store.lessonQuestions },
+      questionBank: { ...store.questionBank },
     };
 
-    if (preview.kind === "alcumus") {
-      for (const [key, imported] of Object.entries(preview.alcumusByLessonKey)) {
-        nextStore.alcumusByLesson[key] = [
-          ...(nextStore.alcumusByLesson[key] ?? []),
-          ...imported,
-        ];
-      }
-    } else {
-      for (const [key, imported] of Object.entries(preview.chapterQuestionsByLessonKey)) {
-        nextStore.lessonQuestions[key] = [
-          ...(nextStore.lessonQuestions[key] ?? []),
-          ...imported,
-        ];
-      }
+    for (const [key, imported] of Object.entries(preview.questionBankByLessonKey)) {
+      nextStore.questionBank[key] = [
+        ...(nextStore.questionBank[key] ?? []),
+        ...imported,
+      ];
     }
 
     const ok = await persist(nextStore);
@@ -151,10 +131,8 @@ export function AdminCsvImportBlock({
     onImported?.();
   }
 
-  const templateName =
-    kind === "alcumus" ? "ysg-alcumus-template.xlsx" : "ysg-end-of-chapter-template.xlsx";
-  const exampleName =
-    kind === "alcumus" ? "ysg-alcumus-examples.csv" : "ysg-end-of-chapter-examples.csv";
+  const templateName = "ysg-chapter-questions-template.xlsx";
+  const exampleName = "ysg-chapter-questions-examples.csv";
 
   async function handleDownloadTemplate() {
     const response = await fetch(`/api/admin/question-template?kind=${kind}`);
@@ -171,20 +149,19 @@ export function AdminCsvImportBlock({
 
   return (
     <div className="space-y-4">
-      <FormatTable kind={kind} />
+      <FormatTable />
 
       <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-stone-400">
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">Type</strong>{" "}
           is a dropdown in the Excel template (
           <code className="text-xs">multiple-choice</code>,{" "}
-          <code className="text-xs">free-response</code>
-          {kind === "end-of-chapter" ? (
-            <>
-              , or <code className="text-xs">fill-in-the-blank</code>
-            </>
-          ) : null}
-          ).
+          <code className="text-xs">free-response</code>, or{" "}
+          <code className="text-xs">fill-in-the-blank</code>).
+        </li>
+        <li>
+          <strong className="font-medium text-slate-800 dark:text-stone-200">Level</strong>{" "}
+          is 1–5. Levels 1–2 are easier (assignment pool); 3–5 are harder (extra practice only).
         </li>
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">
@@ -198,21 +175,17 @@ export function AdminCsvImportBlock({
           <strong className="font-medium text-slate-800 dark:text-stone-200">
             free-response
           </strong>{" "}
-          {kind === "alcumus"
-            ? "rows need Accepted Answers."
-            : "rows need Accepted Answers and/or Min Length."}
+          rows need Accepted Answers and/or Min Length.
         </li>
-        {kind === "end-of-chapter" && (
-          <li>
-            <strong className="font-medium text-slate-800 dark:text-stone-200">
-              fill-in-the-blank
-            </strong>{" "}
-            rows use <code className="text-xs">________</code> in the Question for each
-            blank. Put one accepted answer per blank in Accepted Answers, separated by{" "}
-            <code className="text-xs">|</code> (comma-separate spelling variants within a
-            blank).
-          </li>
-        )}
+        <li>
+          <strong className="font-medium text-slate-800 dark:text-stone-200">
+            fill-in-the-blank
+          </strong>{" "}
+          rows use <code className="text-xs">________</code> in the Question for each
+          blank. Put one accepted answer per blank in Accepted Answers, separated by{" "}
+          <code className="text-xs">|</code> (comma-separate spelling variants within a
+          blank).
+        </li>
         <li>
           Chapter and Section route rows to matching lessons. Leave both blank to use
           the fallback lesson{showLessonPicker ? " below" : " selected above"}.
@@ -231,10 +204,8 @@ export function AdminCsvImportBlock({
             const rows = [
               serializeExampleRow(kind, "multiple-choice"),
               serializeExampleRow(kind, "free-response"),
+              serializeExampleRow(kind, "fill-in-the-blank"),
             ];
-            if (kind === "end-of-chapter") {
-              rows.push(serializeExampleRow(kind, "fill-in-the-blank"));
-            }
             downloadCsv(exampleName, `${getCsvHeaders(kind).join(",")}\n${rows.join("\n")}\n`);
           }}
         >
@@ -289,7 +260,7 @@ export function AdminCsvImportBlock({
           {lessonBuckets && Object.entries(lessonBuckets).length > 0 && (
             <ul className="space-y-1 text-sm text-slate-600 dark:text-stone-400">
               {Object.entries(lessonBuckets).map(([key, questions]) => {
-                const typedQuestions = questions as Array<AlcumusProblem | LessonQuestion>;
+                const typedQuestions = questions as ChapterQuestion[];
                 const [, targetLessonId] = key.split("/");
                 const lesson = course?.lessons.find((l) => l.id === targetLessonId);
                 return (

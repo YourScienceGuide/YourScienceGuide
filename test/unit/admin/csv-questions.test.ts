@@ -12,7 +12,7 @@ import {
 import { makeCourse } from "../../helpers/factories";
 
 const CHAPTER_HEADERS =
-  "Chapter,Section,Type,Question,Option 1,Option 2,Option 3,Option 4,Correct,Accepted Answers,Min Length";
+  "Chapter,Section,Type,Question,Option 1,Option 2,Option 3,Option 4,Correct,Accepted Answers,Min Length,Hint,Level";
 
 describe("parseCsv", () => {
   it("parses quoted fields and commas", () => {
@@ -42,7 +42,7 @@ describe("parseQuestionCsv", () => {
 
   it("parses valid multiple-choice row with two options", () => {
     const csv = `${CHAPTER_HEADERS}
-1,1,multiple-choice,True or false?,True,False,,,1,,`;
+1,1,multiple-choice,True or false?,True,False,,,1,,,,1`;
     const { rows, errors } = parseQuestionCsv(csv, "end-of-chapter");
     expect(errors).toHaveLength(0);
     expect(rows[0].type).toBe("multiple-choice");
@@ -52,25 +52,25 @@ describe("parseQuestionCsv", () => {
 
   it("parses fill-in-the-blank for end-of-chapter only", () => {
     const csv = `${CHAPTER_HEADERS}
-1,1,fill-in-the-blank,Water is ________.,,,,,,"H2O,h2o",`;
+1,1,fill-in-the-blank,Water is ________.,,,,,,"H2O,h2o",,,1`;
     const chapter = parseQuestionCsv(csv, "end-of-chapter");
     expect(chapter.errors).toHaveLength(0);
     expect(chapter.rows[0].blankAnswers[0]).toContain("H2O");
 
     const alcumus = parseQuestionCsv(csv, "alcumus");
-    expect(alcumus.errors[0].message).toContain("only supported for end-of-chapter");
+    expect(alcumus.errors[0].message).toContain("legacy Alcumus");
   });
 
   it("rejects skipped multiple-choice option columns", () => {
     const csv = `${CHAPTER_HEADERS}
-1,1,multiple-choice,Pick one,A,,B,,1,,`;
+1,1,multiple-choice,Pick one,A,,B,,1,,,,1`;
     const { errors } = parseQuestionCsv(csv, "end-of-chapter");
     expect(errors[0].message).toContain("filled in order");
   });
 
   it("requires blank markers in fill-in-the-blank prompts", () => {
     const csv = `${CHAPTER_HEADERS}
-1,1,fill-in-the-blank,No blanks here.,,,,,,answer,`;
+1,1,fill-in-the-blank,No blanks here.,,,,,,answer,,,1`;
     const { errors } = parseQuestionCsv(csv, "end-of-chapter");
     expect(errors[0].message).toContain("underscore");
   });
@@ -80,10 +80,10 @@ describe("buildImportPreview", () => {
   it("maps rows to lessons by chapter and section", () => {
     const course = makeCourse();
     const csv = `${CHAPTER_HEADERS}
-1,1,multiple-choice,Question?,A,B,,,1,,`;
-    const preview = buildImportPreview(csv, "end-of-chapter", course, "lesson-a");
+1,1,multiple-choice,Question?,A,B,,,1,,,,2`;
+    const preview = buildImportPreview(csv, "chapter", course, "lesson-a");
     expect(preview.importableCount).toBe(1);
-    expect(Object.keys(preview.chapterQuestionsByLessonKey)).toContain(
+    expect(Object.keys(preview.questionBankByLessonKey)).toContain(
       "test-course/lesson-a",
     );
   });

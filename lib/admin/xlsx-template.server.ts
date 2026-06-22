@@ -39,8 +39,8 @@ export async function buildQuestionTemplateXlsx(
   validationSheet.getCell("A1").value = "multiple-choice";
   validationSheet.getCell("A2").value = "free-response";
 
-  const typeCount = kind === "end-of-chapter" ? 3 : 2;
-  if (kind === "end-of-chapter") {
+  const typeCount = kind === "alcumus" ? 2 : 3;
+  if (typeCount === 3) {
     validationSheet.getCell("A3").value = "fill-in-the-blank";
   }
 
@@ -64,7 +64,7 @@ export async function buildQuestionTemplateXlsx(
 }
 
 export function questionTemplateFilename(kind: CsvImportKind): string {
-  return kind === "alcumus"
-    ? "ysg-alcumus-template.xlsx"
-    : "ysg-end-of-chapter-template.xlsx";
+  if (kind === "alcumus") return "ysg-alcumus-template.xlsx";
+  if (kind === "end-of-chapter") return "ysg-end-of-chapter-template.xlsx";
+  return "ysg-chapter-questions-template.xlsx";
 }

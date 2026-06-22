@@ -13,16 +13,16 @@ import { makeAlcumusChoice, makeAlcumusNumeric } from "../../helpers/factories";
 
 describe("alcumus machine", () => {
   const pool = [
-    makeAlcumusChoice({ id: "c1", level: 1 }),
-    makeAlcumusChoice({ id: "c2", level: 2 }),
-    makeAlcumusNumeric({ id: "n1", level: 3 }),
+    makeAlcumusChoice({ id: "c1", level: 3 }),
+    makeAlcumusChoice({ id: "c2", level: 4 }),
+    makeAlcumusNumeric({ id: "n1", level: 5 }),
   ];
 
   it("creates initial state from pool", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const state = createInitialAlcumusState(pool);
     expect(pool.some((p) => p.id === state.problemId)).toBe(true);
-    expect(state.level).toBeGreaterThanOrEqual(1);
+    expect(state.level).toBeGreaterThanOrEqual(3);
     expect(state.level).toBeLessThanOrEqual(5);
   });
 

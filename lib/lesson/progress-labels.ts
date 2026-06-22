@@ -1,11 +1,13 @@
-import { LESSON_QUESTION_COUNT } from "@/lib/lesson/types";
-
 export function lessonStepLabel(
   questionIndex: number,
+  assignmentCount: number,
   isComplete: boolean,
 ): string {
-  if (isComplete) {
-    return `Lesson complete · ${LESSON_QUESTION_COUNT} of ${LESSON_QUESTION_COUNT}`;
+  if (assignmentCount <= 0) {
+    return "No assignment questions";
   }
-  return `Question ${questionIndex + 1} of ${LESSON_QUESTION_COUNT}`;
+  if (isComplete) {
+    return `Lesson complete · ${assignmentCount} of ${assignmentCount}`;
+  }
+  return `Question ${questionIndex + 1} of ${assignmentCount}`;
 }
