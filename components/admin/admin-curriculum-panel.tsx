@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import { AdminTextbookSection } from "@/components/admin/admin-textbook-section";
 import {
   courseDeleteConfirmationPhrase,
@@ -25,7 +26,8 @@ import { Input } from "@/components/ui/input";
 
 export function AdminCurriculumPanel() {
   const { store, persist, saving } = useContentStore();
-  const [selectedCourseId, setSelectedCourseId] = useState(store.courses[0]?.id ?? "");
+  const { courseId: selectedCourseId, setCourseId: setSelectedCourseId } =
+    useAdminWorkspace();
   const course = store.courses.find((c) => c.id === selectedCourseId);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");

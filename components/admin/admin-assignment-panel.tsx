@@ -6,6 +6,7 @@ import { AdminConfirmDeleteDialog } from "@/components/admin/admin-confirm-delet
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import {
   chapterQuestionDeletePhrase,
   chapterQuestionsDeleteAllPhrase,
@@ -30,8 +31,7 @@ function newQuestionId() {
 
 export function AdminAssignmentPanel() {
   const { store, persist, saving } = useContentStore();
-  const [courseId, setCourseId] = useState(store.courses[0]?.id ?? "");
-  const [lessonId, setLessonId] = useState(store.courses[0]?.lessons[0]?.id ?? "");
+  const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
   const [questions, setQuestions] = useState<ChapterQuestion[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -131,11 +131,7 @@ export function AdminAssignmentPanel() {
         store={store}
         courseId={courseId}
         lessonId={lessonId}
-        onCourseChange={(id) => {
-          setCourseId(id);
-          const first = store.courses.find((c) => c.id === id)?.lessons[0]?.id;
-          if (first) setLessonId(first);
-        }}
+        onCourseChange={setCourseId}
         onLessonChange={setLessonId}
       />
 
@@ -166,11 +162,7 @@ export function AdminAssignmentPanel() {
             kind="chapter"
             courseId={courseId}
             lessonId={lessonId}
-            onCourseChange={(id) => {
-              setCourseId(id);
-              const first = store.courses.find((c) => c.id === id)?.lessons[0]?.id;
-              if (first) setLessonId(first);
-            }}
+            onCourseChange={setCourseId}
             onLessonChange={setLessonId}
             showLessonPicker={false}
           />

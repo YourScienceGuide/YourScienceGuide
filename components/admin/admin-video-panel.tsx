@@ -5,6 +5,7 @@ import MuxPlayer from "@mux/mux-player-react";
 
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import {
   getVideoFromStore,
   type LessonVideoMeta,
@@ -44,8 +45,7 @@ async function pollForPlaybackId(uploadId: string): Promise<string> {
 
 export function AdminVideoPanel() {
   const { store, persist } = useContentStore();
-  const [courseId, setCourseId] = useState(store.courses[0]?.id ?? "");
-  const [lessonId, setLessonId] = useState(store.courses[0]?.lessons[0]?.id ?? "");
+  const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
   const [meta, setMeta] = useState<LessonVideoMeta>({
     title: "",
     description: "",
@@ -128,11 +128,7 @@ export function AdminVideoPanel() {
         store={store}
         courseId={courseId}
         lessonId={lessonId}
-        onCourseChange={(id) => {
-          setCourseId(id);
-          const first = store.courses.find((c) => c.id === id)?.lessons[0]?.id;
-          if (first) setLessonId(first);
-        }}
+        onCourseChange={setCourseId}
         onLessonChange={setLessonId}
       />
 

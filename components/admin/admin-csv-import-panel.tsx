@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
-import { useContentStore } from "@/components/admin/content-store-provider";
+import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 
 export function AdminCsvImportPanel() {
-  const { store } = useContentStore();
-  const [courseId, setCourseId] = useState(store.courses[0]?.id ?? "");
-  const [lessonId, setLessonId] = useState(store.courses[0]?.lessons[0]?.id ?? "");
+  const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
 
   return (
     <div className="space-y-8">
@@ -26,11 +22,7 @@ export function AdminCsvImportPanel() {
           kind="chapter"
           courseId={courseId}
           lessonId={lessonId}
-          onCourseChange={(id) => {
-            setCourseId(id);
-            const first = store.courses.find((c) => c.id === id)?.lessons[0]?.id;
-            if (first) setLessonId(first);
-          }}
+          onCourseChange={setCourseId}
           onLessonChange={setLessonId}
         />
       </section>

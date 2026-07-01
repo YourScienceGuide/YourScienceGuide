@@ -1,26 +1,27 @@
 "use client";
 
-import { useState } from "react";
-
 import { AdminAssignmentPanel } from "@/components/admin/admin-assignment-panel";
 import { AdminCsvImportPanel } from "@/components/admin/admin-csv-import-panel";
 import { AdminCurriculumPanel } from "@/components/admin/admin-curriculum-panel";
 import { AdminVideoPanel } from "@/components/admin/admin-video-panel";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import {
+  AdminWorkspaceProvider,
+  useAdminWorkspace,
+} from "@/components/admin/admin-workspace-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { AdminTabId } from "@/lib/admin/admin-preferences";
 
 const TABS = [
   { id: "curriculum", label: "Curriculum & lessons" },
   { id: "import", label: "Bulk import (CSV)" },
   { id: "assignment", label: "Chapter questions" },
   { id: "videos", label: "Lesson videos" },
-] as const;
+] as const satisfies ReadonlyArray<{ id: AdminTabId; label: string }>;
 
-type TabId = (typeof TABS)[number]["id"];
-
-export function AdminDashboard() {
-  const [tab, setTab] = useState<TabId>("curriculum");
+function AdminDashboardContent() {
+  const { tab, setTab, ready } = useAdminWorkspace();
   const { reset, saving, saveError, source, loading } = useContentStore();
 
   return (
@@ -88,10 +89,26 @@ export function AdminDashboard() {
         ))}
       </nav>
 
-      {tab === "curriculum" && <AdminCurriculumPanel />}
-      {tab === "import" && <AdminCsvImportPanel />}
-      {tab === "assignment" && <AdminAssignmentPanel />}
-      {tab === "videos" && <AdminVideoPanel />}
+      {ready ? (
+        <>
+          {tab === "curriculum" && <AdminCurriculumPanel />}
+          {tab === "import" && <AdminCsvImportPanel />}
+          {tab === "assignment" && <AdminAssignmentPanel />}
+          {tab === "videos" && <AdminVideoPanel />}
+        </>
+      ) : (
+        <p className="text-sm text-slate-500 dark:text-stone-500">
+          Restoring your last admin selection…
+        </p>
+      )}
     </div>
+  );
+}
+
+export function AdminDashboard() {
+  return (
+    <AdminWorkspaceProvider>
+      <AdminDashboardContent />
+    </AdminWorkspaceProvider>
   );
 }
