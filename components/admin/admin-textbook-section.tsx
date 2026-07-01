@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  AdminActionFeedback,
+  type AdminFeedback,
+} from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { TextbookCover } from "@/components/student/textbook-cover";
 import { Button } from "@/components/ui/button";
@@ -30,39 +34,45 @@ export function AdminTextbookSection({
   const existing = store.textbooks?.[courseId];
   const [enabled, setEnabled] = useState(Boolean(existing));
   const [draft, setDraft] = useState<Textbook>(existing ?? createEmptyTextbook());
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formFeedback, setFormFeedback] = useState<AdminFeedback | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     const next = store.textbooks?.[courseId];
     setEnabled(Boolean(next));
     setDraft(next ?? createEmptyTextbook());
-    setError(null);
     setUploadError(null);
-    setSaved(false);
+    setFormFeedback(null);
   }, [courseId, store.textbooks]);
 
   function updateDraft(patch: Partial<Textbook>) {
     setDraft((current) => ({ ...current, ...patch }));
-    setSaved(false);
+    setFormFeedback(null);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFormFeedback(null);
 
     if (!enabled) {
-      const ok = await persist(removeTextbookFromStore(store, courseId));
-      if (ok) setSaved(true);
-      else setError("Could not save changes.");
+      const result = await persist(removeTextbookFromStore(store, courseId), {
+        successMessage: `Removed companion textbook from ${courseTitle}.`,
+      });
+      if (!result.ok) {
+        setFormFeedback({ type: "error", message: result.error });
+        return;
+      }
+      setFormFeedback({
+        type: "success",
+        message: `Removed companion textbook from ${courseTitle}.`,
+      });
       return;
     }
 
     const title = draft.title.trim();
     const subtitle = draft.subtitle.trim();
     if (!title) {
-      setError("Textbook title is required.");
+      setFormFeedback({ type: "error", message: "Textbook title is required." });
       return;
     }
 
@@ -77,9 +87,17 @@ export function AdminTextbookSection({
         draft.coverAlt.trim() || buildTextbookCoverAlt(title, subtitle),
     };
 
-    const ok = await persist(setTextbookInStore(store, courseId, textbook));
-    if (ok) setSaved(true);
-    else setError("Could not save textbook.");
+    const result = await persist(setTextbookInStore(store, courseId, textbook), {
+      successMessage: `Saved companion textbook for ${courseTitle}.`,
+    });
+    if (!result.ok) {
+      setFormFeedback({ type: "error", message: result.error });
+      return;
+    }
+    setFormFeedback({
+      type: "success",
+      message: `Saved companion textbook for ${courseTitle}.`,
+    });
   }
 
   async function handleCoverUpload(file: File | null) {
@@ -125,7 +143,7 @@ export function AdminTextbookSection({
           checked={enabled}
           onChange={(e) => {
             setEnabled(e.target.checked);
-            setSaved(false);
+            setFormFeedback(null);
             if (e.target.checked && !draft.title) {
               setDraft(createEmptyTextbook());
             }
@@ -155,7 +173,7 @@ export function AdminTextbookSection({
                 />
               </label>
               {uploadError && (
-                <p className="text-xs text-amber-700 dark:text-amber-300">{uploadError}</p>
+                <p className="text-xs text-red-700 dark:text-red-300">{uploadError}</p>
               )}
             </div>
 
@@ -217,28 +235,27 @@ export function AdminTextbookSection({
             </p>
           )}
 
-          {error && (
-            <p className="text-sm text-amber-700 dark:text-amber-300">{error}</p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="space-y-3">
             <Button type="submit" size="sm" disabled={saving}>
               {saving ? "Saving…" : "Save textbook"}
             </Button>
-            {saved && (
-              <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                Companion textbook saved.
-              </p>
-            )}
+            <AdminActionFeedback
+              feedback={formFeedback}
+              onDismiss={() => setFormFeedback(null)}
+            />
           </div>
         </form>
       )}
 
       {!enabled && (
-        <form onSubmit={(e) => void handleSave(e)}>
+        <form onSubmit={(e) => void handleSave(e)} className="space-y-3">
           <Button type="submit" size="sm" variant="outline" disabled={saving}>
             {saving ? "Saving…" : "Remove companion textbook"}
           </Button>
+          <AdminActionFeedback
+            feedback={formFeedback}
+            onDismiss={() => setFormFeedback(null)}
+          />
         </form>
       )}
     </section>

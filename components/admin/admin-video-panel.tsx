@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
 
+import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
@@ -44,7 +45,8 @@ async function pollForPlaybackId(uploadId: string): Promise<string> {
 }
 
 export function AdminVideoPanel() {
-  const { store, persist } = useContentStore();
+  const { store, persist, saving, actionFeedback, clearActionFeedback } =
+    useContentStore();
   const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
   const [meta, setMeta] = useState<LessonVideoMeta>({
     title: "",
@@ -63,13 +65,19 @@ export function AdminVideoPanel() {
     );
   }, [courseId, lessonId, store]);
 
-  function commit(next: LessonVideoMeta) {
+  function commit(
+    next: LessonVideoMeta,
+    options?: { successMessage?: string; silent?: boolean },
+  ) {
     setMeta(next);
     const key = `${courseId}/${lessonId}`;
-    void persist({
-      ...store,
-      videos: { ...store.videos, [key]: next },
-    });
+    void persist(
+      {
+        ...store,
+        videos: { ...store.videos, [key]: next },
+      },
+      options ?? { silent: true },
+    );
   }
 
   async function handleFile(file: File | null) {
@@ -107,12 +115,15 @@ export function AdminVideoPanel() {
       setUploadStatus("Processing video…");
       const playbackId = await pollForPlaybackId(uploadId);
 
-      commit({
-        ...meta,
-        muxPlaybackId: playbackId,
-        fileName: file.name,
-        sourceUrl: undefined,
-      });
+      commit(
+        {
+          ...meta,
+          muxPlaybackId: playbackId,
+          fileName: file.name,
+          sourceUrl: undefined,
+        },
+        { successMessage: `Video uploaded for this lesson.` },
+      );
       setUploadStatus(null);
     } catch (error) {
       setUploadStatus(null);
@@ -124,6 +135,10 @@ export function AdminVideoPanel() {
 
   return (
     <div className="space-y-6">
+      <AdminActionFeedback
+        feedback={actionFeedback}
+        onDismiss={clearActionFeedback}
+      />
       <AdminLessonPicker
         store={store}
         courseId={courseId}
@@ -189,10 +204,13 @@ export function AdminVideoPanel() {
             size="sm"
             disabled={Boolean(uploadStatus)}
             onClick={() =>
-              commit({
-                title: meta.title,
-                description: meta.description,
-              })
+              commit(
+                {
+                  title: meta.title,
+                  description: meta.description,
+                },
+                { successMessage: "Removed uploaded video from this lesson." },
+              )
             }
           >
             Remove uploaded file

@@ -17,6 +17,18 @@ import {
   sanitizeContentStore,
   type AdminContentStore,
 } from "@/lib/admin/content-store";
+import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
+
+export type PersistOptions = {
+  /** Shown in the admin banner when save succeeds. */
+  successMessage?: string;
+  /** Skip success banner (use for auto-save field edits). Errors still show. */
+  silent?: boolean;
+};
+
+export type PersistResult =
+  | { ok: true }
+  | { ok: false; error: string };
 
 type ContentStoreContextValue = {
   store: AdminContentStore;
@@ -24,9 +36,14 @@ type ContentStoreContextValue = {
   saving: boolean;
   error: string | null;
   saveError: string | null;
+  actionFeedback: AdminFeedback | null;
+  clearActionFeedback: () => void;
   refresh: () => Promise<void>;
-  persist: (next: AdminContentStore) => Promise<boolean>;
-  reset: () => Promise<boolean>;
+  persist: (
+    next: AdminContentStore,
+    options?: PersistOptions,
+  ) => Promise<PersistResult>;
+  reset: () => Promise<PersistResult>;
   source: "supabase" | "default" | "unknown";
 };
 
@@ -55,7 +72,12 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<AdminFeedback | null>(null);
   const [source, setSource] = useState<ContentStoreContextValue["source"]>("unknown");
+
+  const clearActionFeedback = useCallback(() => {
+    setActionFeedback(null);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -82,37 +104,57 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(CONTENT_UPDATED_EVENT, onUpdate);
   }, [refresh]);
 
-  const persist = useCallback(async (next: AdminContentStore) => {
-    setSaving(true);
-    setSaveError(null);
-    const sanitized = sanitizeContentStore(next);
+  const persist = useCallback(
+    async (
+      next: AdminContentStore,
+      options?: PersistOptions,
+    ): Promise<PersistResult> => {
+      setSaving(true);
+      setSaveError(null);
 
-    try {
-      const res = await fetch("/api/admin/content", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sanitized),
-      });
+      const sanitized = sanitizeContentStore(next);
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "Failed to save content");
+      try {
+        const res = await fetch("/api/admin/content", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sanitized),
+        });
+
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(body?.error ?? "Failed to save content");
+        }
+
+        const saved = sanitizeContentStore((await res.json()) as AdminContentStore);
+        setStore(saved);
+        setSource("supabase");
+        notifyContentUpdated();
+
+        if (!options?.silent) {
+          setActionFeedback({
+            type: "success",
+            message: options?.successMessage ?? "Changes saved.",
+          });
+        }
+
+        return { ok: true };
+      } catch (err) {
+        const error =
+          err instanceof Error ? err.message : "Failed to save content";
+        setSaveError(error);
+        setActionFeedback({ type: "error", message: error });
+        return { ok: false, error };
+      } finally {
+        setSaving(false);
       }
+    },
+    [],
+  );
 
-      const saved = sanitizeContentStore((await res.json()) as AdminContentStore);
-      setStore(saved);
-      setSource("supabase");
-      notifyContentUpdated();
-      return true;
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save content");
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }, []);
-
-  const reset = useCallback(async () => {
+  const reset = useCallback(async (): Promise<PersistResult> => {
     setSaving(true);
     setSaveError(null);
 
@@ -122,7 +164,9 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         throw new Error(body?.error ?? "Failed to reset content");
       }
 
@@ -130,10 +174,17 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       setStore(saved);
       setSource("supabase");
       notifyContentUpdated();
-      return true;
+      setActionFeedback({
+        type: "success",
+        message: "All content reset to defaults.",
+      });
+      return { ok: true };
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to reset content");
-      return false;
+      const error =
+        err instanceof Error ? err.message : "Failed to reset content";
+      setSaveError(error);
+      setActionFeedback({ type: "error", message: error });
+      return { ok: false, error };
     } finally {
       setSaving(false);
     }
@@ -146,12 +197,26 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       saving,
       error,
       saveError,
+      actionFeedback,
+      clearActionFeedback,
       refresh,
       persist,
       reset,
       source,
     }),
-    [store, loading, saving, error, saveError, refresh, persist, reset, source],
+    [
+      store,
+      loading,
+      saving,
+      error,
+      saveError,
+      actionFeedback,
+      clearActionFeedback,
+      refresh,
+      persist,
+      reset,
+      source,
+    ],
   );
 
   return (

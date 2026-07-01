@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
+import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   CHAPTER_QUESTION_CSV_HEADERS,
@@ -76,7 +77,8 @@ export function AdminCsvImportBlock({
   showLessonPicker = true,
   onImported,
 }: AdminCsvImportBlockProps) {
-  const { store, persist, saveError } = useContentStore();
+  const { store, persist, saving, actionFeedback, clearActionFeedback } =
+    useContentStore();
   const [csvText, setCsvText] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -120,12 +122,11 @@ export function AdminCsvImportBlock({
       ];
     }
 
-    const ok = await persist(nextStore);
-    if (!ok) return;
+    const message = `Imported ${preview.importableCount} ${kindLabel(preview.kind).toLowerCase()} question${preview.importableCount === 1 ? "" : "s"}.`;
+    const result = await persist(nextStore, { successMessage: message });
+    if (!result.ok) return;
 
-    setImportMessage(
-      `Imported ${preview.importableCount} ${kindLabel(preview.kind).toLowerCase()} question${preview.importableCount === 1 ? "" : "s"}.`,
-    );
+    setImportMessage(message);
     setCsvText(null);
     setFileName(null);
     onImported?.();
@@ -149,6 +150,10 @@ export function AdminCsvImportBlock({
 
   return (
     <div className="space-y-4">
+      <AdminActionFeedback
+        feedback={actionFeedback}
+        onDismiss={clearActionFeedback}
+      />
       <FormatTable />
 
       <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-stone-400">
@@ -287,19 +292,16 @@ export function AdminCsvImportBlock({
           <Button
             type="button"
             size="sm"
-            disabled={preview.importableCount === 0}
+            disabled={preview.importableCount === 0 || saving}
             onClick={handleImport}
           >
-            Import {preview.importableCount} question{preview.importableCount === 1 ? "" : "s"}
+            {saving ? "Saving…" : `Import ${preview.importableCount} question${preview.importableCount === 1 ? "" : "s"}`}
           </Button>
         </div>
       )}
 
       {importMessage && (
         <p className="text-sm text-emerald-700 dark:text-emerald-300">{importMessage}</p>
-      )}
-      {saveError && (
-        <p className="text-sm text-red-700 dark:text-red-300">{saveError}</p>
       )}
     </div>
   );

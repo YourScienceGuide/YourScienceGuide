@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminConfirmDeleteDialog } from "@/components/admin/admin-confirm-delete-dialog";
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
+import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import {
@@ -30,7 +31,8 @@ function newQuestionId() {
 }
 
 export function AdminAssignmentPanel() {
-  const { store, persist, saving } = useContentStore();
+  const { store, persist, saving, actionFeedback, clearActionFeedback } =
+    useContentStore();
   const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
   const [questions, setQuestions] = useState<ChapterQuestion[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -47,15 +49,20 @@ export function AdminAssignmentPanel() {
     setQuestions(store.questionBank[key] ?? []);
   }, [courseId, lessonId, store]);
 
-  function commit(next: ChapterQuestion[]) {
+  function commit(next: ChapterQuestion[], successMessage?: string) {
     setQuestions(next);
-    void persist({
-      ...store,
-      questionBank: {
-        ...store.questionBank,
-        [lessonKey(courseId, lessonId)]: next,
+    void persist(
+      {
+        ...store,
+        questionBank: {
+          ...store.questionBank,
+          [lessonKey(courseId, lessonId)]: next,
+        },
       },
-    });
+      successMessage
+        ? { successMessage }
+        : { silent: true },
+    );
   }
 
   function updateQ(index: number, patch: Partial<ChapterQuestion>) {
@@ -66,7 +73,8 @@ export function AdminAssignmentPanel() {
   }
 
   function addQuestion() {
-    commit([
+    commit(
+      [
       ...questions,
       {
         type: "multiple-choice",
@@ -76,7 +84,9 @@ export function AdminAssignmentPanel() {
         correctIndex: 0,
         difficulty: 1,
       },
-    ]);
+    ],
+      "Added a new question.",
+    );
   }
 
   function openDeleteDialog(target: DeleteTarget) {
@@ -100,14 +110,22 @@ export function AdminAssignmentPanel() {
         : questions.filter((_, index) => index !== deleteTarget.index);
 
     setQuestions(next);
-    const ok = await persist({
-      ...store,
-      questionBank: {
-        ...store.questionBank,
-        [lessonKey(courseId, lessonId)]: next,
+    const result = await persist(
+      {
+        ...store,
+        questionBank: {
+          ...store.questionBank,
+          [lessonKey(courseId, lessonId)]: next,
+        },
       },
-    });
-    if (!ok) return;
+      {
+        successMessage:
+          deleteTarget.kind === "all"
+            ? `Deleted all questions for ${lessonTitle}.`
+            : "Deleted question.",
+      },
+    );
+    if (!result.ok) return;
     closeDeleteDialog();
   }
 
@@ -127,6 +145,10 @@ export function AdminAssignmentPanel() {
 
   return (
     <div className="space-y-6">
+      <AdminActionFeedback
+        feedback={actionFeedback}
+        onDismiss={clearActionFeedback}
+      />
       <AdminLessonPicker
         store={store}
         courseId={courseId}

@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
+import {
+  AdminActionFeedback,
+  type AdminFeedback,
+} from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import type { PersistOptions } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import { AdminTextbookSection } from "@/components/admin/admin-textbook-section";
 import {
@@ -54,12 +59,18 @@ export function AdminCurriculumPanel() {
     section: 1,
     chapterTitle: "Chapter 1",
   });
+  const [addCourseFeedback, setAddCourseFeedback] = useState<AdminFeedback | null>(
+    null,
+  );
+  const [addLessonFeedback, setAddLessonFeedback] = useState<AdminFeedback | null>(
+    null,
+  );
 
-  function saveCourses(courses: Course[]) {
-    persist({ ...store, courses });
+  async function saveCourses(courses: Course[], options?: PersistOptions) {
+    return persist({ ...store, courses }, options);
   }
 
-  function handleAddCourse(e: React.FormEvent) {
+  async function handleAddCourse(e: React.FormEvent) {
     e.preventDefault();
     const id = slugifyId(newCourse.id || newCourse.title);
     if (!id || store.courses.some((c) => c.id === id)) return;
@@ -70,12 +81,22 @@ export function AdminCurriculumPanel() {
       description: newCourse.description,
       lessons: [],
     };
-    saveCourses([...store.courses, courseEntry]);
+    const result = await saveCourses([...store.courses, courseEntry], {
+      successMessage: `Added course "${courseEntry.title}".`,
+    });
+    if (!result.ok) {
+      setAddCourseFeedback({ type: "error", message: result.error });
+      return;
+    }
+    setAddCourseFeedback({
+      type: "success",
+      message: `Added course "${courseEntry.title}".`,
+    });
     setSelectedCourseId(id);
     setNewCourse({ title: "", subject: "", description: "", id: "" });
   }
 
-  function handleAddLesson(e: React.FormEvent) {
+  async function handleAddLesson(e: React.FormEvent) {
     e.preventDefault();
     if (!course) return;
     const id = slugifyId(newLesson.title);
@@ -100,7 +121,18 @@ export function AdminCurriculumPanel() {
     const courses = store.courses.map((c) =>
       c.id === course.id ? { ...c, lessons: [...c.lessons, lesson] } : c,
     );
-    saveCourses(courses);
+    const result = await saveCourses(courses, {
+      successMessage: `Added lesson "${lesson.title}" to ${course.title}.`,
+    });
+    if (!result.ok) {
+      setAddLessonFeedback({ type: "error", message: result.error });
+      return;
+    }
+    setAddLessonFeedback({
+      type: "success",
+      message: `Added lesson "${lesson.title}" to ${course.title}.`,
+    });
+
     setNewLesson({
       title: "",
       description: "",
@@ -130,7 +162,7 @@ export function AdminCurriculumPanel() {
           }
         : c,
     );
-    saveCourses(courses);
+    void saveCourses(courses, { silent: true });
   }
 
   const deletePhrase = course ? courseDeleteConfirmationPhrase(course.title) : "";
@@ -158,8 +190,10 @@ export function AdminCurriculumPanel() {
     if (!course || !lessonToDelete || !deleteLessonPhraseMatches) return;
 
     const nextStore = removeLessonFromStore(store, course.id, lessonToDelete.id);
-    const ok = await persist(nextStore);
-    if (!ok) return;
+    const result = await persist(nextStore, {
+      successMessage: `Deleted lesson "${lessonToDelete.title}".`,
+    });
+    if (!result.ok) return;
 
     setDeleteLessonDialogOpen(false);
     setLessonToDelete(null);
@@ -170,8 +204,10 @@ export function AdminCurriculumPanel() {
     if (!course || !deletePhraseMatches || !canDeleteCourse) return;
 
     const nextStore = removeCourseFromStore(store, course.id);
-    const ok = await persist(nextStore);
-    if (!ok) return;
+    const result = await persist(nextStore, {
+      successMessage: `Deleted course "${course.title}".`,
+    });
+    if (!result.ok) return;
 
     setDeleteDialogOpen(false);
     setDeleteConfirmText("");
@@ -213,9 +249,14 @@ export function AdminCurriculumPanel() {
             rows={2}
             className="rounded-md border border-sky-200 px-3 py-2 text-sm sm:col-span-2 dark:border-stone-600 dark:bg-stone-950"
           />
-          <Button type="submit" className="sm:col-span-2 sm:w-fit">
-            Add course
+          <Button type="submit" className="sm:col-span-2 sm:w-fit" disabled={saving}>
+            {saving ? "Saving…" : "Add course"}
           </Button>
+          <AdminActionFeedback
+            feedback={addCourseFeedback}
+            onDismiss={() => setAddCourseFeedback(null)}
+            className="sm:col-span-2"
+          />
         </form>
       </section>
 
@@ -341,9 +382,13 @@ export function AdminCurriculumPanel() {
                   />
                 </label>
               </div>
-              <Button type="submit" size="sm">
-                Add lesson
+              <Button type="submit" size="sm" disabled={saving}>
+                {saving ? "Saving…" : "Add lesson"}
               </Button>
+              <AdminActionFeedback
+                feedback={addLessonFeedback}
+                onDismiss={() => setAddLessonFeedback(null)}
+              />
             </form>
 
             <section className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-5 dark:border-red-900/50 dark:bg-red-950/20">
