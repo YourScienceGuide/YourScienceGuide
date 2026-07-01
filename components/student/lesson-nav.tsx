@@ -4,7 +4,8 @@ import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { CurriculumLesson } from "@/lib/student/curriculum";
+import { lessonPositionLabel } from "@/lib/student/lesson-sort";
+import type { CurriculumLesson } from "@/lib/student/curriculum-types";
 import { coursePath, lessonPath } from "@/lib/student/paths";
 
 type LessonNavProps = {
@@ -43,7 +44,7 @@ export function LessonNav({
             {lesson.title}
           </h1>
           <p className="text-sm text-slate-600 dark:text-stone-400">
-            Lesson {lesson.order} · {lesson.description}
+            {lessonPositionLabel(lesson) || "Lesson"} · {lesson.description}
           </p>
         </div>
 

@@ -1,5 +1,9 @@
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import {
+  compareLessons,
+  sortLessons,
+} from "@/lib/student/lesson-sort";
+import {
   DEFAULT_COURSE_ID,
   SEED_COURSES,
   SEED_LESSONS,
@@ -21,8 +25,11 @@ export function getLesson(
 }
 
 export function getLessonsByChapter(course: Course) {
-  const chapters = new Map<string, { chapterTitle: string; lessons: CurriculumLesson[] }>();
-  for (const lesson of course.lessons) {
+  const chapters = new Map<
+    string,
+    { chapterTitle: string; lessons: CurriculumLesson[] }
+  >();
+  for (const lesson of sortLessons(course.lessons)) {
     const existing = chapters.get(lesson.chapterId);
     if (existing) {
       existing.lessons.push(lesson);
@@ -33,20 +40,27 @@ export function getLessonsByChapter(course: Course) {
       });
     }
   }
-  return Array.from(chapters.entries()).map(([chapterId, data]) => ({
-    chapterId,
-    chapterTitle: data.chapterTitle,
-    lessons: data.lessons,
-  }));
+  return Array.from(chapters.entries())
+    .map(([chapterId, data]) => ({
+      chapterId,
+      chapterTitle: data.chapterTitle,
+      lessons: sortLessons(data.lessons),
+    }))
+    .sort((a, b) => compareLessons(a.lessons[0], b.lessons[0]));
+}
+
+export function getSortedLessons(course: Course): CurriculumLesson[] {
+  return sortLessons(course.lessons);
 }
 
 export function getAdjacentLessons(courseId: string, lessonId: string) {
   const course = getCourse(courseId);
   if (!course) return { prev: undefined, next: undefined };
-  const index = course.lessons.findIndex((l) => l.id === lessonId);
+  const sorted = getSortedLessons(course);
+  const index = sorted.findIndex((l) => l.id === lessonId);
   if (index === -1) return { prev: undefined, next: undefined };
   return {
-    prev: index > 0 ? course.lessons[index - 1] : undefined,
-    next: index < course.lessons.length - 1 ? course.lessons[index + 1] : undefined,
+    prev: index > 0 ? sorted[index - 1] : undefined,
+    next: index < sorted.length - 1 ? sorted[index + 1] : undefined,
   };
 }

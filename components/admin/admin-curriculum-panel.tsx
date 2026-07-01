@@ -13,6 +13,11 @@ import {
 } from "@/lib/admin/content-store";
 import { slugifyId } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
+import {
+  lessonPositionLabel,
+  sortLessons,
+  sortOrderForLesson,
+} from "@/lib/student/lesson-sort";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,9 +50,9 @@ export function AdminCurriculumPanel() {
   const [newLesson, setNewLesson] = useState({
     title: "",
     description: "",
-    chapterId: "chapter-1",
+    chapter: 1,
+    section: 1,
     chapterTitle: "Chapter 1",
-    order: (course?.lessons.length ?? 0) + 1,
   });
 
   function saveCourses(courses: Course[]) {
@@ -75,14 +80,23 @@ export function AdminCurriculumPanel() {
     if (!course) return;
     const id = slugifyId(newLesson.title);
     if (!id || course.lessons.some((l) => l.id === id)) return;
-    const lesson: CurriculumLesson = {
+
+    const chapterId = `chapter-${newLesson.chapter}`;
+    const draft: CurriculumLesson = {
       id,
-      chapterId: newLesson.chapterId,
-      chapterTitle: newLesson.chapterTitle,
+      chapterId,
+      chapterTitle: newLesson.chapterTitle.trim() || `Chapter ${newLesson.chapter}`,
       title: newLesson.title,
       description: newLesson.description,
-      order: newLesson.order,
+      chapter: newLesson.chapter,
+      section: newLesson.section,
+      order: 0,
     };
+    const lesson: CurriculumLesson = {
+      ...draft,
+      order: sortOrderForLesson(draft),
+    };
+
     const courses = store.courses.map((c) =>
       c.id === course.id ? { ...c, lessons: [...c.lessons, lesson] } : c,
     );
@@ -90,9 +104,9 @@ export function AdminCurriculumPanel() {
     setNewLesson({
       title: "",
       description: "",
-      chapterId: newLesson.chapterId,
+      chapter: newLesson.chapter,
+      section: newLesson.section + 1,
       chapterTitle: newLesson.chapterTitle,
-      order: course.lessons.length + 2,
     });
   }
 
@@ -102,9 +116,17 @@ export function AdminCurriculumPanel() {
       c.id === course.id
         ? {
             ...c,
-            lessons: c.lessons.map((l) =>
-              l.id === lessonId ? { ...l, ...patch } : l,
-            ),
+            lessons: c.lessons.map((l) => {
+              if (l.id !== lessonId) return l;
+              const next = { ...l, ...patch };
+              if (patch.chapter != null) {
+                next.chapterId = `chapter-${patch.chapter}`;
+              }
+              return {
+                ...next,
+                order: sortOrderForLesson(next),
+              };
+            }),
           }
         : c,
     );
@@ -227,46 +249,97 @@ export function AdminCurriculumPanel() {
               <h3 className="font-medium text-slate-900 dark:text-stone-50">
                 Add lesson to {course.title}
               </h3>
+              <p className="text-sm text-slate-600 dark:text-stone-400">
+                Lessons are sorted by <strong>chapter</strong>, then{" "}
+                <strong>section</strong> in the course list.
+              </p>
               <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  placeholder="Lesson title"
-                  value={newLesson.title}
-                  onChange={(e) => setNewLesson((s) => ({ ...s, title: e.target.value }))}
-                  required
-                  className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  placeholder="Order"
-                  value={newLesson.order}
-                  onChange={(e) =>
-                    setNewLesson((s) => ({ ...s, order: Number(e.target.value) }))
-                  }
-                  className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
-                />
-                <input
-                  placeholder="Chapter id"
-                  value={newLesson.chapterId}
-                  onChange={(e) => setNewLesson((s) => ({ ...s, chapterId: e.target.value }))}
-                  className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
-                />
-                <input
-                  placeholder="Chapter title"
-                  value={newLesson.chapterTitle}
-                  onChange={(e) => setNewLesson((s) => ({ ...s, chapterTitle: e.target.value }))}
-                  className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
-                />
-                <textarea
-                  placeholder="Lesson description"
-                  value={newLesson.description}
-                  onChange={(e) =>
-                    setNewLesson((s) => ({ ...s, description: e.target.value }))
-                  }
-                  required
-                  rows={2}
-                  className="rounded-md border border-sky-200 px-3 py-2 text-sm sm:col-span-2 dark:border-stone-600 dark:bg-stone-950"
-                />
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700 dark:text-stone-300">
+                    Lesson title
+                  </span>
+                  <input
+                    placeholder="e.g. Introduction to motion"
+                    value={newLesson.title}
+                    onChange={(e) =>
+                      setNewLesson((s) => ({ ...s, title: e.target.value }))
+                    }
+                    required
+                    className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700 dark:text-stone-300">
+                    Chapter title
+                  </span>
+                  <input
+                    placeholder="Chapter 1 · Motion"
+                    value={newLesson.chapterTitle}
+                    onChange={(e) =>
+                      setNewLesson((s) => ({ ...s, chapterTitle: e.target.value }))
+                    }
+                    className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700 dark:text-stone-300">
+                    Chapter
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={newLesson.chapter}
+                    onChange={(e) => {
+                      const chapter = Math.max(
+                        1,
+                        Number.parseInt(e.target.value, 10) || 1,
+                      );
+                      setNewLesson((s) => ({
+                        ...s,
+                        chapter,
+                        chapterTitle: s.chapterTitle || `Chapter ${chapter}`,
+                      }));
+                    }}
+                    className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="font-medium text-slate-700 dark:text-stone-300">
+                    Section
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={newLesson.section}
+                    onChange={(e) =>
+                      setNewLesson((s) => ({
+                        ...s,
+                        section: Math.max(
+                          1,
+                          Number.parseInt(e.target.value, 10) || 1,
+                        ),
+                      }))
+                    }
+                    className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                  />
+                </label>
+                <label className="space-y-1 text-sm sm:col-span-2">
+                  <span className="font-medium text-slate-700 dark:text-stone-300">
+                    Lesson description
+                  </span>
+                  <textarea
+                    placeholder="Brief summary for students"
+                    value={newLesson.description}
+                    onChange={(e) =>
+                      setNewLesson((s) => ({ ...s, description: e.target.value }))
+                    }
+                    required
+                    rows={2}
+                    className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
+                  />
+                </label>
               </div>
               <Button type="submit" size="sm">
                 Add lesson
@@ -300,17 +373,15 @@ export function AdminCurriculumPanel() {
             </section>
 
             <ul className="space-y-3">
-              {course.lessons.map((lesson) => (
+              {sortLessons(course.lessons).map((lesson) => (
                 <li
                   key={lesson.id}
                   className="space-y-2 rounded-lg border border-sky-200 p-4 dark:border-stone-700"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="text-xs text-slate-500">
-                      {lesson.chapterTitle} · #{lesson.order} · id: {lesson.id}
-                      {lesson.chapter != null && lesson.section != null
-                        ? ` · CSV Ch.${lesson.chapter} Sec.${lesson.section}`
-                        : ""}
+                      {lesson.chapterTitle} · {lessonPositionLabel(lesson)} · id:{" "}
+                      {lesson.id}
                     </p>
                     <Button
                       type="button"
@@ -337,14 +408,16 @@ export function AdminCurriculumPanel() {
                   />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="text-xs font-medium text-slate-500">
-                      CSV Chapter
+                      Chapter
                       <input
                         type="number"
                         min={1}
                         value={lesson.chapter ?? ""}
                         onChange={(e) =>
                           updateLesson(lesson.id, {
-                            chapter: e.target.value ? Number(e.target.value) : undefined,
+                            chapter: e.target.value
+                              ? Number(e.target.value)
+                              : undefined,
                           })
                         }
                         placeholder="e.g. 3"
@@ -352,14 +425,16 @@ export function AdminCurriculumPanel() {
                       />
                     </label>
                     <label className="text-xs font-medium text-slate-500">
-                      CSV Section
+                      Section
                       <input
                         type="number"
                         min={1}
                         value={lesson.section ?? ""}
                         onChange={(e) =>
                           updateLesson(lesson.id, {
-                            section: e.target.value ? Number(e.target.value) : undefined,
+                            section: e.target.value
+                              ? Number(e.target.value)
+                              : undefined,
                           })
                         }
                         placeholder="e.g. 1"

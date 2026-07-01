@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LessonTierBadge } from "@/components/guest/lesson-tier-badge";
 import { LessonStatusBadge } from "@/components/student/lesson-status-badge";
+import { lessonPositionLabel, lessonSectionNumber } from "@/lib/student/lesson-sort";
 import type { CurriculumLesson } from "@/lib/student/curriculum-types";
 import { lessonPath } from "@/lib/student/paths";
 import {
@@ -61,7 +62,7 @@ export function CurriculumLessonRow({
         {status === "complete" ? (
           <CheckCircle2 className="size-5" />
         ) : (
-          lesson.order
+          lessonSectionNumber(lesson) || "·"
         )}
       </span>
 

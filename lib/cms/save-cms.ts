@@ -6,6 +6,7 @@ import {
   chapterQuestionToPayload,
 } from "@/lib/cms/question-payload";
 import { resolveTextbookCoverUrl } from "@/lib/cms/textbook-covers.server";
+import { sortOrderForLesson } from "@/lib/student/lesson-sort";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
 const now = () => new Date().toISOString();
@@ -39,14 +40,14 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
     await deleteLessonsNotInList(course.id, lessonIds);
 
     if (course.lessons.length > 0) {
-      const lessonRows = course.lessons.map((lesson, lessonIndex) => ({
+      const lessonRows = course.lessons.map((lesson) => ({
         course_id: course.id,
         id: lesson.id,
         chapter_id: lesson.chapterId,
         chapter_title: lesson.chapterTitle,
         title: lesson.title,
         description: lesson.description,
-        sort_order: lesson.order ?? lessonIndex + 1,
+        sort_order: sortOrderForLesson(lesson),
         csv_chapter: lesson.chapter ?? null,
         csv_section: lesson.section ?? null,
         updated_at: timestamp,

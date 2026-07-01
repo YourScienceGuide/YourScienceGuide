@@ -7,7 +7,7 @@ import {
 } from "@/lib/admin/content-store";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import type { Textbook } from "@/lib/student/textbook";
-import { getLessonsByChapter as getLessonsByChapterBase } from "@/lib/student/curriculum";
+import { getLessonsByChapter as getLessonsByChapterBase, getSortedLessons } from "@/lib/student/curriculum";
 
 export function getCoursesClient(store: AdminContentStore): Course[] {
   return getCoursesFromStore(store);
@@ -39,11 +39,12 @@ export function getAdjacentLessonsClient(
 ) {
   const course = getCourseClient(store, courseId);
   if (!course) return { prev: undefined, next: undefined };
-  const index = course.lessons.findIndex((l) => l.id === lessonId);
+  const sorted = getSortedLessons(course);
+  const index = sorted.findIndex((l) => l.id === lessonId);
   if (index === -1) return { prev: undefined, next: undefined };
   return {
-    prev: index > 0 ? course.lessons[index - 1] : undefined,
-    next: index < course.lessons.length - 1 ? course.lessons[index + 1] : undefined,
+    prev: index > 0 ? sorted[index - 1] : undefined,
+    next: index < sorted.length - 1 ? sorted[index + 1] : undefined,
   };
 }
 

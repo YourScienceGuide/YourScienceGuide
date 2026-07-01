@@ -6,6 +6,11 @@ import { lessonKey } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 import { SEED_TEXTBOOKS, type Textbook } from "@/lib/student/textbook";
+import {
+  parseChapterFromId,
+  sortLessons,
+  sortOrderForLesson,
+} from "@/lib/student/lesson-sort";
 
 export type LessonVideoMeta = {
   title: string;
@@ -88,10 +93,43 @@ function migrateLessonFields(lesson: CurriculumLesson): CurriculumLesson {
   };
 }
 
+function normalizeCourseLessons(lessons: CurriculumLesson[]): CurriculumLesson[] {
+  const migrated = lessons.map(migrateLessonFields);
+  const byChapterId = new Map<string, CurriculumLesson[]>();
+
+  for (const lesson of migrated) {
+    const list = byChapterId.get(lesson.chapterId) ?? [];
+    list.push(lesson);
+    byChapterId.set(lesson.chapterId, list);
+  }
+
+  const normalized: CurriculumLesson[] = [];
+  for (const group of byChapterId.values()) {
+    const sorted = [...group].sort((a, b) => a.order - b.order);
+    sorted.forEach((lesson, index) => {
+      const chapter =
+        lesson.chapter ?? parseChapterFromId(lesson.chapterId) ?? 1;
+      const section = lesson.section ?? index + 1;
+      const next = {
+        ...lesson,
+        chapter,
+        section,
+        chapterId: lesson.chapterId || `chapter-${chapter}`,
+      };
+      normalized.push({
+        ...next,
+        order: sortOrderForLesson(next),
+      });
+    });
+  }
+
+  return sortLessons(normalized);
+}
+
 function migrateCourses(courses: Course[]): Course[] {
   return courses.map((course) => ({
     ...course,
-    lessons: course.lessons.map(migrateLessonFields),
+    lessons: normalizeCourseLessons(course.lessons),
   }));
 }
 

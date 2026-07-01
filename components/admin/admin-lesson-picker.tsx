@@ -2,6 +2,7 @@
 
 import type { AdminContentStore } from "@/lib/admin/content-store";
 import { getCourseFromStore } from "@/lib/admin/content-store";
+import { sortLessons, lessonPositionLabel } from "@/lib/student/lesson-sort";
 
 type AdminLessonPickerProps = {
   store: AdminContentStore;
@@ -19,7 +20,7 @@ export function AdminLessonPicker({
   onLessonChange,
 }: AdminLessonPickerProps) {
   const course = getCourseFromStore(store, courseId);
-  const lessons = course?.lessons ?? [];
+  const lessons = course ? sortLessons(course.lessons) : [];
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -52,7 +53,7 @@ export function AdminLessonPicker({
         >
           {lessons.map((l) => (
             <option key={l.id} value={l.id}>
-              {l.order}. {l.title}
+              {lessonPositionLabel(l) || l.title} · {l.title}
             </option>
           ))}
         </select>
