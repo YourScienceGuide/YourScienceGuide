@@ -14,18 +14,15 @@ import {
 import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   readAdminPreferences,
-  resolveAdminWorkspace,
+  resolveAdminSelection,
   selectionAfterCourseChange,
   selectionAfterLessonChange,
   writeAdminPreferences,
-  type AdminTabId,
 } from "@/lib/admin/admin-preferences";
 
 type AdminWorkspaceContextValue = {
-  tab: AdminTabId;
   courseId: string;
   lessonId: string;
-  setTab: (tab: AdminTabId) => void;
   setCourseId: (courseId: string) => void;
   setLessonId: (lessonId: string) => void;
   ready: boolean;
@@ -40,7 +37,6 @@ export function AdminWorkspaceProvider({ children }: { children: ReactNode }) {
   const { store, loading: storeLoading } = useContentStore();
   const userId = user?.id ?? null;
 
-  const [tab, setTabState] = useState<AdminTabId>("curriculum");
   const [courseId, setCourseIdState] = useState("");
   const [lessonId, setLessonIdState] = useState("");
   const [hydrated, setHydrated] = useState(false);
@@ -57,8 +53,7 @@ export function AdminWorkspaceProvider({ children }: { children: ReactNode }) {
     if (!userLoaded || storeLoading || hydrated) return;
 
     const prefs = userId ? readAdminPreferences(userId) : {};
-    const resolved = resolveAdminWorkspace(store, prefs);
-    setTabState(resolved.tab);
+    const resolved = resolveAdminSelection(store, prefs);
     setCourseIdState(resolved.courseId);
     setLessonIdState(resolved.lessonId);
     setHydrated(true);
@@ -67,8 +62,7 @@ export function AdminWorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated || !userId) return;
 
-    const resolved = resolveAdminWorkspace(store, {
-      tab,
+    const resolved = resolveAdminSelection(store, {
       courseId,
       lessonId,
       lessonByCourse: readAdminPreferences(userId).lessonByCourse,
@@ -80,15 +74,7 @@ export function AdminWorkspaceProvider({ children }: { children: ReactNode }) {
     if (resolved.lessonId !== lessonId) {
       setLessonIdState(resolved.lessonId);
     }
-  }, [store, hydrated, userId, tab, courseId, lessonId]);
-
-  const setTab = useCallback(
-    (nextTab: AdminTabId) => {
-      setTabState(nextTab);
-      persist({ tab: nextTab, courseId, lessonId });
-    },
-    [persist, courseId, lessonId],
-  );
+  }, [store, hydrated, userId, courseId, lessonId]);
 
   const setCourseId = useCallback(
     (nextCourseId: string) => {
@@ -103,13 +89,12 @@ export function AdminWorkspaceProvider({ children }: { children: ReactNode }) {
       setLessonIdState(next.lessonId);
       persist({
         ...prefs,
-        tab,
         courseId: next.courseId,
         lessonId: next.lessonId,
         lessonByCourse: next.lessonByCourse,
       });
     },
-    [persist, store, tab, userId],
+    [persist, store, userId],
   );
 
   const setLessonId = useCallback(
@@ -119,26 +104,22 @@ export function AdminWorkspaceProvider({ children }: { children: ReactNode }) {
 
       const prefs = readAdminPreferences(userId);
       const next = selectionAfterLessonChange(prefs, courseId, nextLessonId);
-      persist({ ...next, tab });
+      persist(next);
     },
-    [courseId, persist, tab, userId],
+    [courseId, persist, userId],
   );
 
   const value = useMemo(
     () => ({
-      tab,
       courseId,
       lessonId,
-      setTab,
       setCourseId,
       setLessonId,
       ready: hydrated && userLoaded && !storeLoading,
     }),
     [
-      tab,
       courseId,
       lessonId,
-      setTab,
       setCourseId,
       setLessonId,
       hydrated,

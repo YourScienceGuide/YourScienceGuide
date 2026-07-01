@@ -54,13 +54,10 @@ export function writeAdminPreferences(
   return next;
 }
 
-export function resolveAdminWorkspace(
+export function resolveAdminSelection(
   store: AdminContentStore,
   prefs: AdminPreferences,
-): { tab: AdminTabId; courseId: string; lessonId: string } {
-  const tab =
-    prefs.tab && VALID_TABS.has(prefs.tab) ? prefs.tab : "curriculum";
-
+): { courseId: string; lessonId: string } {
   const course =
     store.courses.find((c) => c.id === prefs.courseId) ?? store.courses[0];
   const courseId = course?.id ?? "";
@@ -78,7 +75,26 @@ export function resolveAdminWorkspace(
       ? lessonFromPrefs
       : (course?.lessons[0]?.id ?? "");
 
-  return { tab, courseId, lessonId };
+  return { courseId, lessonId };
+}
+
+/** @deprecated Use resolveAdminSelection — tab is encoded in the URL. */
+export function resolveAdminWorkspace(
+  store: AdminContentStore,
+  prefs: AdminPreferences,
+): { tab: AdminTabId; courseId: string; lessonId: string } {
+  const tab =
+    prefs.tab && VALID_TABS.has(prefs.tab) ? prefs.tab : "curriculum";
+  return { tab, ...resolveAdminSelection(store, prefs) };
+}
+
+export function readLastAdminTab(userId: string): AdminTabId {
+  const tab = readAdminPreferences(userId).tab;
+  return tab && VALID_TABS.has(tab) ? tab : "curriculum";
+}
+
+export function rememberAdminTab(userId: string, tab: AdminTabId) {
+  writeAdminPreferences(userId, { tab });
 }
 
 export function selectionAfterCourseChange(

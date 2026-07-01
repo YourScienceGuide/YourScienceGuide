@@ -1,12 +1,23 @@
-import type { Metadata } from "next";
+"use client";
 
-import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
-export const metadata: Metadata = {
-  title: "Admin",
-  description: "Manage curriculum, lessons, problems, and videos.",
-};
+import { readLastAdminTab } from "@/lib/admin/admin-preferences";
+import { adminTabPath, DEFAULT_ADMIN_TAB } from "@/lib/routes/admin";
 
-export default function AdminPage() {
-  return <AdminDashboard />;
+export default function AdminIndexPage() {
+  const router = useRouter();
+  const { user, isLoaded } = useUser();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const tab = user?.id ? readLastAdminTab(user.id) : DEFAULT_ADMIN_TAB;
+    router.replace(adminTabPath(tab));
+  }, [isLoaded, router, user?.id]);
+
+  return (
+    <p className="text-sm text-slate-500 dark:text-stone-500">Opening admin…</p>
+  );
 }

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createDefaultStore } from "@/lib/admin/content-store";
 import {
   readAdminPreferences,
+  resolveAdminSelection,
   resolveAdminWorkspace,
   selectionAfterCourseChange,
   selectionAfterLessonChange,

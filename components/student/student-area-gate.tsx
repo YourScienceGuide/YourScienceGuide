@@ -44,7 +44,7 @@ export function StudentAreaGate({ children }: { children: ReactNode }) {
           </p>
         </header>
         <Button asChild>
-          <Link href="/parent">Go to parent portal</Link>
+          <Link href="/parent/students">Go to parent portal</Link>
         </Button>
       </div>
     );

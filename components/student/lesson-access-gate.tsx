@@ -39,7 +39,7 @@ function NoLessonAccessPrompt() {
       </header>
       <div className="flex flex-wrap justify-center gap-3 sm:justify-start">
         <Button asChild>
-          <Link href="/parent">Go to parent portal</Link>
+          <Link href="/parent/billing">Go to parent portal</Link>
         </Button>
         <Button asChild variant="ghost">
           <Link href="/">Back home</Link>

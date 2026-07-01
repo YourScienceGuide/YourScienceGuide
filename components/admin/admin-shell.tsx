@@ -1,9 +1,10 @@
 "use client";
 
-import { AdminAssignmentPanel } from "@/components/admin/admin-assignment-panel";
-import { AdminCsvImportPanel } from "@/components/admin/admin-csv-import-panel";
-import { AdminCurriculumPanel } from "@/components/admin/admin-curriculum-panel";
-import { AdminVideoPanel } from "@/components/admin/admin-video-panel";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
+import { useUser } from "@clerk/nextjs";
+
 import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   AdminWorkspaceProvider,
@@ -11,18 +12,24 @@ import {
 } from "@/components/admin/admin-workspace-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { AdminTabId } from "@/lib/admin/admin-preferences";
+import {
+  ADMIN_TAB_ROUTES,
+  adminTabFromPathname,
+} from "@/lib/routes/admin";
+import { rememberAdminTab } from "@/lib/admin/admin-preferences";
 
-const TABS = [
-  { id: "curriculum", label: "Curriculum & lessons" },
-  { id: "import", label: "Bulk import (CSV)" },
-  { id: "assignment", label: "Chapter questions" },
-  { id: "videos", label: "Lesson videos" },
-] as const satisfies ReadonlyArray<{ id: AdminTabId; label: string }>;
-
-function AdminDashboardContent() {
-  const { tab, setTab, ready } = useAdminWorkspace();
+function AdminShellContent({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const activeTab = adminTabFromPathname(pathname);
+  const { user } = useUser();
+  const { ready } = useAdminWorkspace();
   const { reset, saving, saveError, source, loading } = useContentStore();
+
+  useEffect(() => {
+    if (activeTab && user?.id) {
+      rememberAdminTab(user.id, activeTab);
+    }
+  }, [activeTab, user?.id]);
 
   return (
     <div className="space-y-8">
@@ -33,8 +40,8 @@ function AdminDashboardContent() {
           </h1>
           <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
             Build courses and lessons, manage the unified chapter question bank
-            (assignment + extra practice), and upload videos via Mux. Content is stored
-            in Supabase tables and shared across browsers and users.
+            (assignment + extra practice), and upload videos via Mux. Content is
+            stored in Supabase tables and shared across browsers and users.
           </p>
           <p className="text-xs text-slate-500 dark:text-stone-500">
             Storage:{" "}
@@ -72,31 +79,24 @@ function AdminDashboardContent() {
         className="flex flex-wrap gap-2 border-b border-sky-200 pb-2 dark:border-stone-700"
         aria-label="Admin sections"
       >
-        {TABS.map(({ id, label }) => (
-          <button
+        {ADMIN_TAB_ROUTES.map(({ id, label, href }) => (
+          <Link
             key={id}
-            type="button"
-            onClick={() => setTab(id)}
+            href={href}
+            aria-current={activeTab === id ? "page" : undefined}
             className={cn(
               "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              tab === id
+              activeTab === id
                 ? "bg-sky-600 text-white dark:bg-stone-100 dark:text-stone-900"
                 : "text-slate-600 hover:bg-sky-50 dark:text-stone-400 dark:hover:bg-stone-800",
             )}
           >
             {label}
-          </button>
+          </Link>
         ))}
       </nav>
 
-      {ready ? (
-        <>
-          {tab === "curriculum" && <AdminCurriculumPanel />}
-          {tab === "import" && <AdminCsvImportPanel />}
-          {tab === "assignment" && <AdminAssignmentPanel />}
-          {tab === "videos" && <AdminVideoPanel />}
-        </>
-      ) : (
+      {ready ? children : (
         <p className="text-sm text-slate-500 dark:text-stone-500">
           Restoring your last admin selection…
         </p>
@@ -105,10 +105,10 @@ function AdminDashboardContent() {
   );
 }
 
-export function AdminDashboard() {
+export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <AdminWorkspaceProvider>
-      <AdminDashboardContent />
+      <AdminShellContent>{children}</AdminShellContent>
     </AdminWorkspaceProvider>
   );
 }
