@@ -9,7 +9,7 @@ type PageProps = {
 export const metadata: Metadata = {
   title: "Extra Practice",
   description:
-    "Adaptive extra practice with mastery progress, separate from the main lesson.",
+    "Five harder chapter problems with clear progress tracking, separate from the main lesson.",
 };
 
 export default async function ExtraPracticeRoute({ params }: PageProps) {

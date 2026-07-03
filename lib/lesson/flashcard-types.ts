@@ -2,7 +2,6 @@ export type Flashcard = {
   id: string;
   front: string;
   back: string;
-  custom?: boolean;
 };
 
 export type CardState = "new" | "learning" | "review";
@@ -19,7 +18,7 @@ export type FlashcardEntry = Flashcard & {
   progress: FlashcardProgress;
 };
 
-export type FlashcardPhase = "question" | "answer";
+export type FlashcardPhase = "define" | "question" | "answer";
 
 export type AnkiRating = "again" | "hard" | "good" | "easy";
 

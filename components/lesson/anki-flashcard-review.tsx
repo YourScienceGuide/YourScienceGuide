@@ -5,33 +5,36 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  addFlashcard,
   deckCounts,
   getCurrentCard,
   ratingIntervalLabel,
+  saveCardDefinition,
   showAnswer,
   rateCard,
 } from "@/lib/lesson/flashcard-machine";
 import type {
   AnkiRating,
   DeckState,
-  Flashcard,
 } from "@/lib/lesson/flashcard-types";
 
 type AnkiFlashcardReviewProps = {
   state: DeckState;
   onStateChange: (state: DeckState) => void;
+  onDefinitionSaved?: (cardId: string, definition: string) => void;
 };
 
 export function AnkiFlashcardReview({
   state,
   onStateChange,
+  onDefinitionSaved,
 }: AnkiFlashcardReviewProps) {
   const current = getCurrentCard(state);
   const counts = deckCounts(state);
-  const [front, setFront] = useState("");
-  const [back, setBack] = useState("");
-  const [addedMessage, setAddedMessage] = useState<string | null>(null);
+  const [definitionDraft, setDefinitionDraft] = useState("");
+
+  useEffect(() => {
+    setDefinitionDraft(current?.back ?? "");
+  }, [current?.id, current?.back]);
 
   const handleShowAnswer = useCallback(() => {
     onStateChange(showAnswer(state));
@@ -48,6 +51,8 @@ export function AnkiFlashcardReview({
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      if (state.phase === "define") return;
 
       if (e.code === "Space") {
         e.preventDefault();
@@ -74,24 +79,19 @@ export function AnkiFlashcardReview({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleRate, handleShowAnswer, state.phase]);
 
-  function handleAddCard(e: React.FormEvent) {
+  if (!current) {
+    return null;
+  }
+
+  const card = current;
+
+  function handleSaveDefinition(e: React.FormEvent) {
     e.preventDefault();
-    const trimmedFront = front.trim();
-    const trimmedBack = back.trim();
-    if (!trimmedFront || !trimmedBack) return;
+    const trimmed = definitionDraft.trim();
+    if (!trimmed) return;
 
-    const newCard: Flashcard = {
-      id: `custom-${Date.now()}`,
-      front: trimmedFront,
-      back: trimmedBack,
-      custom: true,
-    };
-
-    onStateChange(addFlashcard(state, newCard));
-    setFront("");
-    setBack("");
-    setAddedMessage("Card added to your deck.");
-    window.setTimeout(() => setAddedMessage(null), 3000);
+    onStateChange(saveCardDefinition(state, card.id, trimmed));
+    onDefinitionSaved?.(card.id, trimmed);
   }
 
   return (
@@ -121,11 +121,41 @@ export function AnkiFlashcardReview({
         aria-live="polite"
       >
         <div className="flex flex-1 flex-col justify-center px-8 py-10 text-center">
-          {state.phase === "question" ? (
+          {state.phase === "define" ? (
+            <form onSubmit={handleSaveDefinition} className="space-y-4 text-left">
+              <div>
+                <p className="mb-3 text-xs font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                  Term
+                </p>
+                <p className="text-center text-xl font-medium leading-relaxed text-stone-900 dark:text-stone-50">
+                  {current.front}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="flashcard-definition"
+                  className="text-xs font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400"
+                >
+                  Your definition
+                </label>
+                <textarea
+                  id="flashcard-definition"
+                  value={definitionDraft}
+                  onChange={(e) => setDefinitionDraft(e.target.value)}
+                  rows={4}
+                  required
+                  placeholder="Write the definition in your own words…"
+                  className="w-full resize-y rounded-md border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
+                />
+              </div>
+              <Button type="submit" className="w-full">
+                Save definition
+              </Button>
+            </form>
+          ) : state.phase === "question" ? (
             <>
               <p className="mb-3 text-xs font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                Question
-                {current.custom ? " · Your card" : ""}
+                Term
               </p>
               <p className="text-xl font-medium leading-relaxed text-stone-900 dark:text-stone-50">
                 {current.front}
@@ -135,7 +165,7 @@ export function AnkiFlashcardReview({
             <div className="space-y-6 text-left">
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                  Question
+                  Term
                 </p>
                 <p className="text-base text-stone-700 dark:text-stone-300">
                   {current.front}
@@ -144,7 +174,7 @@ export function AnkiFlashcardReview({
               <hr className="border-stone-300 dark:border-stone-600" />
               <div>
                 <p className="mb-2 text-xs font-medium uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                  Answer
+                  Your definition
                 </p>
                 <p className="text-lg font-medium leading-relaxed text-stone-900 dark:text-stone-50">
                   {current.back}
@@ -161,10 +191,10 @@ export function AnkiFlashcardReview({
           className="h-12 w-full text-base"
           onClick={handleShowAnswer}
         >
-          Show answer
+          Show my definition
           <span className="sr-only"> (Space)</span>
         </Button>
-      ) : (
+      ) : state.phase === "answer" ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <RatingButton
             rating="again"
@@ -191,63 +221,15 @@ export function AnkiFlashcardReview({
             onRate={handleRate}
           />
         </div>
+      ) : null}
+
+      {state.phase !== "define" && (
+        <p className="text-center text-xs text-stone-500 dark:text-stone-500">
+          {state.phase === "question"
+            ? "Space to reveal your definition"
+            : "Press 1–4 for Again, Hard, Good, or Easy"}
+        </p>
       )}
-
-      <p className="text-center text-xs text-stone-500 dark:text-stone-500">
-        {state.phase === "question"
-          ? "Space to reveal answer"
-          : "Press 1–4 for Again, Hard, Good, or Easy"}
-      </p>
-
-      <form
-        onSubmit={handleAddCard}
-        className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900"
-      >
-        <h3 className="text-sm font-medium text-slate-900 dark:text-stone-50">
-          Add a card
-        </h3>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label
-              htmlFor="flashcard-front"
-              className="text-xs font-medium text-slate-600 dark:text-stone-400"
-            >
-              Front
-            </label>
-            <input
-              id="flashcard-front"
-              value={front}
-              onChange={(e) => setFront(e.target.value)}
-              placeholder="Term or question"
-              className="w-full rounded-md border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
-            />
-          </div>
-          <div className="space-y-1">
-            <label
-              htmlFor="flashcard-back"
-              className="text-xs font-medium text-slate-600 dark:text-stone-400"
-            >
-              Back
-            </label>
-            <textarea
-              id="flashcard-back"
-              value={back}
-              onChange={(e) => setBack(e.target.value)}
-              rows={3}
-              placeholder="Definition or answer"
-              className="w-full resize-y rounded-md border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
-            />
-          </div>
-        </div>
-        {addedMessage && (
-          <p className="text-sm text-emerald-700 dark:text-emerald-300">
-            {addedMessage}
-          </p>
-        )}
-        <Button type="submit" variant="ghost" size="sm">
-          Add to deck
-        </Button>
-      </form>
     </div>
   );
 }

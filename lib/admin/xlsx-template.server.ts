@@ -6,6 +6,9 @@ import {
   getCsvHeaders,
   type CsvImportKind,
 } from "@/lib/admin/csv-questions";
+import { FLASHCARD_CSV_HEADERS } from "@/lib/admin/csv-flashcards";
+
+export type TemplateKind = CsvImportKind | "flashcards";
 
 const TYPE_COLUMN = "C";
 const TEMPLATE_DATA_ROWS = 100;
@@ -31,8 +34,12 @@ function applyTypeDropdown(
 }
 
 export async function buildQuestionTemplateXlsx(
-  kind: CsvImportKind,
+  kind: TemplateKind,
 ): Promise<Buffer> {
+  if (kind === "flashcards") {
+    return buildFlashcardTemplateXlsx();
+  }
+
   const workbook = new ExcelJS.Workbook();
   const validationSheet = workbook.addWorksheet("_types");
   validationSheet.state = "veryHidden";
@@ -63,8 +70,27 @@ export async function buildQuestionTemplateXlsx(
   return Buffer.from(buffer);
 }
 
-export function questionTemplateFilename(kind: CsvImportKind): string {
+export function questionTemplateFilename(kind: TemplateKind): string {
+  if (kind === "flashcards") return "ysg-flashcards-template.xlsx";
   if (kind === "alcumus") return "ysg-alcumus-template.xlsx";
   if (kind === "end-of-chapter") return "ysg-end-of-chapter-template.xlsx";
   return "ysg-chapter-questions-template.xlsx";
+}
+
+export async function buildFlashcardTemplateXlsx(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Flashcards");
+  worksheet.addRow([...FLASHCARD_CSV_HEADERS]);
+
+  const headerRow = worksheet.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.alignment = { vertical: "middle" };
+
+  FLASHCARD_CSV_HEADERS.forEach((header, index) => {
+    const column = worksheet.getColumn(index + 1);
+    column.width = Math.max(header.length + 2, 14);
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }

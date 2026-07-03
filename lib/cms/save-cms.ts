@@ -1,6 +1,7 @@
 import "server-only";
 
 import { lessonKey } from "@/lib/admin/lesson-key";
+import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import { type AdminContentStore } from "@/lib/admin/content-store";
 import {
   chapterQuestionToPayload,
@@ -100,6 +101,11 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
       const key = lessonKey(course.id, lesson.id);
       await syncChapterQuestionBank(course.id, lesson.id, store.questionBank[key] ?? []);
       await syncLessonVideo(course.id, lesson.id, store.videos[key]);
+      await syncLessonFlashcards(
+        course.id,
+        lesson.id,
+        store.flashcardsByLesson?.[key] ?? [],
+      );
     }
   }
 }
@@ -192,6 +198,39 @@ async function syncChapterQuestionBank(
   const { error: insertError } = await supabase.from("assignment_questions").insert(rows);
   if (insertError) {
     throw new Error(`Failed to save chapter questions: ${insertError.message}`);
+  }
+}
+
+async function syncLessonFlashcards(
+  courseId: string,
+  lessonId: string,
+  flashcards: AdminFlashcard[],
+): Promise<void> {
+  const supabase = createSupabaseAdmin();
+  const { error: deleteError } = await supabase
+    .from("lesson_flashcards")
+    .delete()
+    .eq("course_id", courseId)
+    .eq("lesson_id", lessonId);
+
+  if (deleteError) {
+    throw new Error(`Failed to clear lesson flashcards: ${deleteError.message}`);
+  }
+
+  if (!flashcards.length) return;
+
+  const rows = flashcards.map((card, index) => ({
+    course_id: courseId,
+    lesson_id: lessonId,
+    card_id: card.id,
+    term: card.term,
+    sort_order: index,
+    updated_at: now(),
+  }));
+
+  const { error: insertError } = await supabase.from("lesson_flashcards").insert(rows);
+  if (insertError) {
+    throw new Error(`Failed to save lesson flashcards: ${insertError.message}`);
   }
 }
 

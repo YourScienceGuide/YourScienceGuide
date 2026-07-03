@@ -82,6 +82,18 @@ export function selectPracticeQuestions(
   return bank.filter((q) => !assignedIds.has(q.id));
 }
 
+/** Fixed extra-practice session drawn from the practice pool. */
+export const EXTRA_PRACTICE_SESSION_SIZE = 5;
+
+export function selectExtraPracticeSession(
+  pool: ChapterQuestion[],
+  seed: string,
+  count = EXTRA_PRACTICE_SESSION_SIZE,
+): ChapterQuestion[] {
+  if (pool.length === 0) return [];
+  return seededShuffle(pool, seed).slice(0, Math.min(count, pool.length));
+}
+
 export function splitChapterBank(
   bank: ChapterQuestion[],
   assignmentSeed: string,

@@ -1,3 +1,4 @@
+import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import { mergeLegacyQuestionBank } from "@/lib/lesson/chapter-questions";
@@ -33,6 +34,8 @@ export type AdminContentStore = {
   videos: Record<string, LessonVideoMeta>;
   /** Companion textbooks keyed by course id. */
   textbooks?: Record<string, Textbook>;
+  /** Flashcard terms keyed by courseId/lessonId. Students write definitions. */
+  flashcardsByLesson?: Record<string, AdminFlashcard[]>;
 };
 
 const CURRENT_STORE_VERSION = 3 as const;
@@ -165,20 +168,30 @@ export function createDefaultStore(): AdminContentStore {
     questionBank: {},
     videos: {},
     textbooks: { ...SEED_TEXTBOOKS },
+    flashcardsByLesson: {},
   };
+}
+
+function ensureFlashcards(store: AdminContentStore): AdminContentStore {
+  if (store.flashcardsByLesson !== undefined) {
+    return store;
+  }
+  return { ...store, flashcardsByLesson: {} };
 }
 
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
   const questionBank = normalizeQuestionBank(store);
-  return ensureTextbooks(
-    stripLegacyVideoBlobs({
-      ...store,
-      version: CURRENT_STORE_VERSION,
-      courses: migrateCourses(store.courses),
-      questionBank,
-      lessonQuestions: undefined,
-      alcumusByLesson: undefined,
-    }),
+  return ensureFlashcards(
+    ensureTextbooks(
+      stripLegacyVideoBlobs({
+        ...store,
+        version: CURRENT_STORE_VERSION,
+        courses: migrateCourses(store.courses),
+        questionBank,
+        lessonQuestions: undefined,
+        alcumusByLesson: undefined,
+      }),
+    ),
   );
 }
 
@@ -248,6 +261,31 @@ export function getVideoFromStore(
   lessonId: string,
 ) {
   return store.videos[lessonKey(courseId, lessonId)];
+}
+
+export function getFlashcardsFromStore(
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+): AdminFlashcard[] {
+  const key = lessonKey(courseId, lessonId);
+  return store.flashcardsByLesson?.[key] ?? [];
+}
+
+export function setFlashcardsInStore(
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+  flashcards: AdminFlashcard[],
+): AdminContentStore {
+  const key = lessonKey(courseId, lessonId);
+  return {
+    ...store,
+    flashcardsByLesson: {
+      ...(store.flashcardsByLesson ?? {}),
+      [key]: flashcards,
+    },
+  };
 }
 
 export function getTextbookFromStore(
@@ -359,6 +397,7 @@ export function removeLessonFromStore(
     ),
     questionBank: stripLessonKey(store.questionBank, key),
     videos: stripLessonKey(store.videos, key),
+    flashcardsByLesson: stripLessonKey(store.flashcardsByLesson ?? {}, key),
   };
 }
 
@@ -374,6 +413,7 @@ export function removeCourseFromStore(
     courses: store.courses.filter((course) => course.id !== courseId),
     questionBank: stripKeysForCourse(store.questionBank, courseId),
     videos: stripKeysForCourse(store.videos, courseId),
+    flashcardsByLesson: stripKeysForCourse(store.flashcardsByLesson ?? {}, courseId),
     textbooks,
   };
 }

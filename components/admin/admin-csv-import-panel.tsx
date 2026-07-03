@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
+import { AdminFlashcardCsvImportBlock } from "@/components/admin/admin-flashcard-csv-import-block";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 
 export function AdminCsvImportPanel() {
@@ -20,6 +21,22 @@ export function AdminCsvImportPanel() {
         </p>
         <AdminCsvImportBlock
           kind="chapter"
+          courseId={courseId}
+          lessonId={lessonId}
+          onCourseChange={setCourseId}
+          onLessonChange={setLessonId}
+        />
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-stone-50">
+          Flashcards
+        </h2>
+        <p className="text-sm text-slate-600 dark:text-stone-400">
+          Import flashcard <strong>terms</strong> only. Students write their own
+          definitions during review.
+        </p>
+        <AdminFlashcardCsvImportBlock
           courseId={courseId}
           lessonId={lessonId}
           onCourseChange={setCourseId}

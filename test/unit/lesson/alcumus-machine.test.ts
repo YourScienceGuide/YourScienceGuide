@@ -1,13 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   applyAlcumusCorrect,
   applyAlcumusIncorrect,
   checkAlcumusAnswer,
   createInitialAlcumusState,
+  EXTRA_PRACTICE_SESSION_SIZE,
   getCurrentProblem,
-  masteryPercent,
-  masteryStepLabel,
+  normalizeAlcumusState,
+  practicePercent,
+  practiceStepLabel,
 } from "@/lib/lesson/alcumus-machine";
 import { makeAlcumusChoice, makeAlcumusNumeric } from "../../helpers/factories";
 
@@ -16,20 +18,25 @@ describe("alcumus machine", () => {
     makeAlcumusChoice({ id: "c1", level: 3 }),
     makeAlcumusChoice({ id: "c2", level: 4 }),
     makeAlcumusNumeric({ id: "n1", level: 5 }),
+    makeAlcumusChoice({ id: "c3", level: 3 }),
+    makeAlcumusChoice({ id: "c4", level: 4 }),
+    makeAlcumusNumeric({ id: "n2", level: 5 }),
   ];
 
-  it("creates initial state from pool", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    const state = createInitialAlcumusState(pool);
-    expect(pool.some((p) => p.id === state.problemId)).toBe(true);
-    expect(state.level).toBeGreaterThanOrEqual(3);
-    expect(state.level).toBeLessThanOrEqual(5);
+  const sessionSeed = "student-a/biology/scientific-method/extra-practice";
+
+  it("creates a five-question session from the pool", () => {
+    const state = createInitialAlcumusState(pool, sessionSeed);
+    expect(state.questionIds).toHaveLength(EXTRA_PRACTICE_SESSION_SIZE);
+    expect(state.questionIndex).toBe(0);
+    expect(state.solved).toBe(0);
+    expect(state.isComplete).toBe(false);
   });
 
-  it("resolves current problem with fallback", () => {
-    const state = { ...createInitialAlcumusState(pool), problemId: "missing" };
+  it("resolves current problem from the session", () => {
+    const state = createInitialAlcumusState(pool, sessionSeed);
     const problem = getCurrentProblem(pool, state);
-    expect(problem).toBeDefined();
+    expect(state.questionIds).toContain(problem.id);
   });
 
   it("checks choice and numeric answers", () => {
@@ -42,31 +49,63 @@ describe("alcumus machine", () => {
     expect(checkAlcumusAnswer(numeric, { text: "2.71" })).toBe(false);
   });
 
-  it("levels up on correct and down on incorrect", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    const initial = createInitialAlcumusState(pool);
-    const afterCorrect = applyAlcumusCorrect(pool, initial);
-    expect(afterCorrect.solved).toBe(initial.solved + 1);
-    expect(afterCorrect.streak).toBe(initial.streak + 1);
+  it("advances through the session on correct answers", () => {
+    let state = createInitialAlcumusState(pool, sessionSeed);
 
-    const afterIncorrect = applyAlcumusIncorrect(pool, afterCorrect);
-    expect(afterIncorrect.streak).toBe(0);
-    expect(afterIncorrect.level).toBeLessThanOrEqual(afterCorrect.level);
+    for (let index = 0; index < EXTRA_PRACTICE_SESSION_SIZE - 1; index++) {
+      state = applyAlcumusCorrect(pool, state);
+      expect(state.isComplete).toBe(false);
+      expect(state.solved).toBe(index + 1);
+      expect(state.questionIndex).toBe(index + 1);
+    }
+
+    state = applyAlcumusCorrect(pool, state);
+    expect(state.isComplete).toBe(true);
+    expect(state.solved).toBe(EXTRA_PRACTICE_SESSION_SIZE);
   });
 
-  it("computes mastery metrics", () => {
-    const state = { ...createInitialAlcumusState(pool), level: 3, solved: 4 };
-    expect(masteryPercent(state)).toBeGreaterThan(0);
-    expect(masteryPercent(state)).toBeLessThanOrEqual(100);
-    expect(masteryStepLabel(state)).toContain("Level 3");
+  it("keeps the same problem on incorrect answers", () => {
+    const initial = createInitialAlcumusState(pool, sessionSeed);
+    const afterIncorrect = applyAlcumusIncorrect(pool, initial);
+
+    expect(afterIncorrect.questionIndex).toBe(initial.questionIndex);
+    expect(afterIncorrect.solved).toBe(initial.solved);
+    expect(afterIncorrect.feedbackTone).toBe("retry");
   });
 
-  it("handles empty pool for apply without advancing", () => {
+  it("computes practice progress from solved questions", () => {
     const state = {
-      level: 1 as const,
-      problemId: "",
-      streak: 0,
+      ...createInitialAlcumusState(pool, sessionSeed),
+      solved: 2,
+      questionIndex: 2,
+    };
+
+    expect(practicePercent(state)).toBe(40);
+    expect(practiceStepLabel(state)).toBe("Question 3 of 5");
+  });
+
+  it("normalizes legacy persisted state into a new session", () => {
+    const normalized = normalizeAlcumusState(
+      {
+        level: 3,
+        problemId: "missing",
+        streak: 2,
+        solved: 4,
+      } as never,
+      pool,
+      sessionSeed,
+    );
+
+    expect(normalized.questionIds).toHaveLength(EXTRA_PRACTICE_SESSION_SIZE);
+    expect(normalized.questionIndex).toBe(0);
+  });
+
+  it("handles empty pool without advancing", () => {
+    const state = {
+      questionIds: [],
+      questionIndex: 0,
       solved: 0,
+      isComplete: true,
       feedback: null,
       feedbackTone: null,
       toast: null,

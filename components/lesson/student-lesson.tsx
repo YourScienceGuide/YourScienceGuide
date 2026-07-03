@@ -313,7 +313,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
             </h2>
             <p className="text-sm text-slate-600 dark:text-stone-400">
               {hasExtraPractice
-                ? "Optional harder problems from this chapter—leftover easy questions plus challenge items, with adaptive difficulty."
+                ? "Optional harder problems from this chapter—leftover easy questions plus challenge items."
                 : "Extra practice has not been added for this section yet."}
             </p>
           </div>
@@ -349,8 +349,8 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
               Flashcard Review
             </h2>
             <p className="text-sm text-slate-600 dark:text-stone-400">
-              Anki-style spaced repetition—rate cards after you reveal each
-              answer, with its own mastery progress.
+              Anki-style spaced repetition—write your own definition for each term,
+              then rate cards after you reveal each answer.
             </p>
           </div>
           <Button asChild className="shrink-0">

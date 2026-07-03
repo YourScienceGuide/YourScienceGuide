@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { CsvImportKind } from "@/lib/admin/csv-questions";
+import type { TemplateKind } from "@/lib/admin/xlsx-template.server";
 import {
   buildQuestionTemplateXlsx,
   questionTemplateFilename,
@@ -9,11 +9,12 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 
 export const dynamic = "force-dynamic";
 
-function parseKind(value: string | null): CsvImportKind | null {
+function parseKind(value: string | null): TemplateKind | null {
   if (
     value === "chapter" ||
     value === "alcumus" ||
-    value === "end-of-chapter"
+    value === "end-of-chapter" ||
+    value === "flashcards"
   ) {
     return value;
   }
@@ -29,7 +30,10 @@ export async function GET(request: Request) {
   const kind = parseKind(new URL(request.url).searchParams.get("kind"));
   if (!kind) {
     return NextResponse.json(
-      { error: 'Query param "kind" must be "chapter", "alcumus", or "end-of-chapter".' },
+      {
+        error:
+          'Query param "kind" must be "chapter", "alcumus", "end-of-chapter", or "flashcards".',
+      },
       { status: 400 },
     );
   }

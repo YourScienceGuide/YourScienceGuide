@@ -4,6 +4,7 @@ export const ADMIN_TABS = [
   "curriculum",
   "import",
   "assignment",
+  "flashcards",
   "videos",
 ] as const;
 

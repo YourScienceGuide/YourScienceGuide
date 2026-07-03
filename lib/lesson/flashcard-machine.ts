@@ -4,9 +4,9 @@ import type {
   DeckState,
   Flashcard,
   FlashcardEntry,
+  FlashcardPhase,
   FlashcardProgress,
 } from "@/lib/lesson/flashcard-types";
-import { SEED_FLASHCARDS } from "@/lib/lesson/flashcard-seed";
 
 const DEFAULT_EASE = 2.5;
 
@@ -27,22 +27,78 @@ function shuffleIds(ids: string[]): string[] {
   return next;
 }
 
-export function createInitialDeckState(
-  cards: Flashcard[] = SEED_FLASHCARDS,
-): DeckState {
-  const entries = cards.map((c) => toEntry(c));
-  const queue = shuffleIds(entries.map((e) => e.id));
+function phaseForEntry(entry: FlashcardEntry | undefined): FlashcardPhase {
+  if (!entry) return "question";
+  if (!entry.back.trim()) return "define";
+  return "question";
+}
+
+export function createEmptyDeckState(): DeckState {
   return {
-    entries,
-    queue,
-    currentCardId: queue[0],
+    entries: [],
+    queue: [],
+    currentCardId: "",
     phase: "question",
   };
 }
 
-export function getCurrentCard(state: DeckState): FlashcardEntry {
+export function createInitialDeckState(cards: Flashcard[] = []): DeckState {
+  if (cards.length === 0) {
+    return createEmptyDeckState();
+  }
+
+  const entries = cards.map((card) => toEntry(card));
+  const queue = shuffleIds(entries.map((entry) => entry.id));
+  const currentCardId = queue[0];
+  const current = entries.find((entry) => entry.id === currentCardId);
+
+  return {
+    entries,
+    queue,
+    currentCardId,
+    phase: phaseForEntry(current),
+  };
+}
+
+export function mergeDeckWithCards(
+  persisted: DeckState,
+  cards: Flashcard[],
+): DeckState {
+  if (cards.length === 0) {
+    return createEmptyDeckState();
+  }
+
+  const progressById = new Map(
+    persisted.entries.map((entry) => [entry.id, entry.progress]),
+  );
+  const entries = cards.map((card) =>
+    toEntry(card, progressById.get(card.id)),
+  );
+  const cardIds = new Set(cards.map((card) => card.id));
+  const queue = persisted.queue.filter((id) => cardIds.has(id));
+  const missing = entries
+    .map((entry) => entry.id)
+    .filter((id) => !queue.includes(id));
+  const nextQueue = [...queue, ...shuffleIds(missing)];
+  const currentCardId = nextQueue.includes(persisted.currentCardId)
+    ? persisted.currentCardId
+    : nextQueue[0];
+  const current = entries.find((entry) => entry.id === currentCardId);
+
+  return {
+    entries,
+    queue: nextQueue,
+    currentCardId,
+    phase: phaseForEntry(current),
+  };
+}
+
+export function getCurrentCard(state: DeckState): FlashcardEntry | null {
+  if (!state.currentCardId) return state.entries[0] ?? null;
   return (
-    state.entries.find((e) => e.id === state.currentCardId) ?? state.entries[0]
+    state.entries.find((entry) => entry.id === state.currentCardId) ??
+    state.entries[0] ??
+    null
   );
 }
 
@@ -66,13 +122,42 @@ export function masteryPercent(state: DeckState): number {
 
 export function masteryStepLabel(state: DeckState): string {
   const counts = deckCounts(state);
+  const defined = state.entries.filter((entry) => entry.back.trim()).length;
   const mature = counts.review;
   const total = state.entries.length;
-  return `${mature} of ${total} cards in review`;
+  return `${defined} defined · ${mature} of ${total} in review`;
+}
+
+export function definitionsProgress(state: DeckState): {
+  defined: number;
+  total: number;
+} {
+  const total = state.entries.length;
+  const defined = state.entries.filter((entry) => entry.back.trim()).length;
+  return { defined, total };
 }
 
 export function showAnswer(state: DeckState): DeckState {
   return { ...state, phase: "answer" };
+}
+
+export function saveCardDefinition(
+  state: DeckState,
+  cardId: string,
+  definition: string,
+): DeckState {
+  const trimmed = definition.trim();
+  if (!trimmed) return state;
+
+  const entries = state.entries.map((entry) =>
+    entry.id === cardId ? { ...entry, back: trimmed } : entry,
+  );
+
+  return {
+    ...state,
+    entries,
+    phase: "question",
+  };
 }
 
 function updateEntry(
@@ -110,8 +195,7 @@ function updateEntry(
   }
 
   if (rating === "good") {
-    const nextState: CardState =
-      state === "new" || state === "learning" ? "review" : "review";
+    const nextState: CardState = "review";
     const nextInterval =
       interval === 0 ? 1 : Math.max(1, Math.round(interval * ease));
     return {
@@ -125,14 +209,12 @@ function updateEntry(
     };
   }
 
-  // easy
-  const nextState: CardState = "review";
   const nextInterval =
     interval === 0 ? 4 : Math.max(1, Math.round(interval * ease * 1.3));
   return {
     ...entry,
     progress: {
-      state: nextState,
+      state: "review",
       interval: nextInterval,
       ease: ease + 0.15,
       reps,
@@ -162,26 +244,22 @@ function nextCardId(queue: string[], entries: FlashcardEntry[]): string {
 
 export function rateCard(state: DeckState, rating: AnkiRating): DeckState {
   const current = getCurrentCard(state);
+  if (!current) return state;
+
   const updated = updateEntry(current, rating);
-  const entries = state.entries.map((e) =>
-    e.id === updated.id ? updated : e,
+  const entries = state.entries.map((entry) =>
+    entry.id === updated.id ? updated : entry,
   );
   const queue = buildQueueAfterRating(state, current.id, rating);
   const currentCardId = nextCardId(queue, entries);
+  const next = entries.find((entry) => entry.id === currentCardId);
 
   return {
     entries,
     queue,
     currentCardId,
-    phase: "question",
+    phase: phaseForEntry(next),
   };
-}
-
-export function addFlashcard(state: DeckState, card: Flashcard): DeckState {
-  const entry = toEntry(card);
-  const entries = [...state.entries, entry];
-  const queue = [...state.queue, entry.id];
-  return { ...state, entries, queue };
 }
 
 /** Mock interval labels shown on Anki-style rating buttons. */

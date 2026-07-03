@@ -8,6 +8,7 @@ export const ADMIN_TAB_ROUTES: ReadonlyArray<{
   { id: "curriculum", label: "Curriculum & lessons", href: "/admin/curriculum" },
   { id: "import", label: "Bulk import (CSV)", href: "/admin/import" },
   { id: "assignment", label: "Chapter questions", href: "/admin/assignment" },
+  { id: "flashcards", label: "Flashcards", href: "/admin/flashcards" },
   { id: "videos", label: "Lesson videos", href: "/admin/videos" },
 ];
 

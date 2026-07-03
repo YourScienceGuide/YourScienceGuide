@@ -20,6 +20,7 @@ import {
 } from "@/lib/cms/question-payload";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import type { Textbook } from "@/lib/student/textbook";
+import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import {
   alcumusProblemToChapterQuestion,
@@ -50,6 +51,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     videosResult,
     questionsResult,
     alcumusResult,
+    flashcardsResult,
   ] = await Promise.all([
     supabase.from("courses").select("*").order("sort_order", { ascending: true }),
     supabase.from("lessons").select("*").order("sort_order", { ascending: true }),
@@ -57,6 +59,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     supabase.from("lesson_videos").select("*"),
     supabase.from("assignment_questions").select("*").order("sort_order", { ascending: true }),
     supabase.from("alcumus_problems").select("*"),
+    supabase.from("lesson_flashcards").select("*").order("sort_order", { ascending: true }),
   ]);
 
   for (const result of [
@@ -66,6 +69,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     videosResult,
     questionsResult,
     alcumusResult,
+    flashcardsResult,
   ]) {
     if (result.error) {
       throw new Error(`Failed to load CMS data: ${result.error.message}`);
@@ -129,12 +133,26 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     questionBank[key] = [...map.values()];
   }
 
+  const flashcardsByLesson: AdminContentStore["flashcardsByLesson"] = {};
+  for (const row of (flashcardsResult.data ?? []) as {
+    course_id: string;
+    lesson_id: string;
+    card_id: string;
+    term: string;
+  }[]) {
+    const key = lessonKey(row.course_id, row.lesson_id);
+    const list = flashcardsByLesson[key] ?? [];
+    list.push({ id: row.card_id, term: row.term });
+    flashcardsByLesson[key] = list;
+  }
+
   return sanitizeContentStore({
     version: 3,
     courses,
     questionBank,
     videos,
     textbooks,
+    flashcardsByLesson,
   });
 }
 
@@ -192,6 +210,7 @@ export async function loadLegacyContentBlob(): Promise<AdminContentStore | null>
     alcumusByLesson: parsed.alcumusByLesson,
     videos: parsed.videos ?? {},
     textbooks: parsed.textbooks,
+    flashcardsByLesson: parsed.flashcardsByLesson ?? {},
   });
 }
 
