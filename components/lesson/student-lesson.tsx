@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useContentStore } from "@/components/admin/content-store-provider";
-import { ReviewQuestionsSection } from "@/components/lesson/review-questions-section";
-import { getReviewQuestionsFromStore } from "@/lib/admin/content-store";
+import { useActiveStudent } from "@/components/family/active-student-provider";
+import { GradedLessonFlow } from "@/components/lesson/graded-lesson-flow";
 import { useStudentScope } from "@/components/student/use-student-scope";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";
 import { QuestionHistorySection } from "@/components/student/question-history-section";
-import { useQuestionAttemptRecorder } from "@/components/student/use-question-attempt-recorder";
-import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import {
   getAdjacentLessonsClient,
   getCourseClient,
@@ -23,38 +21,9 @@ import {
 import { getLessonReadings } from "@/lib/student/textbook";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
-import { LessonToast } from "@/components/lesson/lesson-toast";
 import { LessonVideo } from "@/components/lesson/lesson-video";
-import { QuestionPanel } from "@/components/lesson/question-panel";
 import { Button } from "@/components/ui/button";
-import {
-  loadLessonProgress,
-  saveLessonProgress,
-  storedToMachineState,
-} from "@/lib/student/lesson-progress";
-import {
-  lessonFlashcardsPath,
-  lessonPath,
-  lessonPracticePath,
-} from "@/lib/student/paths";
-import {
-  applyCorrectAnswer,
-  applyQuestionHeldForToday,
-  clearToast,
-  hasHeldQuestionsRemaining,
-  hydrateLessonState,
-  INITIAL_LESSON_STATE,
-  progressPercent,
-  resolveActiveQuestionIndex,
-  withAssignmentCount,
-  type LessonMachineState,
-} from "@/lib/lesson/state-machine";
-import { lessonStepLabel } from "@/lib/lesson/progress-labels";
-import {
-  GUEST_LESSON_LIMIT,
-  recordGuestLessonComplete,
-} from "@/lib/guest/guest-progress";
-import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
+import { lessonFlashcardsPath, lessonPracticePath } from "@/lib/student/paths";
 
 type StudentLessonProps = {
   courseId: string;
@@ -62,96 +31,23 @@ type StudentLessonProps = {
 };
 
 export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
-  const { isGuest, openSignupModal } = useAuth();
+  const { isGuest } = useAuth();
   const studentScope = useStudentScope();
+  const { activeStudentId } = useActiveStudent();
   const { store } = useContentStore();
-  const reviewQuestions = getReviewQuestionsFromStore(store, courseId, lessonId);
-  const hasReviewQuestions = reviewQuestions.length > 0;
-  const [canAccessLesson, setCanAccessLesson] = useState(!hasReviewQuestions);
-  const guestCompletionRecorded = useRef(false);
+  const [canAccessLesson, setCanAccessLesson] = useState(false);
+  const [gradePercent, setGradePercent] = useState(0);
   const course = getCourseClient(store, courseId);
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const textbook = getTextbookClient(store, courseId);
   const readings = getLessonReadings(lessonId);
   const { prev, next } = getAdjacentLessonsClient(store, courseId, lessonId);
-
-  const { lesson, practice, ready, error } = useLessonAssessment();
-  const { recordAssignmentAttempt } = useQuestionAttemptRecorder(courseId, lessonId);
-  const [state, setState] = useState<LessonMachineState | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const { practice, ready, error } = useLessonAssessment();
 
   useEffect(() => {
-    setCanAccessLesson(!hasReviewQuestions);
-  }, [hasReviewQuestions, lessonId]);
-
-  useEffect(() => {
-    if (!ready || !studentScope) return;
-    guestCompletionRecorded.current = false;
-    const stored = loadLessonProgress(studentScope, courseId, lessonId);
-    const restored = storedToMachineState(stored);
-    const base = restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE;
-    const withCount = withAssignmentCount(base, lesson.length);
-    const hydrated = hydrateLessonState(withCount, lesson, (questionId) =>
-      isQuestionLockedToday(studentScope, courseId, lessonId, questionId),
-    );
-    setState(hydrated);
-    setHydrated(true);
-  }, [courseId, lessonId, ready, studentScope, lesson]);
-
-  useEffect(() => {
-    if (!state || !hydrated || !studentScope) return;
-    saveLessonProgress(studentScope, courseId, lessonId, state);
-    notifyProgressUpdated();
-  }, [courseId, lessonId, state, hydrated, studentScope]);
-
-  useEffect(() => {
-    if (!isGuest || !hydrated || !state?.isComplete) return;
-    if (guestCompletionRecorded.current) return;
-    guestCompletionRecorded.current = true;
-    const count = recordGuestLessonComplete(courseId, lessonId);
-    if (count >= GUEST_LESSON_LIMIT) {
-      openSignupModal("limit");
-    }
-  }, [
-    isGuest,
-    hydrated,
-    state?.isComplete,
-    courseId,
-    lessonId,
-    openSignupModal,
-  ]);
-
-  const dismissToast = useCallback(() => {
-    setState((s) => (s ? clearToast(s) : s));
-  }, []);
-
-  const handleAnswer = useCallback(
-    (correct: boolean, questionId: string) => {
-      if (!correct || !studentScope) return;
-      setState((current) => {
-        if (!current) return current;
-        const next = applyCorrectAnswer(current, questionId);
-        return hydrateLessonState(next, lesson, (id) =>
-          isQuestionLockedToday(studentScope, courseId, lessonId, id),
-        );
-      });
-    },
-    [courseId, lesson, lessonId, studentScope],
-  );
-
-  const handleHeldForToday = useCallback(
-    (questionId: string) => {
-      if (!studentScope) return;
-      setState((current) => {
-        if (!current) return current;
-        const next = applyQuestionHeldForToday(current, questionId);
-        return hydrateLessonState(next, lesson, (id) =>
-          isQuestionLockedToday(studentScope, courseId, lessonId, id),
-        );
-      });
-    },
-    [courseId, lesson, lessonId, studentScope],
-  );
+    setCanAccessLesson(false);
+    setGradePercent(0);
+  }, [lessonId]);
 
   if (!course || !lessonMeta) {
     return (
@@ -169,7 +65,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     );
   }
 
-  if (!ready || !state || !studentScope) {
+  if (!ready || !studentScope) {
     return (
       <p className="text-sm text-slate-600 dark:text-stone-400">
         Loading lesson…
@@ -177,225 +73,122 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     );
   }
 
-  const hasAssignment = lesson.length > 0;
   const hasExtraPractice = practice.length > 0;
-
-  const isLockedToday = (questionId: string) =>
-    isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
-
-  const activeQuestionIndex = hasAssignment
-    ? resolveActiveQuestionIndex(lesson, state, isLockedToday)
-    : null;
-  const currentQuestion =
-    activeQuestionIndex !== null ? lesson[activeQuestionIndex] : undefined;
-  const heldQuestionsRemain =
-    hasAssignment &&
-    !state.isComplete &&
-    activeQuestionIndex === null &&
-    hasHeldQuestionsRemaining(lesson, state, isLockedToday);
-
-  const percent = hasAssignment ? progressPercent(state) : 0;
-  const stepLabel = hasAssignment
-    ? lessonStepLabel(
-        activeQuestionIndex ?? state.completedQuestionIds.length,
-        state.assignmentCount,
-        state.isComplete,
-      )
-    : "No assignment questions";
+  const familyStudentId = isGuest ? null : activeStudentId;
 
   return (
     <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
-    <div className="space-y-10">
-      <LessonToast message={state.toast} onDismiss={dismissToast} />
+      <div className="space-y-10">
+        <LessonProgressRail
+          percent={gradePercent}
+          stepLabel={`Lesson grade · ${gradePercent}%`}
+        />
 
-      <LessonProgressRail percent={percent} stepLabel={stepLabel} />
+        <LessonNav
+          courseId={courseId}
+          courseTitle={course.title}
+          lesson={lessonMeta}
+          prev={prev}
+          next={next}
+        />
 
-      <LessonNav
-        courseId={courseId}
-        courseTitle={course.title}
-        lesson={lessonMeta}
-        prev={prev}
-        next={next}
-      />
+        <p className="text-base text-slate-600 dark:text-stone-400">
+          Complete review questions, watch the video, then work through each graded
+          section. Your parent can see your score on their dashboard.
+        </p>
 
-      <p className="text-base text-slate-600 dark:text-stone-400">
-        {hasReviewQuestions && !canAccessLesson
-          ? "Start with the review questions below, then continue with readings, the video, and your assignment."
-          : hasAssignment
-            ? "Complete the required readings, watch the video, then finish all assignment parts below. Extra Practice and Flashcard Review are optional."
-            : "Complete the required readings and watch the video. Extra Practice and Flashcard Review are optional when available."}
-      </p>
-
-      {hasReviewQuestions && studentScope && (
-        <ReviewQuestionsSection
+        <GradedLessonFlow
           studentScope={studentScope}
+          familyStudentId={familyStudentId}
           courseId={courseId}
           lessonId={lessonId}
-          questions={reviewQuestions}
           onAccessChange={setCanAccessLesson}
-        />
-      )}
-
-      {!canAccessLesson ? (
-        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-4 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
-          <p className="font-medium text-slate-900 dark:text-stone-50">
-            Lesson content locked
-          </p>
-          <p className="mt-1">
-            Finish the review questions above to unlock readings, the video, and
-            today&apos;s assignment.
-          </p>
-        </div>
-      ) : (
-        <>
-      {textbook && readings.length > 0 && (
-        <RequiredReadings textbook={textbook} readings={readings} />
-      )}
-
-      <LessonVideo courseId={courseId} lessonId={lessonId} />
-
-      <section className="space-y-6" aria-labelledby="lesson-questions-heading">
-        <div className="space-y-1">
-          <h2
-            id="lesson-questions-heading"
-            className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
-          >
-            Your assignment
-          </h2>
-          <p className="text-sm text-slate-600 dark:text-stone-400">
-            {hasAssignment
-              ? "Complete all parts in order."
-              : "Assignment questions have not been added yet."}
-          </p>
-        </div>
-
-        {!hasAssignment ? (
-          <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
-            No assignment questions for this section.
-          </p>
-        ) : state.isComplete ? (
-          <div className="rounded-lg border border-sky-200 bg-white p-6 text-center dark:border-stone-700 dark:bg-stone-900">
-            <p className="text-lg font-medium text-slate-900 dark:text-stone-50">
-              Lesson complete!
-            </p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-stone-400">
-              You finished all {state.assignmentCount} assignment question
-              {state.assignmentCount === 1 ? "" : "s"}. Try Extra Practice or
-              Flashcard Review, or continue to the next lesson.
-            </p>
-            {next && (
-              <Button asChild className="mt-4">
-                <Link href={lessonPath(courseId, next.id)}>
-                  Next lesson: {next.title}
-                </Link>
-              </Button>
-            )}
-          </div>
-        ) : heldQuestionsRemain ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
-            <p className="font-medium">
-              {state.heldQuestionIds.length === 1
-                ? "1 question is on hold until tomorrow."
-                : `${state.heldQuestionIds.length} questions are on hold until tomorrow.`}
-            </p>
-            <p className="mt-2 text-amber-900 dark:text-amber-200">
-              You&apos;ve completed {state.completedQuestionIds.length} of{" "}
-              {state.assignmentCount} assignment question
-              {state.assignmentCount === 1 ? "" : "s"}. Come back tomorrow to
-              finish the question
-              {state.heldQuestionIds.length === 1 ? "" : "s"} still on hold.
-            </p>
-          </div>
-        ) : currentQuestion ? (
-          <QuestionPanel
-            key={`${studentScope}-${currentQuestion.id}`}
-            studentScope={studentScope}
-            courseId={courseId}
-            lessonId={lessonId}
-            question={currentQuestion}
-            difficulty={state.difficulty}
-            disabled={false}
-            onSubmit={(correct) => {
-              if (correct) {
-                handleAnswer(true, currentQuestion.id);
-              }
-            }}
-            onHeldForToday={() => handleHeldForToday(currentQuestion.id)}
-            onAnswerChecked={(result) => {
-              void recordAssignmentAttempt(result);
-            }}
-          />
-        ) : (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-            Assignment questions could not be loaded. Please refresh the page.
-          </p>
-        )}
-      </section>
-
-      <section
-        className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
-        aria-labelledby="extra-practice-heading"
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <h2
-              id="extra-practice-heading"
-              className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
-            >
-              Extra Practice
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-stone-400">
-              {hasExtraPractice
-                ? "Optional harder problems from this chapter—leftover easy questions plus challenge items."
-                : "Extra practice has not been added for this section yet."}
-            </p>
-          </div>
-          {hasExtraPractice ? (
-            <Button asChild className="shrink-0">
-              <Link href={lessonPracticePath(courseId, lessonId)}>Extra Practice</Link>
-            </Button>
+          onScoreChange={setGradePercent}
+        >
+          {canAccessLesson ? (
+            <>
+              {textbook && readings.length > 0 && (
+                <RequiredReadings textbook={textbook} readings={readings} />
+              )}
+              <LessonVideo courseId={courseId} lessonId={lessonId} />
+            </>
           ) : (
-            <p className="text-sm text-slate-600 dark:text-stone-400 sm:text-right">
-              No extra practice problems for this section.
-            </p>
+            <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-4 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
+              <p className="font-medium text-slate-900 dark:text-stone-50">
+                Video and readings locked
+              </p>
+              <p className="mt-1">
+                Finish the review questions above to unlock the video and readings.
+              </p>
+            </div>
           )}
-        </div>
-      </section>
+        </GradedLessonFlow>
 
-      <QuestionHistorySection
-        courseId={courseId}
-        lessonId={lessonId}
-        title="Your question history"
-        description="Assignment and extra practice attempts for this lesson."
-      />
-
-      <section
-        className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
-        aria-labelledby="flashcard-review-heading"
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <h2
-              id="flashcard-review-heading"
-              className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
+        {canAccessLesson && (
+          <>
+            <section
+              className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
+              aria-labelledby="extra-practice-heading"
             >
-              Flashcard Review
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-stone-400">
-              Anki-style spaced repetition—write your own definition for each term,
-              then rate cards after you reveal each answer.
-            </p>
-          </div>
-          <Button asChild className="shrink-0">
-            <Link href={lessonFlashcardsPath(courseId, lessonId)}>
-              Flashcard Review
-            </Link>
-          </Button>
-        </div>
-      </section>
-        </>
-      )}
-    </div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <h2
+                    id="extra-practice-heading"
+                    className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
+                  >
+                    Bonus extra practice
+                  </h2>
+                  <p className="text-sm text-slate-600 dark:text-stone-400">
+                    Optional harder problems — not counted toward your lesson grade.
+                  </p>
+                </div>
+                {hasExtraPractice ? (
+                  <Button asChild className="shrink-0">
+                    <Link href={lessonPracticePath(courseId, lessonId)}>
+                      Bonus practice
+                    </Link>
+                  </Button>
+                ) : (
+                  <p className="text-sm text-slate-600 dark:text-stone-400 sm:text-right">
+                    No bonus practice for this section.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <QuestionHistorySection
+              courseId={courseId}
+              lessonId={lessonId}
+              title="Your question history"
+              description="Attempts for this lesson."
+            />
+
+            <section
+              className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
+              aria-labelledby="flashcard-review-heading"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <h2
+                    id="flashcard-review-heading"
+                    className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50"
+                  >
+                    Flashcard Review
+                  </h2>
+                  <p className="text-sm text-slate-600 dark:text-stone-400">
+                    Optional spaced repetition — not counted toward your lesson grade.
+                  </p>
+                </div>
+                <Button asChild className="shrink-0">
+                  <Link href={lessonFlashcardsPath(courseId, lessonId)}>
+                    Flashcard Review
+                  </Link>
+                </Button>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </GuestLessonGuard>
   );
 }

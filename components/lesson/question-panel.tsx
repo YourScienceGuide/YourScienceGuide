@@ -41,6 +41,8 @@ type QuestionPanelProps = {
   /** Extra practice skips per-day attempt limits. */
   skipAttemptLimits?: boolean;
   onSubmit: (correct: boolean) => void;
+  /** Called with full text when a long-answer passes validation. */
+  onLongAnswerSubmit?: (answer: string) => void;
   /** Called when this question is held until tomorrow after exhausting tries. */
   onHeldForToday?: () => void;
   onAnswerChecked?: (result: {
@@ -60,6 +62,7 @@ export function QuestionPanel({
   disabled: disabledExternal = false,
   skipAttemptLimits = false,
   onSubmit,
+  onLongAnswerSubmit,
   onHeldForToday,
   onAnswerChecked,
 }: QuestionPanelProps) {
@@ -361,7 +364,10 @@ export function QuestionPanel({
               const correct = validateAnswer(questionForValidation, {
                 text: longAnswer,
               });
-              if (correct) setParentSubmitted(true);
+              if (correct) {
+                setParentSubmitted(true);
+                onLongAnswerSubmit?.(longAnswer.trim());
+              }
               notifyChecked(correct);
               onSubmit(correct);
             }}

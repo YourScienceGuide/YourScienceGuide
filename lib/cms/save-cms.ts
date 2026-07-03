@@ -2,6 +2,7 @@ import "server-only";
 
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
+import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { type AdminContentStore } from "@/lib/admin/content-store";
 import {
@@ -53,6 +54,7 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
         sort_order: sortOrderForLesson(lesson),
         csv_chapter: lesson.chapter ?? null,
         csv_section: lesson.section ?? null,
+        graduation_problem_count: lesson.graduationProblemCount ?? null,
         updated_at: timestamp,
       }));
 
@@ -98,6 +100,8 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
         );
       }
     }
+
+    await syncCourseGradingConfig(course.id, store.gradingConfigByCourse?.[course.id]);
 
     for (const lesson of course.lessons) {
       const key = lessonKey(course.id, lesson.id);
@@ -238,6 +242,47 @@ async function syncLessonFlashcards(
   const { error: insertError } = await supabase.from("lesson_flashcards").insert(rows);
   if (insertError) {
     throw new Error(`Failed to save lesson flashcards: ${insertError.message}`);
+  }
+}
+
+async function syncCourseGradingConfig(
+  courseId: string,
+  config: GradingRubricConfig | undefined,
+): Promise<void> {
+  const supabase = createSupabaseAdmin();
+  if (!config) {
+    const { error } = await supabase
+      .from("course_grading_config")
+      .delete()
+      .eq("course_id", courseId);
+    if (error) {
+      throw new Error(`Failed to clear grading config for ${courseId}: ${error.message}`);
+    }
+    return;
+  }
+
+  const { error } = await supabase.from("course_grading_config").upsert(
+    {
+      course_id: courseId,
+      review_count: config.reviewCount,
+      review_points_each: config.reviewPointsEach,
+      mc_bank_size: config.mcBankSize,
+      mc_target_correct: config.mcTargetCorrect,
+      mc_points_each: config.mcPointsEach,
+      fib_count: config.fibCount,
+      fib_points_each: config.fibPointsEach,
+      extra_count: config.extraCount,
+      extra_points_each: config.extraPointsEach,
+      free_response_count: config.freeResponseCount,
+      free_response_points: config.freeResponsePoints,
+      default_graduation_problem_count: config.defaultGraduationProblemCount,
+      updated_at: now(),
+    },
+    { onConflict: "course_id" },
+  );
+
+  if (error) {
+    throw new Error(`Failed to save grading config for ${courseId}: ${error.message}`);
   }
 }
 

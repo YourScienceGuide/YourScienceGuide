@@ -7,6 +7,8 @@ import { lessonKey } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 import { SEED_TEXTBOOKS, type Textbook } from "@/lib/student/textbook";
+import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
+import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
 import {
   parseChapterFromId,
   sortLessons,
@@ -38,6 +40,8 @@ export type AdminContentStore = {
   flashcardsByLesson?: Record<string, AdminFlashcard[]>;
   /** Warm-up review questions shown before lesson content. */
   reviewQuestionsByLesson?: Record<string, LessonQuestion[]>;
+  /** Per-course grading rubric and defaults. */
+  gradingConfigByCourse?: Record<string, GradingRubricConfig>;
 };
 
 const CURRENT_STORE_VERSION = 3 as const;
@@ -172,6 +176,7 @@ export function createDefaultStore(): AdminContentStore {
     textbooks: { ...SEED_TEXTBOOKS },
     flashcardsByLesson: {},
     reviewQuestionsByLesson: {},
+    gradingConfigByCourse: {},
   };
 }
 
@@ -189,16 +194,31 @@ function ensureReviewQuestions(store: AdminContentStore): AdminContentStore {
   return { ...store, reviewQuestionsByLesson: {} };
 }
 
+function ensureGradingConfig(store: AdminContentStore): AdminContentStore {
+  if (store.gradingConfigByCourse !== undefined) {
+    return store;
+  }
+  return { ...store, gradingConfigByCourse: {} };
+}
+
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
   const questionBank = normalizeQuestionBank(store);
+  const withGrading = ensureGradingConfig(store);
+  const gradingConfigByCourse: Record<string, GradingRubricConfig> = {};
+  for (const course of withGrading.courses) {
+    gradingConfigByCourse[course.id] = normalizeGradingRubric(
+      withGrading.gradingConfigByCourse?.[course.id],
+    );
+  }
   return ensureReviewQuestions(
     ensureFlashcards(
       ensureTextbooks(
         stripLegacyVideoBlobs({
-          ...store,
+          ...withGrading,
           version: CURRENT_STORE_VERSION,
-          courses: migrateCourses(store.courses),
+          courses: migrateCourses(withGrading.courses),
           questionBank,
+          gradingConfigByCourse,
           lessonQuestions: undefined,
           alcumusByLesson: undefined,
         }),
@@ -321,6 +341,27 @@ export function setReviewQuestionsInStore(
     reviewQuestionsByLesson: {
       ...(store.reviewQuestionsByLesson ?? {}),
       [key]: questions,
+    },
+  };
+}
+
+export function getGradingConfigFromStore(
+  store: AdminContentStore,
+  courseId: string,
+): GradingRubricConfig {
+  return normalizeGradingRubric(store.gradingConfigByCourse?.[courseId]);
+}
+
+export function setGradingConfigInStore(
+  store: AdminContentStore,
+  courseId: string,
+  config: GradingRubricConfig,
+): AdminContentStore {
+  return {
+    ...store,
+    gradingConfigByCourse: {
+      ...(store.gradingConfigByCourse ?? {}),
+      [courseId]: normalizeGradingRubric(config),
     },
   };
 }
@@ -464,6 +505,10 @@ export function removeCourseFromStore(
     flashcardsByLesson: stripKeysForCourse(store.flashcardsByLesson ?? {}, courseId),
     reviewQuestionsByLesson: stripKeysForCourse(
       store.reviewQuestionsByLesson ?? {},
+      courseId,
+    ),
+    gradingConfigByCourse: stripKeysForCourse(
+      store.gradingConfigByCourse ?? {},
       courseId,
     ),
     textbooks,

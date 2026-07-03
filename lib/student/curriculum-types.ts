@@ -9,6 +9,8 @@ export type CurriculumLesson = {
   chapter?: number;
   /** Matches the Section column in bulk-import CSV files. */
   section?: number;
+  /** Override course default; problems solved to graduate this section. */
+  graduationProblemCount?: number;
 };
 
 export type Course = {

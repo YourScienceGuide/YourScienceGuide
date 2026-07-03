@@ -14,6 +14,7 @@ import {
   chapterQuestionToPayload,
   type AlcumusProblemRow,
   type AssignmentQuestionRow,
+  type CourseGradingConfigRow,
   type CourseRow,
   type CourseTextbookRow,
   type LessonRow,
@@ -21,7 +22,8 @@ import {
 } from "@/lib/cms/question-payload";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import type { Textbook } from "@/lib/student/textbook";
-import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
+import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
+import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import {
@@ -55,6 +57,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     alcumusResult,
     flashcardsResult,
     reviewQuestionsResult,
+    gradingConfigResult,
   ] = await Promise.all([
     supabase.from("courses").select("*").order("sort_order", { ascending: true }),
     supabase.from("lessons").select("*").order("sort_order", { ascending: true }),
@@ -67,6 +70,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
       .from("lesson_review_questions")
       .select("*")
       .order("sort_order", { ascending: true }),
+    supabase.from("course_grading_config").select("*"),
   ]);
 
   for (const result of [
@@ -78,6 +82,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     alcumusResult,
     flashcardsResult,
     reviewQuestionsResult,
+    gradingConfigResult,
   ]) {
     if (result.error) {
       throw new Error(`Failed to load CMS data: ${result.error.message}`);
@@ -164,6 +169,16 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     reviewQuestionsByLesson[key] = list;
   }
 
+  const gradingConfigByCourse: AdminContentStore["gradingConfigByCourse"] = {};
+  for (const row of (gradingConfigResult.data ?? []) as CourseGradingConfigRow[]) {
+    gradingConfigByCourse[row.course_id] = mapGradingConfigRow(row);
+  }
+  for (const course of courses) {
+    if (!gradingConfigByCourse[course.id]) {
+      gradingConfigByCourse[course.id] = normalizeGradingRubric();
+    }
+  }
+
   return sanitizeContentStore({
     version: 3,
     courses,
@@ -172,6 +187,24 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     textbooks,
     flashcardsByLesson,
     reviewQuestionsByLesson,
+    gradingConfigByCourse,
+  });
+}
+
+function mapGradingConfigRow(row: CourseGradingConfigRow): GradingRubricConfig {
+  return normalizeGradingRubric({
+    reviewCount: row.review_count,
+    reviewPointsEach: row.review_points_each,
+    mcBankSize: row.mc_bank_size,
+    mcTargetCorrect: row.mc_target_correct,
+    mcPointsEach: row.mc_points_each,
+    fibCount: row.fib_count,
+    fibPointsEach: row.fib_points_each,
+    extraCount: row.extra_count,
+    extraPointsEach: row.extra_points_each,
+    freeResponseCount: row.free_response_count,
+    freeResponsePoints: row.free_response_points,
+    defaultGraduationProblemCount: row.default_graduation_problem_count,
   });
 }
 
@@ -185,6 +218,7 @@ function mapLessonRow(row: LessonRow): CurriculumLesson {
     order: row.sort_order,
     chapter: row.csv_chapter ?? undefined,
     section: row.csv_section ?? undefined,
+    graduationProblemCount: row.graduation_problem_count ?? undefined,
   };
 }
 
@@ -231,6 +265,7 @@ export async function loadLegacyContentBlob(): Promise<AdminContentStore | null>
     textbooks: parsed.textbooks,
     flashcardsByLesson: parsed.flashcardsByLesson ?? {},
     reviewQuestionsByLesson: parsed.reviewQuestionsByLesson ?? {},
+    gradingConfigByCourse: parsed.gradingConfigByCourse ?? {},
   });
 }
 

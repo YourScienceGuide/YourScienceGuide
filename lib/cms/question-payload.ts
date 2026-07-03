@@ -19,6 +19,23 @@ export type LessonRow = {
   sort_order: number;
   csv_chapter: number | null;
   csv_section: number | null;
+  graduation_problem_count: number | null;
+};
+
+export type CourseGradingConfigRow = {
+  course_id: string;
+  review_count: number;
+  review_points_each: number;
+  mc_bank_size: number;
+  mc_target_correct: number;
+  mc_points_each: number;
+  fib_count: number;
+  fib_points_each: number;
+  extra_count: number;
+  extra_points_each: number;
+  free_response_count: number;
+  free_response_points: number;
+  default_graduation_problem_count: number;
 };
 
 export type CourseTextbookRow = {
