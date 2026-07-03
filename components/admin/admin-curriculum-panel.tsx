@@ -9,6 +9,7 @@ import {
 import { useContentStore } from "@/components/admin/content-store-provider";
 import type { PersistOptions } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
+import { AdminLessonPositionEditor } from "@/components/admin/admin-lesson-position-editor";
 import { AdminTextbookSection } from "@/components/admin/admin-textbook-section";
 import {
   courseDeleteConfirmationPhrase,
@@ -19,6 +20,8 @@ import {
 import { slugifyId } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import {
+  duplicateLessonChapterSectionMessage,
+  findLessonWithChapterSection,
   lessonPositionLabel,
   sortLessons,
   sortOrderForLesson,
@@ -102,7 +105,18 @@ export function AdminCurriculumPanel() {
     const id = slugifyId(newLesson.title);
     if (!id || course.lessons.some((l) => l.id === id)) return;
 
-    const chapterId = `chapter-${newLesson.chapter}`;
+    const chapter = newLesson.chapter;
+    const section = newLesson.section;
+    const existing = findLessonWithChapterSection(course.lessons, chapter, section);
+    if (existing) {
+      setAddLessonFeedback({
+        type: "error",
+        message: duplicateLessonChapterSectionMessage(chapter, section),
+      });
+      return;
+    }
+
+    const chapterId = `chapter-${chapter}`;
     const draft: CurriculumLesson = {
       id,
       chapterId,
@@ -144,25 +158,54 @@ export function AdminCurriculumPanel() {
 
   function updateLesson(lessonId: string, patch: Partial<CurriculumLesson>) {
     if (!course) return;
+
+    const current = course.lessons.find((lesson) => lesson.id === lessonId);
+    if (!current) return;
+
+    const next = { ...current, ...patch, order: sortOrderForLesson({ ...current, ...patch }) };
+
     const courses = store.courses.map((c) =>
       c.id === course.id
         ? {
             ...c,
-            lessons: c.lessons.map((l) => {
-              if (l.id !== lessonId) return l;
-              const next = { ...l, ...patch };
-              if (patch.chapter != null) {
-                next.chapterId = `chapter-${patch.chapter}`;
-              }
-              return {
-                ...next,
-                order: sortOrderForLesson(next),
-              };
-            }),
+            lessons: c.lessons.map((l) => (l.id === lessonId ? next : l)),
           }
         : c,
     );
     void saveCourses(courses, { silent: true });
+  }
+
+  async function saveLessonPosition(
+    lessonId: string,
+    position: { chapter: number; section: number },
+  ): Promise<boolean> {
+    if (!course) return false;
+
+    const current = course.lessons.find((lesson) => lesson.id === lessonId);
+    if (!current) return false;
+
+    const next: CurriculumLesson = {
+      ...current,
+      chapter: position.chapter,
+      section: position.section,
+      chapterId: `chapter-${position.chapter}`,
+      order: sortOrderForLesson({
+        ...current,
+        chapter: position.chapter,
+        section: position.section,
+      }),
+    };
+
+    const courses = store.courses.map((c) =>
+      c.id === course.id
+        ? {
+            ...c,
+            lessons: c.lessons.map((l) => (l.id === lessonId ? next : l)),
+          }
+        : c,
+    );
+    const result = await saveCourses(courses, { silent: true });
+    return result.ok;
   }
 
   const deletePhrase = course ? courseDeleteConfirmationPhrase(course.title) : "";
@@ -451,42 +494,12 @@ export function AdminCurriculumPanel() {
                     rows={2}
                     className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
                   />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs font-medium text-slate-500">
-                      Chapter
-                      <input
-                        type="number"
-                        min={1}
-                        value={lesson.chapter ?? ""}
-                        onChange={(e) =>
-                          updateLesson(lesson.id, {
-                            chapter: e.target.value
-                              ? Number(e.target.value)
-                              : undefined,
-                          })
-                        }
-                        placeholder="e.g. 3"
-                        className="mt-1 block w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
-                      />
-                    </label>
-                    <label className="text-xs font-medium text-slate-500">
-                      Section
-                      <input
-                        type="number"
-                        min={1}
-                        value={lesson.section ?? ""}
-                        onChange={(e) =>
-                          updateLesson(lesson.id, {
-                            section: e.target.value
-                              ? Number(e.target.value)
-                              : undefined,
-                          })
-                        }
-                        placeholder="e.g. 1"
-                        className="mt-1 block w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
-                      />
-                    </label>
-                  </div>
+                  <AdminLessonPositionEditor
+                    lesson={lesson}
+                    courseLessons={course.lessons}
+                    saving={saving}
+                    onSave={saveLessonPosition}
+                  />
                 </li>
               ))}
             </ul>

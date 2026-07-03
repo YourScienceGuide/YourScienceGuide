@@ -9,4 +9,4 @@ export function getQuestionHint(question: LessonQuestion): string {
 }
 
 export const LOCKED_UNTIL_TOMORROW_MESSAGE =
-  "You've used all your tries for today. Come back tomorrow to try again.";
+  "You've used all your tries for today on this question. It's on hold until tomorrow—you can continue with the other assignment questions.";

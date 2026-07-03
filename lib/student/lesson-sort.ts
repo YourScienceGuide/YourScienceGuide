@@ -52,3 +52,34 @@ export function lessonPositionLabel(lesson: CurriculumLesson): string {
   if (chapter > 0) return `Ch.${chapter}`;
   return "";
 }
+
+export function lessonMatchesChapterSection(
+  lesson: CurriculumLesson,
+  chapter: number,
+  section: number,
+): boolean {
+  return (
+    lessonChapterNumber(lesson) === chapter &&
+    lessonSectionNumber(lesson) === section
+  );
+}
+
+export function findLessonWithChapterSection(
+  lessons: CurriculumLesson[],
+  chapter: number,
+  section: number,
+  excludeLessonId?: string,
+): CurriculumLesson | undefined {
+  return lessons.find(
+    (lesson) =>
+      lesson.id !== excludeLessonId &&
+      lessonMatchesChapterSection(lesson, chapter, section),
+  );
+}
+
+export function duplicateLessonChapterSectionMessage(
+  chapter: number,
+  section: number,
+): string {
+  return `Lesson for Chapter ${chapter} section ${section} already exists. Edit the current lesson, or delete it to add a new lesson`;
+}

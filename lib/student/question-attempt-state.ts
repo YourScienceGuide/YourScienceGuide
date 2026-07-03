@@ -71,3 +71,17 @@ export function getResolvedQuestionAttemptState(
   );
   return getQuestionAttemptState(record);
 }
+
+export function isQuestionLockedToday(
+  studentScope: string,
+  courseId: string,
+  lessonId: string,
+  questionId: string,
+): boolean {
+  return getResolvedQuestionAttemptState(
+    studentScope,
+    courseId,
+    lessonId,
+    questionId,
+  ).isLocked;
+}

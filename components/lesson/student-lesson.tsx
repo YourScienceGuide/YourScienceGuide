@@ -37,9 +37,13 @@ import {
 } from "@/lib/student/paths";
 import {
   applyCorrectAnswer,
+  applyQuestionHeldForToday,
   clearToast,
+  hasHeldQuestionsRemaining,
+  hydrateLessonState,
   INITIAL_LESSON_STATE,
   progressPercent,
+  resolveActiveQuestionIndex,
   withAssignmentCount,
   type LessonMachineState,
 } from "@/lib/lesson/state-machine";
@@ -48,6 +52,7 @@ import {
   GUEST_LESSON_LIMIT,
   recordGuestLessonComplete,
 } from "@/lib/guest/guest-progress";
+import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
 
 type StudentLessonProps = {
   courseId: string;
@@ -76,9 +81,13 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     const stored = loadLessonProgress(studentScope, courseId, lessonId);
     const restored = storedToMachineState(stored);
     const base = restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE;
-    setState(withAssignmentCount(base, lesson.length));
+    const withCount = withAssignmentCount(base, lesson.length);
+    const hydrated = hydrateLessonState(withCount, lesson, (questionId) =>
+      isQuestionLockedToday(studentScope, courseId, lessonId, questionId),
+    );
+    setState(hydrated);
     setHydrated(true);
-  }, [courseId, lessonId, ready, studentScope, lesson.length]);
+  }, [courseId, lessonId, ready, studentScope, lesson]);
 
   useEffect(() => {
     if (!state || !hydrated || !studentScope) return;
@@ -107,13 +116,33 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
     setState((s) => (s ? clearToast(s) : s));
   }, []);
 
-  const handleAnswer = useCallback((correct: boolean) => {
-    if (!correct) return;
-    setState((s) => {
-      if (!s) return s;
-      return applyCorrectAnswer(s);
-    });
-  }, []);
+  const handleAnswer = useCallback(
+    (correct: boolean, questionId: string) => {
+      if (!correct || !studentScope) return;
+      setState((current) => {
+        if (!current) return current;
+        const next = applyCorrectAnswer(current, questionId);
+        return hydrateLessonState(next, lesson, (id) =>
+          isQuestionLockedToday(studentScope, courseId, lessonId, id),
+        );
+      });
+    },
+    [courseId, lesson, lessonId, studentScope],
+  );
+
+  const handleHeldForToday = useCallback(
+    (questionId: string) => {
+      if (!studentScope) return;
+      setState((current) => {
+        if (!current) return current;
+        const next = applyQuestionHeldForToday(current, questionId);
+        return hydrateLessonState(next, lesson, (id) =>
+          isQuestionLockedToday(studentScope, courseId, lessonId, id),
+        );
+      });
+    },
+    [courseId, lesson, lessonId, studentScope],
+  );
 
   if (!course || !lessonMeta) {
     return (
@@ -141,11 +170,28 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
 
   const hasAssignment = lesson.length > 0;
   const hasExtraPractice = practice.length > 0;
-  const currentQuestion = hasAssignment ? lesson[state.questionIndex] : undefined;
+
+  const isLockedToday = (questionId: string) =>
+    isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
+
+  const activeQuestionIndex = hasAssignment
+    ? resolveActiveQuestionIndex(lesson, state, isLockedToday)
+    : null;
+  const currentQuestion =
+    activeQuestionIndex !== null ? lesson[activeQuestionIndex] : undefined;
+  const heldQuestionsRemain =
+    hasAssignment &&
+    !state.isComplete &&
+    activeQuestionIndex === null &&
+    hasHeldQuestionsRemaining(lesson, state, isLockedToday);
 
   const percent = hasAssignment ? progressPercent(state) : 0;
   const stepLabel = hasAssignment
-    ? lessonStepLabel(state.questionIndex, state.assignmentCount, state.isComplete)
+    ? lessonStepLabel(
+        activeQuestionIndex ?? state.completedQuestionIds.length,
+        state.assignmentCount,
+        state.isComplete,
+      )
     : "No assignment questions";
 
   return (
@@ -212,6 +258,21 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
               </Button>
             )}
           </div>
+        ) : heldQuestionsRemain ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+            <p className="font-medium">
+              {state.heldQuestionIds.length === 1
+                ? "1 question is on hold until tomorrow."
+                : `${state.heldQuestionIds.length} questions are on hold until tomorrow.`}
+            </p>
+            <p className="mt-2 text-amber-900 dark:text-amber-200">
+              You&apos;ve completed {state.completedQuestionIds.length} of{" "}
+              {state.assignmentCount} assignment question
+              {state.assignmentCount === 1 ? "" : "s"}. Come back tomorrow to
+              finish the question
+              {state.heldQuestionIds.length === 1 ? "" : "s"} still on hold.
+            </p>
+          </div>
         ) : currentQuestion ? (
           <QuestionPanel
             key={`${studentScope}-${currentQuestion.id}`}
@@ -221,7 +282,12 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
             question={currentQuestion}
             difficulty={state.difficulty}
             disabled={false}
-            onSubmit={handleAnswer}
+            onSubmit={(correct) => {
+              if (correct) {
+                handleAnswer(true, currentQuestion.id);
+              }
+            }}
+            onHeldForToday={() => handleHeldForToday(currentQuestion.id)}
             onAnswerChecked={(result) => {
               void recordAssignmentAttempt(result);
             }}

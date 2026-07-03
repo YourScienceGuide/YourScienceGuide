@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 import {
   compareLessons,
+  findLessonWithChapterSection,
   lessonChapterNumber,
   lessonSectionNumber,
   sortLessons,
@@ -83,5 +84,34 @@ describe("lesson sort", () => {
     expect(sorted[0].id).toBe("scientific-method");
     expect(lessonChapterNumber(sorted.at(-1)!)).toBe(5);
     expect(lessonSectionNumber(sorted[0])).toBe(1);
+  });
+
+  it("finds a lesson with the same chapter and section", () => {
+    const lessons: CurriculumLesson[] = [
+      {
+        id: "a",
+        chapterId: "chapter-3",
+        chapterTitle: "Ch 3",
+        title: "A",
+        description: "",
+        order: 3005,
+        chapter: 3,
+        section: 5,
+      },
+      {
+        id: "b",
+        chapterId: "chapter-3",
+        chapterTitle: "Ch 3",
+        title: "B",
+        description: "",
+        order: 3001,
+        chapter: 3,
+        section: 1,
+      },
+    ];
+
+    expect(findLessonWithChapterSection(lessons, 3, 5)?.id).toBe("a");
+    expect(findLessonWithChapterSection(lessons, 3, 5, "a")).toBeUndefined();
+    expect(findLessonWithChapterSection(lessons, 3, 1)?.id).toBe("b");
   });
 });

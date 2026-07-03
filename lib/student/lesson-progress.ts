@@ -7,7 +7,11 @@ export type LessonStatus = "not_started" | "in_progress" | "complete";
 
 export type StoredLessonProgress = Pick<
   LessonMachineState,
-  "questionIndex" | "completedCount" | "isComplete"
+  | "questionIndex"
+  | "completedCount"
+  | "completedQuestionIds"
+  | "heldQuestionIds"
+  | "isComplete"
 >;
 
 /** studentScope -> courseId -> lessonId */
@@ -51,7 +55,12 @@ export function saveLessonProgress(
   const course = byCourse[courseId] ?? {};
   course[lessonId] = {
     questionIndex: state.questionIndex,
-    completedCount: state.completedCount,
+    completedCount:
+      state.completedQuestionIds.length > 0
+        ? state.completedQuestionIds.length
+        : state.completedCount,
+    completedQuestionIds: state.completedQuestionIds,
+    heldQuestionIds: state.heldQuestionIds,
     isComplete: state.isComplete,
   };
   byCourse[courseId] = course;
@@ -77,6 +86,8 @@ export function storedToMachineState(
   return {
     questionIndex: stored.questionIndex,
     completedCount: stored.completedCount,
+    completedQuestionIds: stored.completedQuestionIds ?? [],
+    heldQuestionIds: stored.heldQuestionIds ?? [],
     isComplete: stored.isComplete,
     difficulty: 1,
     feedback: null,
@@ -94,6 +105,8 @@ export function lessonProgressPercent(
   return progressPercent({
     ...progress,
     assignmentCount,
+    completedQuestionIds: progress.completedQuestionIds ?? [],
+    heldQuestionIds: progress.heldQuestionIds ?? [],
     difficulty: 1,
     feedback: null,
     feedbackTone: null,

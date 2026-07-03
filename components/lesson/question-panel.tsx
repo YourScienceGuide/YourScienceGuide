@@ -41,6 +41,8 @@ type QuestionPanelProps = {
   /** Extra practice skips per-day attempt limits. */
   skipAttemptLimits?: boolean;
   onSubmit: (correct: boolean) => void;
+  /** Called when this question is held until tomorrow after exhausting tries. */
+  onHeldForToday?: () => void;
   onAnswerChecked?: (result: {
     questionId: string;
     questionType: string;
@@ -58,6 +60,7 @@ export function QuestionPanel({
   disabled: disabledExternal = false,
   skipAttemptLimits = false,
   onSubmit,
+  onHeldForToday,
   onAnswerChecked,
 }: QuestionPanelProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -153,6 +156,7 @@ export function QuestionPanel({
         setFeedback(LOCKED_UNTIL_TOMORROW_MESSAGE);
         setFeedbackTone("retry");
         notifyChecked(false);
+        onHeldForToday?.();
         return;
       }
     }
@@ -340,6 +344,12 @@ export function QuestionPanel({
         >
           {feedback}
         </p>
+      )}
+
+      {isLocked && onHeldForToday && (
+        <Button type="button" onClick={onHeldForToday}>
+          Continue to next question
+        </Button>
       )}
 
       <div className="flex flex-wrap gap-3">
