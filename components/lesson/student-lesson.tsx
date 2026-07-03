@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { ReviewQuestionsSection } from "@/components/lesson/review-questions-section";
+import { getReviewQuestionsFromStore } from "@/lib/admin/content-store";
 import { useStudentScope } from "@/components/student/use-student-scope";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
@@ -63,6 +65,9 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const { isGuest, openSignupModal } = useAuth();
   const studentScope = useStudentScope();
   const { store } = useContentStore();
+  const reviewQuestions = getReviewQuestionsFromStore(store, courseId, lessonId);
+  const hasReviewQuestions = reviewQuestions.length > 0;
+  const [canAccessLesson, setCanAccessLesson] = useState(!hasReviewQuestions);
   const guestCompletionRecorded = useRef(false);
   const course = getCourseClient(store, courseId);
   const lessonMeta = getLessonClient(store, courseId, lessonId);
@@ -74,6 +79,10 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const { recordAssignmentAttempt } = useQuestionAttemptRecorder(courseId, lessonId);
   const [state, setState] = useState<LessonMachineState | null>(null);
   const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setCanAccessLesson(!hasReviewQuestions);
+  }, [hasReviewQuestions, lessonId]);
 
   useEffect(() => {
     if (!ready || !studentScope) return;
@@ -210,11 +219,35 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
       />
 
       <p className="text-base text-slate-600 dark:text-stone-400">
-        {hasAssignment
-          ? "Complete the required readings, watch the video, then finish all assignment parts below. Extra Practice and Flashcard Review are optional."
-          : "Complete the required readings and watch the video. Extra Practice and Flashcard Review are optional when available."}
+        {hasReviewQuestions && !canAccessLesson
+          ? "Start with the review questions below, then continue with readings, the video, and your assignment."
+          : hasAssignment
+            ? "Complete the required readings, watch the video, then finish all assignment parts below. Extra Practice and Flashcard Review are optional."
+            : "Complete the required readings and watch the video. Extra Practice and Flashcard Review are optional when available."}
       </p>
 
+      {hasReviewQuestions && studentScope && (
+        <ReviewQuestionsSection
+          studentScope={studentScope}
+          courseId={courseId}
+          lessonId={lessonId}
+          questions={reviewQuestions}
+          onAccessChange={setCanAccessLesson}
+        />
+      )}
+
+      {!canAccessLesson ? (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-4 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
+          <p className="font-medium text-slate-900 dark:text-stone-50">
+            Lesson content locked
+          </p>
+          <p className="mt-1">
+            Finish the review questions above to unlock readings, the video, and
+            today&apos;s assignment.
+          </p>
+        </div>
+      ) : (
+        <>
       {textbook && readings.length > 0 && (
         <RequiredReadings textbook={textbook} readings={readings} />
       )}
@@ -360,6 +393,8 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
           </Button>
         </div>
       </section>
+        </>
+      )}
     </div>
     </GuestLessonGuard>
   );

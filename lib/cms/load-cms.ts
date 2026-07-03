@@ -10,6 +10,7 @@ import {
 import {
   payloadToChapterQuestion,
   payloadToAlcumusProblem,
+  payloadToLessonQuestion,
   chapterQuestionToPayload,
   type AlcumusProblemRow,
   type AssignmentQuestionRow,
@@ -22,6 +23,7 @@ import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import type { Textbook } from "@/lib/student/textbook";
 import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
+import type { LessonQuestion } from "@/lib/lesson/types";
 import {
   alcumusProblemToChapterQuestion,
 } from "@/lib/lesson/chapter-questions";
@@ -52,6 +54,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     questionsResult,
     alcumusResult,
     flashcardsResult,
+    reviewQuestionsResult,
   ] = await Promise.all([
     supabase.from("courses").select("*").order("sort_order", { ascending: true }),
     supabase.from("lessons").select("*").order("sort_order", { ascending: true }),
@@ -60,6 +63,10 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     supabase.from("assignment_questions").select("*").order("sort_order", { ascending: true }),
     supabase.from("alcumus_problems").select("*"),
     supabase.from("lesson_flashcards").select("*").order("sort_order", { ascending: true }),
+    supabase
+      .from("lesson_review_questions")
+      .select("*")
+      .order("sort_order", { ascending: true }),
   ]);
 
   for (const result of [
@@ -70,6 +77,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     questionsResult,
     alcumusResult,
     flashcardsResult,
+    reviewQuestionsResult,
   ]) {
     if (result.error) {
       throw new Error(`Failed to load CMS data: ${result.error.message}`);
@@ -146,6 +154,16 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     flashcardsByLesson[key] = list;
   }
 
+  const reviewQuestionsByLesson: AdminContentStore["reviewQuestionsByLesson"] = {};
+  for (const row of (reviewQuestionsResult.data ?? []) as AssignmentQuestionRow[]) {
+    const key = lessonKey(row.course_id, row.lesson_id);
+    const question = payloadToLessonQuestion(row);
+    if (!question) continue;
+    const list = reviewQuestionsByLesson[key] ?? [];
+    list.push(question);
+    reviewQuestionsByLesson[key] = list;
+  }
+
   return sanitizeContentStore({
     version: 3,
     courses,
@@ -153,6 +171,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     videos,
     textbooks,
     flashcardsByLesson,
+    reviewQuestionsByLesson,
   });
 }
 
@@ -211,6 +230,7 @@ export async function loadLegacyContentBlob(): Promise<AdminContentStore | null>
     videos: parsed.videos ?? {},
     textbooks: parsed.textbooks,
     flashcardsByLesson: parsed.flashcardsByLesson ?? {},
+    reviewQuestionsByLesson: parsed.reviewQuestionsByLesson ?? {},
   });
 }
 

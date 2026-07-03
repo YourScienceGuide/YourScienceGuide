@@ -2,9 +2,11 @@ import "server-only";
 
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
+import type { LessonQuestion } from "@/lib/lesson/types";
 import { type AdminContentStore } from "@/lib/admin/content-store";
 import {
   chapterQuestionToPayload,
+  lessonQuestionToPayload,
 } from "@/lib/cms/question-payload";
 import { resolveTextbookCoverUrl } from "@/lib/cms/textbook-covers.server";
 import { sortOrderForLesson } from "@/lib/student/lesson-sort";
@@ -105,6 +107,11 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
         course.id,
         lesson.id,
         store.flashcardsByLesson?.[key] ?? [],
+      );
+      await syncLessonReviewQuestions(
+        course.id,
+        lesson.id,
+        store.reviewQuestionsByLesson?.[key] ?? [],
       );
     }
   }
@@ -231,6 +238,41 @@ async function syncLessonFlashcards(
   const { error: insertError } = await supabase.from("lesson_flashcards").insert(rows);
   if (insertError) {
     throw new Error(`Failed to save lesson flashcards: ${insertError.message}`);
+  }
+}
+
+async function syncLessonReviewQuestions(
+  courseId: string,
+  lessonId: string,
+  questions: LessonQuestion[],
+): Promise<void> {
+  const supabase = createSupabaseAdmin();
+  const { error: deleteError } = await supabase
+    .from("lesson_review_questions")
+    .delete()
+    .eq("course_id", courseId)
+    .eq("lesson_id", lessonId);
+
+  if (deleteError) {
+    throw new Error(`Failed to clear lesson review questions: ${deleteError.message}`);
+  }
+
+  if (!questions.length) return;
+
+  const rows = questions.map((question, index) => ({
+    course_id: courseId,
+    lesson_id: lessonId,
+    question_id: question.id,
+    sort_order: index,
+    question_type: question.type,
+    prompt: question.prompt,
+    payload: lessonQuestionToPayload(question),
+    updated_at: now(),
+  }));
+
+  const { error: insertError } = await supabase.from("lesson_review_questions").insert(rows);
+  if (insertError) {
+    throw new Error(`Failed to save lesson review questions: ${insertError.message}`);
   }
 }
 

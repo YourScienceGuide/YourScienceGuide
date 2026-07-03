@@ -36,6 +36,8 @@ export type AdminContentStore = {
   textbooks?: Record<string, Textbook>;
   /** Flashcard terms keyed by courseId/lessonId. Students write definitions. */
   flashcardsByLesson?: Record<string, AdminFlashcard[]>;
+  /** Warm-up review questions shown before lesson content. */
+  reviewQuestionsByLesson?: Record<string, LessonQuestion[]>;
 };
 
 const CURRENT_STORE_VERSION = 3 as const;
@@ -169,6 +171,7 @@ export function createDefaultStore(): AdminContentStore {
     videos: {},
     textbooks: { ...SEED_TEXTBOOKS },
     flashcardsByLesson: {},
+    reviewQuestionsByLesson: {},
   };
 }
 
@@ -179,18 +182,27 @@ function ensureFlashcards(store: AdminContentStore): AdminContentStore {
   return { ...store, flashcardsByLesson: {} };
 }
 
+function ensureReviewQuestions(store: AdminContentStore): AdminContentStore {
+  if (store.reviewQuestionsByLesson !== undefined) {
+    return store;
+  }
+  return { ...store, reviewQuestionsByLesson: {} };
+}
+
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
   const questionBank = normalizeQuestionBank(store);
-  return ensureFlashcards(
-    ensureTextbooks(
-      stripLegacyVideoBlobs({
-        ...store,
-        version: CURRENT_STORE_VERSION,
-        courses: migrateCourses(store.courses),
-        questionBank,
-        lessonQuestions: undefined,
-        alcumusByLesson: undefined,
-      }),
+  return ensureReviewQuestions(
+    ensureFlashcards(
+      ensureTextbooks(
+        stripLegacyVideoBlobs({
+          ...store,
+          version: CURRENT_STORE_VERSION,
+          courses: migrateCourses(store.courses),
+          questionBank,
+          lessonQuestions: undefined,
+          alcumusByLesson: undefined,
+        }),
+      ),
     ),
   );
 }
@@ -288,6 +300,31 @@ export function setFlashcardsInStore(
   };
 }
 
+export function getReviewQuestionsFromStore(
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+): LessonQuestion[] {
+  const key = lessonKey(courseId, lessonId);
+  return store.reviewQuestionsByLesson?.[key] ?? [];
+}
+
+export function setReviewQuestionsInStore(
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+  questions: LessonQuestion[],
+): AdminContentStore {
+  const key = lessonKey(courseId, lessonId);
+  return {
+    ...store,
+    reviewQuestionsByLesson: {
+      ...(store.reviewQuestionsByLesson ?? {}),
+      [key]: questions,
+    },
+  };
+}
+
 export function getTextbookFromStore(
   store: AdminContentStore,
   courseId: string,
@@ -336,6 +373,16 @@ export function chapterQuestionsDeleteAllPhrase(lessonTitle: string): string {
 /** Exact phrase admins must type to confirm deleting one chapter question. */
 export function chapterQuestionDeletePhrase(questionNumber: number): string {
   return `delete chapter question ${questionNumber}`;
+}
+
+/** Exact phrase admins must type to confirm deleting all review questions for a lesson. */
+export function reviewQuestionsDeleteAllPhrase(lessonTitle: string): string {
+  return `delete all review questions for ${lessonTitle}`;
+}
+
+/** Exact phrase admins must type to confirm deleting one review question. */
+export function reviewQuestionDeletePhrase(questionNumber: number): string {
+  return `delete review question ${questionNumber}`;
 }
 
 /** @deprecated Use chapterQuestionsDeleteAllPhrase */
@@ -398,6 +445,7 @@ export function removeLessonFromStore(
     questionBank: stripLessonKey(store.questionBank, key),
     videos: stripLessonKey(store.videos, key),
     flashcardsByLesson: stripLessonKey(store.flashcardsByLesson ?? {}, key),
+    reviewQuestionsByLesson: stripLessonKey(store.reviewQuestionsByLesson ?? {}, key),
   };
 }
 
@@ -414,6 +462,10 @@ export function removeCourseFromStore(
     questionBank: stripKeysForCourse(store.questionBank, courseId),
     videos: stripKeysForCourse(store.videos, courseId),
     flashcardsByLesson: stripKeysForCourse(store.flashcardsByLesson ?? {}, courseId),
+    reviewQuestionsByLesson: stripKeysForCourse(
+      store.reviewQuestionsByLesson ?? {},
+      courseId,
+    ),
     textbooks,
   };
 }

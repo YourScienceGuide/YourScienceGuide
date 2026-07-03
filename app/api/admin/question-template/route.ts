@@ -14,7 +14,8 @@ function parseKind(value: string | null): TemplateKind | null {
     value === "chapter" ||
     value === "alcumus" ||
     value === "end-of-chapter" ||
-    value === "flashcards"
+    value === "flashcards" ||
+    value === "review"
   ) {
     return value;
   }
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          'Query param "kind" must be "chapter", "alcumus", "end-of-chapter", or "flashcards".',
+          'Query param "kind" must be "chapter", "alcumus", "end-of-chapter", "flashcards", or "review".',
       },
       { status: 400 },
     );
