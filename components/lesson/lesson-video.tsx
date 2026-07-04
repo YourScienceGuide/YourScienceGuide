@@ -3,7 +3,9 @@
 import MuxPlayer from "@mux/mux-player-react";
 import {
   Maximize,
+  Maximize2,
   Minimize,
+  Minimize2,
   Pause,
   Play,
   RotateCcw,
@@ -12,6 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { Button } from "@/components/ui/button";
 import { getVideoFromStore } from "@/lib/admin/content-store";
 import { cn } from "@/lib/utils";
 
@@ -29,28 +32,65 @@ type LessonVideoProps = {
   lessonId: string;
 };
 
+const COMPACT_PLAYER_CLASS =
+  "mx-auto w-full max-w-[min(100%,56rem,calc(52vh*16/9))]";
+const EXPANDED_PLAYER_CLASS = "w-full";
+
 export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
   const { store } = useContentStore();
   const meta = getVideoFromStore(store, courseId, lessonId);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [courseId, lessonId]);
 
   const title = meta?.title ?? MOCK_VIDEO.title;
   const description = meta?.description ?? MOCK_VIDEO.description;
   const hasUpload = Boolean(meta?.muxPlaybackId || meta?.sourceUrl);
+  const playerShellClass = expanded ? EXPANDED_PLAYER_CLASS : COMPACT_PLAYER_CLASS;
 
   return (
     <section className="space-y-3">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50">
-          Lesson video
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-stone-400">
-          {hasUpload
-            ? "Uploaded lesson video from your instructor."
-            : "Start with a short overview, then practice below."}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50">
+            Lesson video
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-stone-400">
+            {hasUpload
+              ? "Uploaded lesson video from your instructor."
+              : "Start with a short overview, then practice below."}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? (
+            <>
+              <Minimize2 aria-hidden />
+              Shrink
+            </>
+          ) : (
+            <>
+              <Maximize2 aria-hidden />
+              Expand
+            </>
+          )}
+        </Button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900">
+      <div
+        className={cn(
+          "overflow-hidden rounded-lg border border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900",
+          playerShellClass,
+        )}
+      >
         {meta?.muxPlaybackId ? (
           <MuxPlayer
             playbackId={meta.muxPlaybackId}
@@ -71,7 +111,14 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
 
         <div className="space-y-1 border-t border-sky-100 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
           <h3 className="font-medium text-slate-900 dark:text-stone-50">{title}</h3>
-          <p className="text-sm text-slate-600 dark:text-stone-400">{description}</p>
+          <p
+            className={cn(
+              "text-sm text-slate-600 dark:text-stone-400",
+              !expanded && "line-clamp-2",
+            )}
+          >
+            {description}
+          </p>
           {meta?.fileName && (
             <p className="text-xs text-slate-500 dark:text-stone-500">
               File: {meta.fileName}
