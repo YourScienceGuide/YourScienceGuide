@@ -32,7 +32,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Student profiles require Supabase to be configured." },
+      { error: "Student profiles are not available right now." },
       { status: 503 },
     );
   }
@@ -69,7 +69,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Student profiles require Supabase to be configured." },
+      { error: "Student profiles are not available right now." },
       { status: 503 },
     );
   }

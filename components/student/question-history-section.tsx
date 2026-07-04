@@ -120,7 +120,7 @@ export function QuestionHistorySection({
           className,
         )}
       >
-        Question history is unavailable until Supabase is configured for this site.
+        Question history is unavailable right now. Please try again later.
       </section>
     );
   }

@@ -25,7 +25,8 @@ export function StudentAreaGate({ children }: { children: ReactNode }) {
     return (
       <div className="mx-auto max-w-2xl space-y-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
         <p>
-          Student profiles are unavailable until Supabase is configured for this site.
+          Student profiles are unavailable right now. Please try again later or
+          contact support if this continues.
         </p>
       </div>
     );

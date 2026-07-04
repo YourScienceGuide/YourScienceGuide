@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
   if (!process.env.MUX_TOKEN_ID || !process.env.MUX_TOKEN_SECRET) {
     return Response.json(
-      { error: "Mux credentials are not configured" },
+      { error: "Video upload is not available right now." },
       { status: 500 },
     );
   }

@@ -45,9 +45,16 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
     setExpanded(false);
   }, [courseId, lessonId]);
 
-  const title = meta?.title ?? MOCK_VIDEO.title;
-  const description = meta?.description ?? MOCK_VIDEO.description;
   const hasUpload = Boolean(meta?.muxPlaybackId || meta?.sourceUrl);
+  const title = hasUpload
+    ? (meta?.title?.trim() ?? "")
+    : MOCK_VIDEO.title;
+  const description = hasUpload
+    ? (meta?.description?.trim() ?? "")
+    : MOCK_VIDEO.description;
+  const showTitle = title.length > 0;
+  const showDescription = description.length > 0;
+  const showMetadata = showTitle || showDescription;
   const playerShellClass = expanded ? EXPANDED_PLAYER_CLASS : COMPACT_PLAYER_CLASS;
 
   return (
@@ -109,22 +116,23 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
           <MockVideoPlayer />
         )}
 
-        <div className="space-y-1 border-t border-sky-100 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
-          <h3 className="font-medium text-slate-900 dark:text-stone-50">{title}</h3>
-          <p
-            className={cn(
-              "text-sm text-slate-600 dark:text-stone-400",
-              !expanded && "line-clamp-2",
+        {showMetadata && (
+          <div className="space-y-1 border-t border-sky-100 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
+            {showTitle && (
+              <h3 className="font-medium text-slate-900 dark:text-stone-50">{title}</h3>
             )}
-          >
-            {description}
-          </p>
-          {meta?.fileName && (
-            <p className="text-xs text-slate-500 dark:text-stone-500">
-              File: {meta.fileName}
-            </p>
-          )}
-        </div>
+            {showDescription && (
+              <p
+                className={cn(
+                  "text-sm text-slate-600 dark:text-stone-400",
+                  !expanded && "line-clamp-2",
+                )}
+              >
+                {description}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

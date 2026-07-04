@@ -44,7 +44,7 @@ export async function PUT(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to your environment.",
+          "Saving is not available right now. Please try again later.",
       },
       { status: 503 },
     );
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Supabase is not configured" },
+      { error: "Saving is not available right now." },
       { status: 503 },
     );
   }

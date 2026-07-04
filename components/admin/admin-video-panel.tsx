@@ -12,7 +12,7 @@ import {
   type LessonVideoMeta,
 } from "@/lib/admin/content-store";
 import { Button } from "@/components/ui/button";
-import { MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB, VIDEO_UPLOAD_MODE } from "@/lib/config";
+import { MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/config";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 90;
@@ -169,8 +169,7 @@ export function AdminVideoPanel() {
             Upload video file
           </label>
           <p className="text-xs text-slate-500 dark:text-stone-500">
-            Uploaded to Mux ({VIDEO_UPLOAD_MODE}). Max {MAX_VIDEO_UPLOAD_MB} MB. Only
-            playback metadata is stored in this browser.
+            MP4 or similar video files. Max {MAX_VIDEO_UPLOAD_MB} MB.
           </p>
           <input
             type="file"
@@ -179,8 +178,8 @@ export function AdminVideoPanel() {
             onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
             className="block w-full text-sm disabled:opacity-50"
           />
-          {meta.fileName && (
-            <p className="text-xs text-slate-500">Current: {meta.fileName}</p>
+          {hasVideo && (
+            <p className="text-xs text-slate-500">A video is attached to this lesson.</p>
           )}
           {uploadStatus && (
             <p className="text-sm text-slate-600 dark:text-stone-400">{uploadStatus}</p>

@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Student profiles require Supabase to be configured." },
+      { error: "Student profiles are not available right now." },
       { status: 503 },
     );
   }

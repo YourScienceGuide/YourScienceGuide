@@ -96,7 +96,8 @@ export function FamilyStudentsSection() {
 
       {studentsSource === "unavailable" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-          Student profiles require Supabase to be configured for this site.
+          Student profiles are unavailable right now. Please try again later or
+          contact support if this continues.
         </div>
       )}
 

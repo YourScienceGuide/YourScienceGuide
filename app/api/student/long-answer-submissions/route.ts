@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Submissions require Supabase to be configured." },
+      { error: "Submissions are not available right now." },
       { status: 503 },
     );
   }

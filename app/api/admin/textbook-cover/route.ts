@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Supabase is not configured." },
+      { error: "Cover upload is not available right now." },
       { status: 503 },
     );
   }

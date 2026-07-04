@@ -133,7 +133,7 @@ export function AdminTextbookSection({
         </h3>
         <p className="text-sm text-slate-600 dark:text-stone-400">
           Optional reading material shown on the {courseTitle} course page. Upload
-          a cover image (stored in Supabase Storage) or paste a URL path.
+          a cover image or paste a URL path.
         </p>
       </div>
 

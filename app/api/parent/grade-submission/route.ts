@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
-      { error: "Grading requires Supabase to be configured." },
+      { error: "Grading is not available right now." },
       { status: 503 },
     );
   }

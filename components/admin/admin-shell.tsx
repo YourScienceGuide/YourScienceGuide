@@ -29,8 +29,6 @@ function AdminShellContent({ children }: { children: ReactNode }) {
     saving,
     actionFeedback,
     clearActionFeedback,
-    source,
-    loading,
   } = useContentStore();
 
   useEffect(() => {
@@ -48,16 +46,8 @@ function AdminShellContent({ children }: { children: ReactNode }) {
           </h1>
           <p className="max-w-2xl text-base text-slate-600 dark:text-stone-400">
             Build courses and lessons, manage the unified chapter question bank
-            (assignment + extra practice), and upload videos via Mux. Content is
-            stored in Supabase tables and shared across browsers and users.
-          </p>
-          <p className="text-xs text-slate-500 dark:text-stone-500">
-            Storage:{" "}
-            {loading
-              ? "Loading…"
-              : source === "supabase"
-                ? "Supabase CMS tables (live)"
-                : "Seed defaults — configure Supabase env vars to persist edits"}
+            (assignment + extra practice), and upload lesson videos. Changes are
+            saved for all students and parents using the site.
           </p>
           {saving && (
             <p className="text-sm text-sky-700 dark:text-sky-300">Saving…</p>
