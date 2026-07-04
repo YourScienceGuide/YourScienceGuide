@@ -5,6 +5,7 @@ import { mergeLegacyQuestionBank } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
+import { normalizeLessonAccessTier } from "@/lib/student/lesson-access";
 import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 import { SEED_TEXTBOOKS, type Textbook } from "@/lib/student/textbook";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
@@ -99,6 +100,7 @@ function migrateLessonFields(lesson: CurriculumLesson): CurriculumLesson {
     ...lesson,
     chapterId,
     chapterTitle,
+    accessTier: normalizeLessonAccessTier(lesson.accessTier, lesson.id),
   };
 }
 
@@ -170,7 +172,7 @@ function ensureTextbooks(store: AdminContentStore): AdminContentStore {
 export function createDefaultStore(): AdminContentStore {
   return {
     version: CURRENT_STORE_VERSION,
-    courses: cloneCourses(),
+    courses: migrateCourses(cloneCourses()),
     questionBank: {},
     videos: {},
     textbooks: { ...SEED_TEXTBOOKS },

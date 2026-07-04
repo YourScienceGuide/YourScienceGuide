@@ -1,8 +1,7 @@
-/** First two curriculum lessons are free previews for guests. */
-export const GUEST_PREVIEW_LESSON_IDS = [
-  "scientific-method",
-  "lab-safety",
-] as const;
+import { LEGACY_PREVIEW_LESSON_IDS } from "@/lib/student/lesson-access";
+
+/** Legacy fallback preview ids used when old lesson records have no access tier yet. */
+export const GUEST_PREVIEW_LESSON_IDS = LEGACY_PREVIEW_LESSON_IDS;
 
 export type LessonTier = "preview" | "advanced";
 

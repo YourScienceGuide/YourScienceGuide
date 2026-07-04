@@ -7,6 +7,7 @@ export const ADMIN_TAB_ROUTES: ReadonlyArray<{
 }> = [
   { id: "curriculum", label: "Curriculum & lessons", href: "/admin/curriculum" },
   { id: "import", label: "Bulk import (CSV)", href: "/admin/import" },
+  { id: "access", label: "Lesson access", href: "/admin/access" },
   { id: "grading", label: "Grading", href: "/admin/grading" },
   { id: "review", label: "Review questions", href: "/admin/review" },
   { id: "assignment", label: "Chapter questions", href: "/admin/assignment" },

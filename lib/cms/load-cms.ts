@@ -21,6 +21,7 @@ import {
   type LessonVideoRow,
 } from "@/lib/cms/question-payload";
 import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
+import { normalizeLessonAccessTier } from "@/lib/student/lesson-access";
 import type { Textbook } from "@/lib/student/textbook";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
@@ -218,6 +219,7 @@ function mapLessonRow(row: LessonRow): CurriculumLesson {
     order: row.sort_order,
     chapter: row.csv_chapter ?? undefined,
     section: row.csv_section ?? undefined,
+    accessTier: normalizeLessonAccessTier(row.access_tier, row.id),
     graduationProblemCount: row.graduation_problem_count ?? undefined,
   };
 }

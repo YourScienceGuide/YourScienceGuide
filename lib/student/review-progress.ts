@@ -1,5 +1,6 @@
 import { progressPercent, type LessonMachineState } from "@/lib/lesson/state-machine";
 import { storedToMachineState } from "@/lib/student/lesson-progress";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 export type StoredReviewProgress = Pick<
   LessonMachineState,
@@ -39,6 +40,7 @@ export function loadReviewProgress(
   courseId: string,
   lessonId: string,
 ): StoredReviewProgress | null {
+  if (!shouldPersistStudentData(studentScope)) return null;
   const store = readStore();
   return store[studentScope]?.[courseId]?.[lessonId] ?? null;
 }
@@ -49,6 +51,7 @@ export function saveReviewProgress(
   lessonId: string,
   state: LessonMachineState,
 ) {
+  if (!shouldPersistStudentData(studentScope)) return;
   const store = readStore();
   const byCourse = store[studentScope] ?? {};
   const course = byCourse[courseId] ?? {};

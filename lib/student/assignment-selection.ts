@@ -4,6 +4,7 @@ import {
   type ChapterQuestion,
 } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 /** studentScope -> lesson assignment key -> selected question ids */
 type SelectionStore = Record<string, Record<string, string[]>>;
@@ -53,6 +54,9 @@ export function getOrCreateAssignmentQuestions(
 ): LessonQuestion[] {
   const lessonAssignmentKey = assignmentSeed(courseId, lessonId);
   const selectionSeed = `${studentScope}/${lessonAssignmentKey}`;
+  if (!shouldPersistStudentData(studentScope)) {
+    return selectAssignmentQuestions(bank, selectionSeed);
+  }
   const validEasy = new Set(easyIds(bank));
   const store = readStore();
   const byStudent = store[studentScope] ?? {};

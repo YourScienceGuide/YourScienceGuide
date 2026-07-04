@@ -6,14 +6,10 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LessonTierBadge } from "@/components/guest/lesson-tier-badge";
 import { LessonStatusBadge } from "@/components/student/lesson-status-badge";
+import { canGuestOpenLesson } from "@/lib/guest/guest-progress";
 import { lessonPositionLabel, lessonSectionNumber } from "@/lib/student/lesson-sort";
 import type { CurriculumLesson } from "@/lib/student/curriculum-types";
 import { lessonPath } from "@/lib/student/paths";
-import {
-  canGuestOpenLesson,
-  hasGuestCompletedLesson,
-} from "@/lib/guest/guest-progress";
-import { isAdvancedLesson } from "@/lib/guest/lesson-tiers";
 import type { LessonStatus } from "@/lib/student/lesson-progress";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +27,7 @@ export function CurriculumLessonRow({
   partialPercent,
 }: CurriculumLessonRowProps) {
   const { isGuest, openSignupModal } = useAuth();
-  const guestLocked =
-    isGuest &&
-    (isAdvancedLesson(lesson.id) ||
-      !canGuestOpenLesson(courseId, lesson.id));
-  const guestCompleted =
-    isGuest && hasGuestCompletedLesson(courseId, lesson.id);
+  const guestLocked = isGuest && !canGuestOpenLesson(lesson);
 
   const rowClassName = cn(
     "group flex w-full items-center gap-4 rounded-lg border px-4 py-4 text-left transition-colors",
@@ -71,13 +62,8 @@ export function CurriculumLessonRow({
           <span className="font-medium text-slate-900 dark:text-stone-50">
             {lesson.title}
           </span>
-          {isGuest && <LessonTierBadge lessonId={lesson.id} />}
+          {isGuest && <LessonTierBadge lesson={lesson} />}
           {!isGuest && <LessonStatusBadge status={status} />}
-          {isGuest && guestCompleted && (
-            <span className="text-xs text-emerald-700 dark:text-emerald-300">
-              Completed (guest)
-            </span>
-          )}
         </span>
         <span className="mt-0.5 block text-sm text-slate-600 dark:text-stone-400">
           {lesson.description}
@@ -104,9 +90,7 @@ export function CurriculumLessonRow({
       <li>
         <button
           type="button"
-          onClick={() =>
-            openSignupModal(isAdvancedLesson(lesson.id) ? "locked" : "limit")
-          }
+          onClick={() => openSignupModal("locked")}
           className={rowClassName}
         >
           {inner}

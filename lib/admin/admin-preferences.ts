@@ -3,6 +3,7 @@ import type { AdminContentStore } from "@/lib/admin/content-store";
 export const ADMIN_TABS = [
   "curriculum",
   "import",
+  "access",
   "grading",
   "review",
   "assignment",

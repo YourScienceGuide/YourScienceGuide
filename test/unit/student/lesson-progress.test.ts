@@ -29,7 +29,7 @@ describe("lesson progress (localStorage)", () => {
     expect(loadLessonProgress(studentB, courseId, lessonId)).toBeNull();
   });
 
-  it("isolates guest progress from family students", () => {
+  it("does not persist guest progress", () => {
     saveLessonProgress(studentA, courseId, lessonId, {
       ...INITIAL_LESSON_STATE,
       completedCount: 1,
@@ -42,9 +42,7 @@ describe("lesson progress (localStorage)", () => {
       isComplete: false,
     });
 
-    expect(
-      loadLessonProgress(GUEST_STUDENT_SCOPE, courseId, lessonId)?.completedCount,
-    ).toBe(2);
+    expect(loadLessonProgress(GUEST_STUDENT_SCOPE, courseId, lessonId)).toBeNull();
     expect(loadLessonProgress(studentA, courseId, lessonId)?.completedCount).toBe(1);
   });
 

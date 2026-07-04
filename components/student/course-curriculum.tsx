@@ -9,10 +9,6 @@ import { useStudentScope } from "@/components/student/use-student-scope";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { getCourseClient, getLessonsByChapterClient, getTextbookClient } from "@/lib/student/curriculum-client";
 import { lessonProgressPercent, loadLessonProgress } from "@/lib/student/lesson-progress";
-import {
-  GUEST_LESSON_LIMIT,
-  getGuestCompletedCount,
-} from "@/lib/guest/guest-progress";
 
 type CourseCurriculumProps = {
   courseId: string;
@@ -64,9 +60,9 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
 
       {isGuest && (
         <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-300">
-          Browsing as a guest — complete up to {GUEST_LESSON_LIMIT} Preview
-          lessons ({getGuestCompletedCount()} of {GUEST_LESSON_LIMIT} used).
-          Advanced lessons require an account.
+          Browsing as a guest — Preview lessons are open without an account, but
+          guest progress is not saved. Subscription lessons require you to sign
+          up first.
         </p>
       )}
 

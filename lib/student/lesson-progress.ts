@@ -2,6 +2,7 @@ import type { LessonMachineState } from "@/lib/lesson/state-machine";
 import { progressPercent } from "@/lib/lesson/state-machine";
 import { MAX_END_OF_CHAPTER_QUESTIONS } from "@/lib/lesson/types";
 import type { Course } from "@/lib/student/curriculum";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 export type LessonStatus = "not_started" | "in_progress" | "complete";
 
@@ -40,6 +41,7 @@ export function loadLessonProgress(
   courseId: string,
   lessonId: string,
 ): StoredLessonProgress | null {
+  if (!shouldPersistStudentData(studentScope)) return null;
   const store = readStore();
   return store[studentScope]?.[courseId]?.[lessonId] ?? null;
 }
@@ -50,6 +52,7 @@ export function saveLessonProgress(
   lessonId: string,
   state: LessonMachineState,
 ) {
+  if (!shouldPersistStudentData(studentScope)) return;
   const store = readStore();
   const byCourse = store[studentScope] ?? {};
   const course = byCourse[courseId] ?? {};
@@ -118,6 +121,7 @@ export function getCourseCompletionPercent(
   course: Course,
   studentScope: string,
 ): number {
+  if (!shouldPersistStudentData(studentScope)) return 0;
   if (course.lessons.length === 0) return 0;
   const store = readStore();
   const courseProgress = store[studentScope]?.[course.id] ?? {};
@@ -136,6 +140,11 @@ export function getLessonStatusesForCourse(
   course: Course,
   studentScope: string,
 ) {
+  if (!shouldPersistStudentData(studentScope)) {
+    return Object.fromEntries(
+      course.lessons.map((lesson) => [lesson.id, "not_started"]),
+    ) as Record<string, LessonStatus>;
+  }
   const store = readStore();
   const courseProgress = store[studentScope]?.[course.id] ?? {};
   return Object.fromEntries(

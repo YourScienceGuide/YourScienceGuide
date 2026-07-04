@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 import {
   normalizeAlcumusState,
   practicePercent,
@@ -36,6 +37,7 @@ function loadPersistedState(
   lessonId: string,
   pool: ChapterQuestion[],
 ): AlcumusState | null {
+  if (!shouldPersistStudentData(studentScope)) return null;
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(alcumusStorageKey(studentScope, courseId, lessonId));
@@ -121,7 +123,7 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
   }, [ready, practice, state, studentScope, courseId, lessonId]);
 
   useEffect(() => {
-    if (!state || !studentScope) return;
+    if (!state || !studentScope || !shouldPersistStudentData(studentScope)) return;
     sessionStorage.setItem(
       alcumusStorageKey(studentScope, courseId, lessonId),
       JSON.stringify(state),

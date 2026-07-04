@@ -26,6 +26,7 @@ import {
   saveFlashcardDefinition,
 } from "@/lib/student/flashcard-definitions";
 import { lessonPath } from "@/lib/student/paths";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 function flashcardStorageKey(
   studentScope: string,
@@ -40,6 +41,7 @@ function loadPersistedState(
   courseId: string,
   lessonId: string,
 ): DeckState | null {
+  if (!shouldPersistStudentData(studentScope)) return null;
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(
@@ -96,7 +98,14 @@ export function FlashcardReviewPage({
   }, [studentScope, courseId, lessonId, lessonCards]);
 
   useEffect(() => {
-    if (!state || !studentScope || state.entries.length === 0) return;
+    if (
+      !state ||
+      !studentScope ||
+      !shouldPersistStudentData(studentScope) ||
+      state.entries.length === 0
+    ) {
+      return;
+    }
     sessionStorage.setItem(
       flashcardStorageKey(studentScope, courseId, lessonId),
       JSON.stringify(state),

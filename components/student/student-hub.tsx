@@ -5,10 +5,6 @@ import Link from "next/link";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
-import {
-  GUEST_LESSON_LIMIT,
-  getGuestCompletedCount,
-} from "@/lib/guest/guest-progress";
 import { SwitchStudentButton } from "@/components/student/switch-student-button";
 import { getCoursesClient } from "@/lib/student/curriculum-client";
 import { coursePath } from "@/lib/student/paths";
@@ -41,9 +37,9 @@ export function StudentHub() {
 
       {isGuest && (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
-          Guest mode — try up to {GUEST_LESSON_LIMIT} Preview lessons (
-          {getGuestCompletedCount()} of {GUEST_LESSON_LIMIT} completed). Lessons
-          marked Locked need an account.
+          Guest mode — open any lesson marked Preview without an account. Progress
+          is not saved until you sign up, and subscriber lessons stay behind the
+          paywall.
         </p>
       )}
 

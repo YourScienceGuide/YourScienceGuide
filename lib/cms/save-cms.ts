@@ -10,6 +10,7 @@ import {
   lessonQuestionToPayload,
 } from "@/lib/cms/question-payload";
 import { resolveTextbookCoverUrl } from "@/lib/cms/textbook-covers.server";
+import { normalizeLessonAccessTier } from "@/lib/student/lesson-access";
 import { sortOrderForLesson } from "@/lib/student/lesson-sort";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -54,6 +55,7 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
         sort_order: sortOrderForLesson(lesson),
         csv_chapter: lesson.chapter ?? null,
         csv_section: lesson.section ?? null,
+        access_tier: normalizeLessonAccessTier(lesson.accessTier, lesson.id),
         graduation_problem_count: lesson.graduationProblemCount ?? null,
         updated_at: timestamp,
       }));

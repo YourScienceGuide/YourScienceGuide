@@ -1,4 +1,5 @@
 import type { GradedLessonProgress } from "@/lib/lesson/graded-lesson-machine";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 /** studentScope -> courseId -> lessonId */
 type GradedProgressStore = Record<
@@ -29,6 +30,7 @@ export function loadGradedLessonProgress(
   courseId: string,
   lessonId: string,
 ): GradedLessonProgress | null {
+  if (!shouldPersistStudentData(studentScope)) return null;
   const store = readStore();
   return store[studentScope]?.[courseId]?.[lessonId] ?? null;
 }
@@ -39,6 +41,7 @@ export function saveGradedLessonProgress(
   lessonId: string,
   progress: GradedLessonProgress,
 ) {
+  if (!shouldPersistStudentData(studentScope)) return;
   const store = readStore();
   const byCourse = store[studentScope] ?? {};
   const course = byCourse[courseId] ?? {};

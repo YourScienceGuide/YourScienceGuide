@@ -1,3 +1,5 @@
+export type LessonAccessTier = "preview" | "subscriber";
+
 export type CurriculumLesson = {
   id: string;
   chapterId: string;
@@ -9,6 +11,8 @@ export type CurriculumLesson = {
   chapter?: number;
   /** Matches the Section column in bulk-import CSV files. */
   section?: number;
+  /** Preview lessons are open without an account; subscriber lessons are paywalled. */
+  accessTier?: LessonAccessTier;
   /** Override course default; problems solved to graduate this section. */
   graduationProblemCount?: number;
 };

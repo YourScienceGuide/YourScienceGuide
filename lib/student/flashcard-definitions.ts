@@ -1,3 +1,5 @@
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
+
 /** studentScope -> lessonKey -> cardId -> student-written definition */
 type DefinitionStore = Record<string, Record<string, Record<string, string>>>;
 
@@ -28,6 +30,7 @@ export function loadFlashcardDefinitions(
   courseId: string,
   lessonId: string,
 ): Record<string, string> {
+  if (!shouldPersistStudentData(studentScope)) return {};
   const store = readStore();
   return { ...(store[studentScope]?.[lessonKey(courseId, lessonId)] ?? {}) };
 }
@@ -39,6 +42,7 @@ export function saveFlashcardDefinition(
   cardId: string,
   definition: string,
 ) {
+  if (!shouldPersistStudentData(studentScope)) return;
   const store = readStore();
   const key = lessonKey(courseId, lessonId);
   const byStudent = store[studentScope] ?? {};

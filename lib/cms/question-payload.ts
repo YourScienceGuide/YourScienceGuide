@@ -19,6 +19,7 @@ export type LessonRow = {
   sort_order: number;
   csv_chapter: number | null;
   csv_section: number | null;
+  access_tier: "preview" | "subscriber" | null;
   graduation_problem_count: number | null;
 };
 

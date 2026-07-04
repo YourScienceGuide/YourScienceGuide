@@ -15,6 +15,7 @@ import {
 
 describe("shareable route helpers", () => {
   it("maps admin paths to tabs", () => {
+    expect(adminTabFromPathname("/admin/access")).toBe("access");
     expect(adminTabFromPathname("/admin/assignment")).toBe("assignment");
     expect(adminTabPath("videos")).toBe("/admin/videos");
   });

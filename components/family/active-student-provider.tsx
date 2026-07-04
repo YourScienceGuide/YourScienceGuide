@@ -68,10 +68,10 @@ export function ActiveStudentProvider({
   const [studentsSource, setStudentsSource] = useState<StudentsSource>("idle");
   const [maxStudents, setMaxStudents] = useState(MAX_FAMILY_STUDENTS);
 
-  const { isLoggedIn, hasLessonAccess } = useAuth();
+  const { isLoggedIn } = useAuth();
 
   const refreshStudents = useCallback(async () => {
-    if (!isLoggedIn || !hasLessonAccess) {
+    if (!isLoggedIn) {
       setStudents([]);
       setStudentsSource("idle");
       return;
@@ -86,13 +86,13 @@ export function ActiveStudentProvider({
       setStudents([]);
       setStudentsSource("unavailable");
     }
-  }, [hasLessonAccess, isLoggedIn]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      if (!isLoggedIn || !hasLessonAccess) {
+      if (!isLoggedIn) {
         setStudents([]);
         setStudentsSource("idle");
         setReady(true);
@@ -109,7 +109,7 @@ export function ActiveStudentProvider({
     return () => {
       cancelled = true;
     };
-  }, [hasLessonAccess, isLoggedIn, refreshStudents]);
+  }, [isLoggedIn, refreshStudents]);
 
   useEffect(() => {
     const onUpdate = () => {
@@ -200,7 +200,7 @@ export function ActiveStudentProvider({
   );
 
   const hasNoStudents =
-    ready && isLoggedIn && hasLessonAccess && studentsSource === "supabase" && students.length === 0;
+    ready && isLoggedIn && studentsSource === "supabase" && students.length === 0;
 
   const needsStudentPicker =
     ready && students.length > 1 && activeStudentId === null;

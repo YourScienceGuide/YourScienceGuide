@@ -2,6 +2,7 @@ import {
   type QuestionAttemptRecord,
   getQuestionAttemptState,
 } from "@/lib/lesson/question-attempt-limits";
+import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 type LessonAttemptStore = Record<string, QuestionAttemptRecord>;
 
@@ -36,6 +37,7 @@ export function loadQuestionAttemptRecord(
   lessonId: string,
   questionId: string,
 ): QuestionAttemptRecord | null {
+  if (!shouldPersistStudentData(studentScope)) return null;
   const store = readStore();
   return store[studentScope]?.[lessonKey(courseId, lessonId)]?.[questionId] ?? null;
 }
@@ -47,6 +49,7 @@ export function saveQuestionAttemptRecord(
   questionId: string,
   record: QuestionAttemptRecord,
 ) {
+  if (!shouldPersistStudentData(studentScope)) return;
   const store = readStore();
   const key = lessonKey(courseId, lessonId);
   const byStudent = store[studentScope] ?? {};
