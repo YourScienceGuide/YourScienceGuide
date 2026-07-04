@@ -76,11 +76,25 @@ export function GradedLessonFlow({
   const { store } = useContentStore();
   const course = getCourseClient(store, courseId);
   const lesson = getLessonClient(store, courseId, lessonId);
-  const rubric = getGradingConfigFromStore(store, courseId);
+  const storedRubric = store.gradingConfigByCourse?.[courseId];
+  const rubric = useMemo(
+    () => getGradingConfigFromStore(store, courseId),
+    [storedRubric, courseId],
+  );
   const plan = useMemo(() => {
     if (!course || !lesson) return null;
     return buildLessonAssessmentPlan(store, course, lesson, rubric);
   }, [course, lesson, rubric, store]);
+  const planIdentity = useMemo(() => {
+    if (!plan) return null;
+    return [
+      plan.review.map((question) => question.id).join(","),
+      plan.multipleChoice.map((question) => question.id).join(","),
+      plan.fillInBlank.map((question) => question.id).join(","),
+      plan.extraPractice.map((question) => question.id).join(","),
+      plan.freeResponse?.id ?? "",
+    ].join("|");
+  }, [plan]);
 
   const [progress, setProgress] = useState<GradedLessonProgress | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -91,7 +105,7 @@ export function GradedLessonFlow({
     const next = hydrateGradedProgress(stored, plan);
     setProgress(next);
     setHydrated(true);
-  }, [courseId, lessonId, plan, studentScope]);
+  }, [courseId, lessonId, planIdentity, studentScope]);
 
   const score = progress ? calculateLessonScore(progress, rubric) : null;
   const graduationThreshold = graduationThresholdForLesson(
