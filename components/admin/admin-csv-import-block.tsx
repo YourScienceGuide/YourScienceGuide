@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { questionTemplateFilename } from "@/lib/admin/csv-template";
 import {
   CHAPTER_QUESTION_CSV_HEADERS,
   buildImportPreview,
@@ -132,7 +133,7 @@ export function AdminCsvImportBlock({
     onImported?.();
   }
 
-  const templateName = "ysg-chapter-questions-template.xlsx";
+  const templateName = questionTemplateFilename(kind);
   const exampleName = "ysg-chapter-questions-examples.csv";
 
   async function handleDownloadTemplate() {
@@ -159,10 +160,10 @@ export function AdminCsvImportBlock({
       <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-stone-400">
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">Type</strong>{" "}
-          is a dropdown in the Excel template (
+          must be{" "}
           <code className="text-xs">multiple-choice</code>,{" "}
           <code className="text-xs">free-response</code>, or{" "}
-          <code className="text-xs">fill-in-the-blank</code>).
+          <code className="text-xs">fill-in-the-blank</code>.
         </li>
         <li>
           <strong className="font-medium text-slate-800 dark:text-stone-200">Level</strong>{" "}
@@ -199,7 +200,7 @@ export function AdminCsvImportBlock({
 
       <div className="flex flex-wrap gap-3">
         <Button type="button" size="sm" onClick={handleDownloadTemplate}>
-          Download blank template (.xlsx)
+          Download blank template (.csv)
         </Button>
         <Button
           type="button"
@@ -234,14 +235,9 @@ export function AdminCsvImportBlock({
         </>
       )}
 
-      <p className="text-sm text-slate-600 dark:text-stone-400">
-        After filling in the template, save the workbook as CSV before uploading
-        below.
-      </p>
-
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700 dark:text-stone-300">
-          {kindLabel(kind)} CSV file
+          Upload filled {kindLabel(kind).toLowerCase()} CSV
         </label>
         <input
           type="file"

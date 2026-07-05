@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { questionTemplateFilename } from "@/lib/admin/csv-template";
 import {
   FLASHCARD_CSV_HEADERS,
   downloadFlashcardCsv,
@@ -88,7 +89,7 @@ export function AdminFlashcardCsvImportBlock({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "ysg-flashcards-template.xlsx";
+    anchor.download = questionTemplateFilename("flashcards");
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -141,7 +142,7 @@ export function AdminFlashcardCsvImportBlock({
 
       <div className="flex flex-wrap gap-3">
         <Button type="button" size="sm" onClick={() => void handleDownloadTemplate()}>
-          Download blank template (.xlsx)
+          Download blank template (.csv)
         </Button>
         <Button
           type="button"
@@ -173,7 +174,7 @@ export function AdminFlashcardCsvImportBlock({
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700 dark:text-stone-300">
-          {flashcardKindLabel()} CSV file
+          Upload filled {flashcardKindLabel().toLowerCase()} CSV
         </label>
         <input
           type="file"

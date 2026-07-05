@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import type { TemplateKind } from "@/lib/admin/xlsx-template.server";
 import {
-  buildQuestionTemplateXlsx,
+  buildQuestionTemplateCsv,
   questionTemplateFilename,
-} from "@/lib/admin/xlsx-template.server";
+  type TemplateKind,
+} from "@/lib/admin/csv-template";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
 export const dynamic = "force-dynamic";
@@ -40,13 +40,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const buffer = await buildQuestionTemplateXlsx(kind);
+    const content = buildQuestionTemplateCsv(kind);
     const filename = questionTemplateFilename(kind);
 
-    return new NextResponse(new Uint8Array(buffer), {
+    return new NextResponse(content, {
       headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
       },
