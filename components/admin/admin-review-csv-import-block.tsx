@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 
-import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
+import { AdminCsvImportRoutingSettings } from "@/components/admin/admin-csv-import-routing-settings";
+import { AdminCsvImportScopeCallout } from "@/components/admin/admin-csv-import-scope-callout";
 import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { questionTemplateFilename } from "@/lib/admin/csv-template";
@@ -21,6 +22,7 @@ type AdminReviewCsvImportBlockProps = {
   lessonId: string;
   onCourseChange: (courseId: string) => void;
   onLessonChange: (lessonId: string) => void;
+  showScopeCallout?: boolean;
 };
 
 export function AdminReviewCsvImportBlock({
@@ -28,6 +30,7 @@ export function AdminReviewCsvImportBlock({
   lessonId,
   onCourseChange,
   onLessonChange,
+  showScopeCallout = true,
 }: AdminReviewCsvImportBlockProps) {
   const { store, persist, saving, actionFeedback, clearActionFeedback } =
     useContentStore();
@@ -100,6 +103,7 @@ export function AdminReviewCsvImportBlock({
         feedback={actionFeedback}
         onDismiss={clearActionFeedback}
       />
+      {showScopeCallout && <AdminCsvImportScopeCallout />}
 
       <div className="overflow-x-auto rounded-md border border-sky-100 bg-sky-50/50 dark:border-stone-700 dark:bg-stone-950">
         <table className="min-w-full text-left text-sm">
@@ -141,8 +145,9 @@ export function AdminReviewCsvImportBlock({
           column is not used — omit it or leave it blank.
         </li>
         <li>
-          Chapter and Section route rows to matching lessons. Leave both blank to use
-          the fallback lesson below.
+          Chapter and Section on each row route to matching lessons in the course.
+          Leave both blank only when you want that row to use the fallback lesson in
+          Routing settings.
         </li>
       </ul>
 
@@ -165,18 +170,13 @@ export function AdminReviewCsvImportBlock({
         </Button>
       </div>
 
-      <AdminLessonPicker
+      <AdminCsvImportRoutingSettings
         store={store}
         courseId={courseId}
         lessonId={lessonId}
         onCourseChange={onCourseChange}
         onLessonChange={onLessonChange}
       />
-
-      <p className="text-sm text-slate-600 dark:text-stone-400">
-        Fallback lesson when Chapter and Section are blank. Imported questions append to
-        existing review questions for each lesson.
-      </p>
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700 dark:text-stone-300">
@@ -195,8 +195,26 @@ export function AdminReviewCsvImportBlock({
         <div className="space-y-3 rounded-md border border-sky-100 bg-sky-50/40 p-4 dark:border-stone-700 dark:bg-stone-950">
           <p className="text-sm text-slate-700 dark:text-stone-300">
             {preview.importableCount} question{preview.importableCount === 1 ? "" : "s"}{" "}
-            ready to import.
+            ready to import
+            {Object.keys(preview.reviewQuestionsByLessonKey).length > 0 &&
+              ` across ${Object.keys(preview.reviewQuestionsByLessonKey).length} lesson${Object.keys(preview.reviewQuestionsByLessonKey).length === 1 ? "" : "s"}`}
+            .
           </p>
+
+          {Object.entries(preview.reviewQuestionsByLessonKey).length > 0 && (
+            <ul className="space-y-1 text-sm text-slate-600 dark:text-stone-400">
+              {Object.entries(preview.reviewQuestionsByLessonKey).map(([key, questions]) => {
+                const [, targetLessonId] = key.split("/");
+                const lesson = course?.lessons.find((entry) => entry.id === targetLessonId);
+                return (
+                  <li key={key}>
+                    {lesson?.title ?? targetLessonId}: {questions.length} question
+                    {questions.length === 1 ? "" : "s"}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           {preview.errors.length > 0 && (
             <ul className="max-h-40 space-y-1 overflow-y-auto text-sm text-red-700 dark:text-red-300">

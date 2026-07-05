@@ -148,7 +148,7 @@ export function AdminReviewQuestionsPanel() {
 
       <details className="rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
         <summary className="cursor-pointer text-sm font-semibold text-slate-900 dark:text-stone-50">
-          Bulk import review questions (CSV)
+          Bulk import review questions (CSV, any lesson)
         </summary>
         <div className="mt-4 border-t border-sky-100 pt-4 dark:border-stone-700">
           <AdminReviewCsvImportBlock

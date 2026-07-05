@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 
-import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
+import { AdminCsvImportRoutingSettings } from "@/components/admin/admin-csv-import-routing-settings";
+import { AdminCsvImportScopeCallout } from "@/components/admin/admin-csv-import-scope-callout";
 import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { questionTemplateFilename } from "@/lib/admin/csv-template";
@@ -21,6 +22,7 @@ type AdminFlashcardCsvImportBlockProps = {
   lessonId: string;
   onCourseChange: (courseId: string) => void;
   onLessonChange: (lessonId: string) => void;
+  showScopeCallout?: boolean;
 };
 
 export function AdminFlashcardCsvImportBlock({
@@ -28,6 +30,7 @@ export function AdminFlashcardCsvImportBlock({
   lessonId,
   onCourseChange,
   onLessonChange,
+  showScopeCallout = true,
 }: AdminFlashcardCsvImportBlockProps) {
   const { store, persist, saving, actionFeedback, clearActionFeedback } =
     useContentStore();
@@ -100,6 +103,7 @@ export function AdminFlashcardCsvImportBlock({
         feedback={actionFeedback}
         onDismiss={clearActionFeedback}
       />
+      {showScopeCallout && <AdminCsvImportScopeCallout />}
 
       <div className="overflow-x-auto rounded-md border border-sky-100 bg-sky-50/50 dark:border-stone-700 dark:bg-stone-950">
         <table className="min-w-full text-left text-sm">
@@ -135,8 +139,9 @@ export function AdminFlashcardCsvImportBlock({
           include definitions in the CSV.
         </li>
         <li>
-          Chapter and Section route rows to matching lessons. Leave both blank to use
-          the fallback lesson below.
+          Chapter and Section on each row route to matching lessons in the course.
+          Leave both blank only when you want that row to use the fallback lesson in
+          Routing settings.
         </li>
       </ul>
 
@@ -159,18 +164,13 @@ export function AdminFlashcardCsvImportBlock({
         </Button>
       </div>
 
-      <AdminLessonPicker
+      <AdminCsvImportRoutingSettings
         store={store}
         courseId={courseId}
         lessonId={lessonId}
         onCourseChange={onCourseChange}
         onLessonChange={onLessonChange}
       />
-
-      <p className="text-sm text-slate-600 dark:text-stone-400">
-        Fallback lesson when Chapter and Section are blank. Imported terms append to
-        existing flashcards for each lesson.
-      </p>
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700 dark:text-stone-300">
@@ -189,8 +189,26 @@ export function AdminFlashcardCsvImportBlock({
         <div className="space-y-3 rounded-md border border-sky-100 bg-sky-50/40 p-4 dark:border-stone-700 dark:bg-stone-950">
           <p className="text-sm text-slate-700 dark:text-stone-300">
             {preview.importableCount} term{preview.importableCount === 1 ? "" : "s"}{" "}
-            ready to import.
+            ready to import
+            {Object.keys(preview.flashcardsByLessonKey).length > 0 &&
+              ` across ${Object.keys(preview.flashcardsByLessonKey).length} lesson${Object.keys(preview.flashcardsByLessonKey).length === 1 ? "" : "s"}`}
+            .
           </p>
+
+          {Object.entries(preview.flashcardsByLessonKey).length > 0 && (
+            <ul className="space-y-1 text-sm text-slate-600 dark:text-stone-400">
+              {Object.entries(preview.flashcardsByLessonKey).map(([key, flashcards]) => {
+                const [, targetLessonId] = key.split("/");
+                const lesson = course?.lessons.find((entry) => entry.id === targetLessonId);
+                return (
+                  <li key={key}>
+                    {lesson?.title ?? targetLessonId}: {flashcards.length} term
+                    {flashcards.length === 1 ? "" : "s"}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           {preview.errors.length > 0 && (
             <ul className="max-h-40 space-y-1 overflow-y-auto text-sm text-red-700 dark:text-red-300">

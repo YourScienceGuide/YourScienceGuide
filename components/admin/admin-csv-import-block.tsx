@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 
-import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
+import { AdminCsvImportRoutingSettings } from "@/components/admin/admin-csv-import-routing-settings";
+import { AdminCsvImportScopeCallout } from "@/components/admin/admin-csv-import-scope-callout";
 import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { questionTemplateFilename } from "@/lib/admin/csv-template";
@@ -26,6 +27,7 @@ type AdminCsvImportBlockProps = {
   onCourseChange: (courseId: string) => void;
   onLessonChange: (lessonId: string) => void;
   showLessonPicker?: boolean;
+  showScopeCallout?: boolean;
   onImported?: () => void;
 };
 
@@ -76,6 +78,7 @@ export function AdminCsvImportBlock({
   onCourseChange,
   onLessonChange,
   showLessonPicker = true,
+  showScopeCallout = true,
   onImported,
 }: AdminCsvImportBlockProps) {
   const { store, persist, saving, actionFeedback, clearActionFeedback } =
@@ -155,6 +158,7 @@ export function AdminCsvImportBlock({
         feedback={actionFeedback}
         onDismiss={clearActionFeedback}
       />
+      {showScopeCallout && <AdminCsvImportScopeCallout />}
       <FormatTable />
 
       <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-stone-400">
@@ -193,8 +197,9 @@ export function AdminCsvImportBlock({
           blank).
         </li>
         <li>
-          Chapter and Section route rows to matching lessons. Leave both blank to use
-          the fallback lesson{showLessonPicker ? " below" : " selected above"}.
+          Chapter and Section on each row route to matching lessons in the course.
+          Leave both blank only when you want that row to use the fallback lesson in
+          Routing settings.
         </li>
       </ul>
 
@@ -219,21 +224,14 @@ export function AdminCsvImportBlock({
         </Button>
       </div>
 
-      {showLessonPicker && (
-        <>
-          <AdminLessonPicker
-            store={store}
-            courseId={courseId}
-            lessonId={lessonId}
-            onCourseChange={onCourseChange}
-            onLessonChange={onLessonChange}
-          />
-          <p className="text-sm text-slate-600 dark:text-stone-400">
-            Fallback lesson when Chapter and Section are blank. Imported questions
-            append to existing questions for each lesson.
-          </p>
-        </>
-      )}
+      <AdminCsvImportRoutingSettings
+        store={store}
+        courseId={courseId}
+        lessonId={lessonId}
+        onCourseChange={onCourseChange}
+        onLessonChange={showLessonPicker ? onLessonChange : undefined}
+        showLessonPicker={showLessonPicker}
+      />
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-slate-700 dark:text-stone-300">
