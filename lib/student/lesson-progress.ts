@@ -1,7 +1,14 @@
 import type { LessonMachineState } from "@/lib/lesson/state-machine";
 import { progressPercent } from "@/lib/lesson/state-machine";
 import { MAX_END_OF_CHAPTER_QUESTIONS } from "@/lib/lesson/types";
+import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import type { Course } from "@/lib/student/curriculum";
+import {
+  gradedLessonProgressPercent,
+  getGradedLessonStatus,
+  loadGradedLessonProgress,
+} from "@/lib/student/graded-lesson-progress";
+import { loadReviewProgress } from "@/lib/student/review-progress";
 import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
 export type LessonStatus = "not_started" | "in_progress" | "complete";
@@ -82,6 +89,46 @@ export function getLessonStatus(
   return "not_started";
 }
 
+function mergeLessonStatuses(...statuses: LessonStatus[]): LessonStatus {
+  if (statuses.includes("complete")) return "complete";
+  if (statuses.includes("in_progress")) return "in_progress";
+  return "not_started";
+}
+
+export function getLessonStatusForLesson(
+  studentScope: string,
+  courseId: string,
+  lessonId: string,
+): LessonStatus {
+  if (!shouldPersistStudentData(studentScope)) return "not_started";
+
+  return mergeLessonStatuses(
+    getLessonStatus(loadLessonProgress(studentScope, courseId, lessonId)),
+    getGradedLessonStatus(loadGradedLessonProgress(studentScope, courseId, lessonId)),
+    getLessonStatus(loadReviewProgress(studentScope, courseId, lessonId)),
+  );
+}
+
+export function getLessonPartialPercent(
+  studentScope: string,
+  courseId: string,
+  lessonId: string,
+  rubric: GradingRubricConfig,
+  assignmentCount = MAX_END_OF_CHAPTER_QUESTIONS,
+): number {
+  if (!shouldPersistStudentData(studentScope)) return 0;
+
+  const graded = loadGradedLessonProgress(studentScope, courseId, lessonId);
+  if (graded) {
+    return gradedLessonProgressPercent(graded, rubric);
+  }
+
+  return lessonProgressPercent(
+    loadLessonProgress(studentScope, courseId, lessonId),
+    assignmentCount,
+  );
+}
+
 export function storedToMachineState(
   stored: StoredLessonProgress | null,
 ): Partial<LessonMachineState> | null {
@@ -120,17 +167,18 @@ export function lessonProgressPercent(
 export function getCourseCompletionPercent(
   course: Course,
   studentScope: string,
+  rubric?: GradingRubricConfig,
 ): number {
   if (!shouldPersistStudentData(studentScope)) return 0;
   if (course.lessons.length === 0) return 0;
-  const store = readStore();
-  const courseProgress = store[studentScope]?.[course.id] ?? {};
   let total = 0;
   for (const lesson of course.lessons) {
-    const status = getLessonStatus(courseProgress[lesson.id]);
+    const status = getLessonStatusForLesson(studentScope, course.id, lesson.id);
     if (status === "complete") total += 100;
     else if (status === "in_progress") {
-      total += lessonProgressPercent(courseProgress[lesson.id]);
+      total += rubric
+        ? getLessonPartialPercent(studentScope, course.id, lesson.id, rubric)
+        : lessonProgressPercent(loadLessonProgress(studentScope, course.id, lesson.id));
     }
   }
   return Math.round(total / course.lessons.length);
@@ -145,12 +193,10 @@ export function getLessonStatusesForCourse(
       course.lessons.map((lesson) => [lesson.id, "not_started"]),
     ) as Record<string, LessonStatus>;
   }
-  const store = readStore();
-  const courseProgress = store[studentScope]?.[course.id] ?? {};
   return Object.fromEntries(
     course.lessons.map((lesson) => [
       lesson.id,
-      getLessonStatus(courseProgress[lesson.id]),
+      getLessonStatusForLesson(studentScope, course.id, lesson.id),
     ]),
   ) as Record<string, LessonStatus>;
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { useAuth } from "@/components/auth/auth-provider";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { CurriculumLessonRow } from "@/components/student/curriculum-lesson-row";
@@ -7,8 +9,10 @@ import { TextbookCard } from "@/components/student/textbook-card";
 import { useCourseProgress } from "@/components/student/use-course-progress";
 import { useStudentScope } from "@/components/student/use-student-scope";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
+import { getGradingConfigFromStore } from "@/lib/admin/content-store";
 import { getCourseClient, getLessonsByChapterClient, getTextbookClient } from "@/lib/student/curriculum-client";
-import { lessonProgressPercent, loadLessonProgress } from "@/lib/student/lesson-progress";
+import type { Course } from "@/lib/student/curriculum-types";
+import { getLessonPartialPercent } from "@/lib/student/lesson-progress";
 
 type CourseCurriculumProps = {
   courseId: string;
@@ -20,9 +24,22 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
   const { store } = useContentStore();
   const course = getCourseClient(store, courseId);
   const textbook = getTextbookClient(store, courseId);
-  const { percent, statuses } = useCourseProgress(
-    course ?? { id: courseId, title: "", subject: "", description: "", lessons: [] },
+  const storedRubric = store.gradingConfigByCourse?.[courseId];
+  const rubric = useMemo(
+    () => getGradingConfigFromStore(store, courseId),
+    [storedRubric, courseId],
   );
+  const progressCourse = useMemo(
+    (): Course => course ?? {
+      id: courseId,
+      title: "",
+      subject: "",
+      description: "",
+      lessons: [],
+    },
+    [course, courseId],
+  );
+  const { percent, statuses } = useCourseProgress(progressCourse, rubric);
   const chapters = course ? getLessonsByChapterClient(course) : [];
   const completedCount = course
     ? course.lessons.filter((l) => statuses[l.id] === "complete").length
@@ -78,12 +95,9 @@ export function CourseCurriculum({ courseId }: CourseCurriculumProps) {
             <ol className="space-y-2">
               {lessons.map((lesson) => {
                 const status = statuses[lesson.id] ?? "not_started";
-                const stored = studentScope
-                  ? loadLessonProgress(studentScope, course.id, lesson.id)
-                  : null;
                 const partialPercent =
-                  status === "in_progress"
-                    ? lessonProgressPercent(stored)
+                  status === "in_progress" && studentScope
+                    ? getLessonPartialPercent(studentScope, course.id, lesson.id, rubric)
                     : undefined;
 
                 return (

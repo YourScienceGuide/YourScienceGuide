@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
 import { QuestionPanel } from "@/components/lesson/question-panel";
@@ -117,6 +118,7 @@ export function GradedLessonFlow({
     (next: GradedLessonProgress) => {
       setProgress(next);
       saveGradedLessonProgress(studentScope, courseId, lessonId, next);
+      notifyProgressUpdated();
       const breakdown = calculateLessonScore(next, rubric);
       if (familyStudentId) {
         void syncLessonGrade({

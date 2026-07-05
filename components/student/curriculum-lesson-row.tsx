@@ -34,6 +34,7 @@ export function CurriculumLessonRow({
     "border-sky-200 bg-white hover:border-sky-300 hover:bg-sky-50/50",
     "dark:border-stone-700 dark:bg-stone-900 dark:hover:border-stone-600 dark:hover:bg-stone-800/80",
     status === "complete" && "border-emerald-200 dark:border-emerald-900/50",
+    status === "in_progress" && "border-amber-200 dark:border-amber-900/50",
     guestLocked && "cursor-pointer opacity-90",
   );
 
@@ -44,6 +45,8 @@ export function CurriculumLessonRow({
           "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums",
           status === "complete"
             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+            : status === "in_progress"
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
             : guestLocked
               ? "bg-slate-100 text-slate-500 dark:bg-stone-800 dark:text-stone-500"
               : "bg-sky-100 text-sky-800 dark:bg-stone-800 dark:text-stone-200",
@@ -70,7 +73,7 @@ export function CurriculumLessonRow({
         </span>
         {partialPercent !== undefined && partialPercent > 0 && (
           <span className="mt-2 block text-xs text-amber-700 dark:text-amber-300">
-            Assignment {partialPercent}% complete
+            Lesson {partialPercent}% complete
           </span>
         )}
       </span>

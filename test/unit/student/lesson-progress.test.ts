@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { INITIAL_LESSON_STATE } from "@/lib/lesson/state-machine";
+import { INITIAL_GRADED_LESSON_PROGRESS } from "@/lib/lesson/graded-lesson-machine";
 import {
   getLessonStatus,
+  getLessonStatusForLesson,
   lessonProgressPercent,
   loadLessonProgress,
   saveLessonProgress,
   storedToMachineState,
 } from "@/lib/student/lesson-progress";
+import {
+  saveGradedLessonProgress,
+} from "@/lib/student/graded-lesson-progress";
 import { GUEST_STUDENT_SCOPE } from "@/lib/student/student-scope";
 
 describe("lesson progress (localStorage)", () => {
@@ -80,5 +85,15 @@ describe("lesson progress (localStorage)", () => {
     expect(
       lessonProgressPercent({ questionIndex: 2, completedCount: 3, isComplete: true }, 3),
     ).toBe(100);
+  });
+
+  it("uses graded lesson progress for course status", () => {
+    saveGradedLessonProgress(studentA, courseId, lessonId, {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      reviewCorrectIds: ["warmup-1"],
+    });
+
+    expect(getLessonStatusForLesson(studentA, courseId, lessonId)).toBe("in_progress");
+    expect(getLessonStatusForLesson(studentB, courseId, lessonId)).toBe("not_started");
   });
 });
