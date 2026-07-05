@@ -5,6 +5,9 @@ import {
   assignmentQuestionsDeleteAllPhrase,
   courseDeleteConfirmationPhrase,
   createDefaultStore,
+  getFlashcardsFromStore,
+  getQuestionBankFromStore,
+  getReviewQuestionsFromStore,
   getTextbookFromStore,
   lessonDeleteConfirmationPhrase,
   removeCourseFromStore,
@@ -13,6 +16,11 @@ import {
   sanitizeContentStore,
   setTextbookInStore,
 } from "@/lib/admin/content-store";
+import {
+  EMPTY_CHAPTER_QUESTIONS,
+  EMPTY_FLASHCARDS,
+  EMPTY_LESSON_QUESTIONS,
+} from "@/lib/utils/collections";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import { makeStore } from "../../helpers/factories";
 
@@ -96,5 +104,32 @@ describe("content store", () => {
     expect(lessonDeleteConfirmationPhrase("Cells")).toBe("delete lesson Cells");
     expect(assignmentQuestionsDeleteAllPhrase("Cells")).toContain("chapter");
     expect(assignmentQuestionDeletePhrase(2)).toBe("delete chapter question 2");
+  });
+
+  describe("stable empty getters", () => {
+    const store = makeStore();
+    const courseId = "missing-course";
+    const lessonId = "missing-lesson";
+
+    it("returns shared EMPTY_CHAPTER_QUESTIONS when question bank key is missing", () => {
+      const first = getQuestionBankFromStore(store, courseId, lessonId);
+      const second = getQuestionBankFromStore(store, courseId, lessonId);
+      expect(first).toBe(EMPTY_CHAPTER_QUESTIONS);
+      expect(second).toBe(first);
+    });
+
+    it("returns shared EMPTY_FLASHCARDS when flashcards key is missing", () => {
+      const first = getFlashcardsFromStore(store, courseId, lessonId);
+      const second = getFlashcardsFromStore(store, courseId, lessonId);
+      expect(first).toBe(EMPTY_FLASHCARDS);
+      expect(second).toBe(first);
+    });
+
+    it("returns shared EMPTY_LESSON_QUESTIONS when review questions key is missing", () => {
+      const first = getReviewQuestionsFromStore(store, courseId, lessonId);
+      const second = getReviewQuestionsFromStore(store, courseId, lessonId);
+      expect(first).toBe(EMPTY_LESSON_QUESTIONS);
+      expect(second).toBe(first);
+    });
   });
 });

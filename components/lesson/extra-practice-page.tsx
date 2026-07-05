@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/lesson/alcumus-machine";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import { cn } from "@/lib/utils";
+import { listIdSignature } from "@/lib/utils/collections";
 
 function alcumusStorageKey(studentScope: string, courseId: string, lessonId: string) {
   return `ysg-alcumus-state-${studentScope}-${courseId}-${lessonId}`;
@@ -107,20 +108,27 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
   const studentScope = useStudentScope();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const { practice, ready, error } = useLessonAssessment();
+  const practiceSignature = useMemo(
+    () => listIdSignature(practice),
+    [practice],
+  );
   const [state, setState] = useState<AlcumusState | null>(null);
 
   useEffect(() => {
-    if (ready && practice.length > 0 && !state && studentScope) {
-      setState(
-        loadPersistedState(studentScope, courseId, lessonId, practice) ??
-          normalizeAlcumusState(
-            null,
-            practice,
-            sessionSeed(studentScope, courseId, lessonId),
-          ),
-      );
+    if (!ready || !studentScope || practice.length === 0) {
+      setState(null);
+      return;
     }
-  }, [ready, practice, state, studentScope, courseId, lessonId]);
+
+    setState(
+      loadPersistedState(studentScope, courseId, lessonId, practice) ??
+        normalizeAlcumusState(
+          null,
+          practice,
+          sessionSeed(studentScope, courseId, lessonId),
+        ),
+    );
+  }, [ready, practiceSignature, studentScope, courseId, lessonId, practice]);
 
   useEffect(() => {
     if (!state || !studentScope || !shouldPersistStudentData(studentScope)) return;

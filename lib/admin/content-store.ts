@@ -15,6 +15,11 @@ import {
   sortLessons,
   sortOrderForLesson,
 } from "@/lib/student/lesson-sort";
+import {
+  EMPTY_CHAPTER_QUESTIONS,
+  EMPTY_FLASHCARDS,
+  EMPTY_LESSON_QUESTIONS,
+} from "@/lib/utils/collections";
 
 export type LessonVideoMeta = {
   title: string;
@@ -260,7 +265,7 @@ export function getQuestionBankFromStore(
   lessonId: string,
 ): ChapterQuestion[] {
   const key = lessonKey(courseId, lessonId);
-  return store.questionBank[key] ?? [];
+  return store.questionBank[key] ?? EMPTY_CHAPTER_QUESTIONS;
 }
 
 /** @deprecated Use getQuestionBankFromStore and chapter split helpers. */
@@ -303,7 +308,7 @@ export function getFlashcardsFromStore(
   lessonId: string,
 ): AdminFlashcard[] {
   const key = lessonKey(courseId, lessonId);
-  return store.flashcardsByLesson?.[key] ?? [];
+  return store.flashcardsByLesson?.[key] ?? EMPTY_FLASHCARDS;
 }
 
 export function setFlashcardsInStore(
@@ -328,7 +333,7 @@ export function getReviewQuestionsFromStore(
   lessonId: string,
 ): LessonQuestion[] {
   const key = lessonKey(courseId, lessonId);
-  return store.reviewQuestionsByLesson?.[key] ?? [];
+  return store.reviewQuestionsByLesson?.[key] ?? EMPTY_LESSON_QUESTIONS;
 }
 
 export function setReviewQuestionsInStore(

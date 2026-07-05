@@ -11,7 +11,6 @@ import { useStudentScope } from "@/components/student/use-student-scope";
 import { Button } from "@/components/ui/button";
 import {
   createInitialDeckState,
-  createEmptyDeckState,
   definitionsProgress,
   masteryPercent,
   masteryStepLabel,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/lesson/flashcard-machine";
 import type { DeckState, Flashcard } from "@/lib/lesson/flashcard-types";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { lessonKey } from "@/lib/admin/lesson-key";
 import { getFlashcardsFromStore } from "@/lib/admin/content-store";
 import { getLessonClient } from "@/lib/student/curriculum-client";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/lib/student/flashcard-definitions";
 import { lessonPath } from "@/lib/student/paths";
 import { shouldPersistStudentData } from "@/lib/student/student-scope";
+import { EMPTY_FLASHCARDS, listIdSignature } from "@/lib/utils/collections";
 
 function flashcardStorageKey(
   studentScope: string,
@@ -56,6 +57,20 @@ function loadPersistedState(
   }
 }
 
+function buildLessonCards(
+  studentScope: string,
+  courseId: string,
+  lessonId: string,
+  adminCards: ReturnType<typeof getFlashcardsFromStore>,
+): Flashcard[] {
+  const definitions = loadFlashcardDefinitions(studentScope, courseId, lessonId);
+  return adminCards.map((card) => ({
+    id: card.id,
+    front: card.term,
+    back: definitions[card.id] ?? "",
+  }));
+}
+
 type FlashcardReviewPageProps = {
   courseId: string;
   lessonId: string;
@@ -68,34 +83,37 @@ export function FlashcardReviewPage({
   const { store } = useContentStore();
   const studentScope = useStudentScope();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
-  const adminCards = getFlashcardsFromStore(store, courseId, lessonId);
+  const flashcardKey = lessonKey(courseId, lessonId);
+  const storedFlashcards = store.flashcardsByLesson?.[flashcardKey];
+  const adminCards = useMemo(
+    () => storedFlashcards ?? EMPTY_FLASHCARDS,
+    [storedFlashcards],
+  );
+  const adminCardSignature = useMemo(
+    () => listIdSignature(adminCards),
+    [adminCards],
+  );
   const [state, setState] = useState<DeckState | null>(null);
 
-  const lessonCards = useMemo((): Flashcard[] => {
-    if (!studentScope) return [];
-    const definitions = loadFlashcardDefinitions(studentScope, courseId, lessonId);
-    return adminCards.map((card) => ({
-      id: card.id,
-      front: card.term,
-      back: definitions[card.id] ?? "",
-    }));
-  }, [adminCards, courseId, lessonId, studentScope]);
-
   useEffect(() => {
-    if (!studentScope) return;
-
-    const persisted = loadPersistedState(studentScope, courseId, lessonId);
-    if (lessonCards.length === 0) {
-      setState(createEmptyDeckState());
+    if (!studentScope || adminCards.length === 0) {
+      setState(null);
       return;
     }
 
+    const lessonCards = buildLessonCards(
+      studentScope,
+      courseId,
+      lessonId,
+      adminCards,
+    );
+    const persisted = loadPersistedState(studentScope, courseId, lessonId);
     setState(
       persisted
         ? mergeDeckWithCards(persisted, lessonCards)
         : createInitialDeckState(lessonCards),
     );
-  }, [studentScope, courseId, lessonId, lessonCards]);
+  }, [studentScope, courseId, lessonId, adminCards, adminCardSignature]);
 
   useEffect(() => {
     if (

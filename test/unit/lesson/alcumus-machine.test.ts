@@ -113,4 +113,24 @@ describe("alcumus machine", () => {
     expect(applyAlcumusCorrect([], state)).toEqual(state);
     expect(applyAlcumusIncorrect([], state)).toEqual(state);
   });
+
+  describe("empty pool edge cases", () => {
+    it("createInitialAlcumusState with empty pool starts complete", () => {
+      const state = createInitialAlcumusState([], sessionSeed);
+      expect(state.questionIds).toEqual([]);
+      expect(state.questionIndex).toBe(0);
+      expect(state.solved).toBe(0);
+      expect(state.isComplete).toBe(true);
+    });
+
+    it("normalizeAlcumusState with empty pool starts a complete session", () => {
+      const normalized = normalizeAlcumusState(
+        { questionIds: ["stale"], questionIndex: 2, solved: 1 },
+        [],
+        sessionSeed,
+      );
+      expect(normalized.questionIds).toEqual([]);
+      expect(normalized.isComplete).toBe(true);
+    });
+  });
 });

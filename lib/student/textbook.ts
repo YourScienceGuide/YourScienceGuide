@@ -1,3 +1,5 @@
+import { EMPTY_TEXTBOOK_READINGS } from "@/lib/utils/collections";
+
 export type TextbookReading = {
   section: string;
   title: string;
@@ -73,7 +75,7 @@ export function getTextbook(courseId: string): Textbook | undefined {
 }
 
 export function getLessonReadings(lessonId: string): TextbookReading[] {
-  return LESSON_READINGS[lessonId] ?? [];
+  return LESSON_READINGS[lessonId] ?? EMPTY_TEXTBOOK_READINGS;
 }
 
 export function getTextbookDisplayTitle(textbook: Textbook): string {

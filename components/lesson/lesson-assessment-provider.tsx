@@ -10,13 +10,16 @@ import {
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useStudentScope } from "@/components/student/use-student-scope";
 import { getQuestionBankFromStore } from "@/lib/admin/content-store";
-import { lessonKey } from "@/lib/admin/lesson-key";
 import {
   selectPracticeQuestions,
   type ChapterQuestion,
 } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { getOrCreateAssignmentQuestions } from "@/lib/student/assignment-selection";
+import {
+  EMPTY_CHAPTER_QUESTIONS,
+  EMPTY_LESSON_QUESTIONS,
+} from "@/lib/utils/collections";
 
 type LessonAssessmentContextValue = {
   bank: ChapterQuestion[];
@@ -43,18 +46,19 @@ export function LessonAssessmentProvider({
 }: LessonAssessmentProviderProps) {
   const { store, loading: contentLoading, error: contentError } = useContentStore();
   const studentScope = useStudentScope();
-  const key = lessonKey(courseId, lessonId);
   const ready = !contentLoading && studentScope !== null;
 
-  const bank = ready ? getQuestionBankFromStore(store, courseId, lessonId) : [];
+  const bank = ready
+    ? getQuestionBankFromStore(store, courseId, lessonId)
+    : EMPTY_CHAPTER_QUESTIONS;
 
   const lesson = useMemo(() => {
-    if (!ready || !studentScope || bank.length === 0) return [];
+    if (!ready || !studentScope || bank.length === 0) return EMPTY_LESSON_QUESTIONS;
     return getOrCreateAssignmentQuestions(studentScope, courseId, lessonId, bank);
   }, [ready, studentScope, bank, courseId, lessonId]);
 
   const practice = useMemo(() => {
-    if (!ready || bank.length === 0) return [];
+    if (!ready || bank.length === 0) return EMPTY_CHAPTER_QUESTIONS;
     return selectPracticeQuestions(bank, lesson);
   }, [ready, bank, lesson]);
 

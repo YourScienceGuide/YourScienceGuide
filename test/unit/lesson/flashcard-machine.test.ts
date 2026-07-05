@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createEmptyDeckState,
   createInitialDeckState,
   deckCounts,
   masteryPercent,
+  mergeDeckWithCards,
   rateCard,
   ratingIntervalLabel,
   saveCardDefinition,
@@ -75,5 +77,31 @@ describe("flashcard machine", () => {
     const entry = state.entries[0];
     expect(ratingIntervalLabel(entry, "again")).toBe("<1m");
     expect(ratingIntervalLabel(entry, "good")).toBeTruthy();
+  });
+
+  describe("empty deck edge cases", () => {
+    it("createEmptyDeckState returns an idle deck", () => {
+      const state = createEmptyDeckState();
+      expect(state.entries).toEqual([]);
+      expect(state.queue).toEqual([]);
+      expect(state.currentCardId).toBe("");
+      expect(state.phase).toBe("question");
+    });
+
+    it("createInitialDeckState([]) matches createEmptyDeckState", () => {
+      const fromDefault = createInitialDeckState();
+      const fromEmpty = createInitialDeckState([]);
+      expect(fromEmpty).toEqual(fromDefault);
+    });
+
+    it("mergeDeckWithCards with empty cards returns empty deck", () => {
+      const persisted = createInitialDeckState(TEST_CARDS);
+      const merged = mergeDeckWithCards(persisted, []);
+      expect(merged).toEqual(createEmptyDeckState());
+    });
+
+    it("masteryPercent returns 0 for empty entries", () => {
+      expect(masteryPercent(createEmptyDeckState())).toBe(0);
+    });
   });
 });

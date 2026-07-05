@@ -142,7 +142,7 @@ export function GradedLessonFlow({
       plan.review.length === 0 || reviewPhaseComplete(progress, plan.review.length);
     onAccessChange?.(canAccess);
     onScoreChange?.(calculateLessonScore(progress, rubric).percent);
-  }, [onAccessChange, onScoreChange, plan, progress, rubric]);
+  }, [onAccessChange, onScoreChange, planIdentity, progress, rubric]);
 
   if (!course || !lesson || !plan || !progress || !hydrated) {
     return <p className="text-sm text-slate-600 dark:text-stone-400">Loading lesson…</p>;

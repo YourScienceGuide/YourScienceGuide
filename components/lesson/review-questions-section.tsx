@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LessonToast } from "@/components/lesson/lesson-toast";
 import { QuestionPanel } from "@/components/lesson/question-panel";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/student/review-progress";
 import { storedToMachineState } from "@/lib/student/lesson-progress";
 import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
+import { listIdSignature } from "@/lib/utils/collections";
 
 type ReviewQuestionsSectionProps = {
   studentScope: string;
@@ -44,8 +45,19 @@ export function ReviewQuestionsSection({
 }: ReviewQuestionsSectionProps) {
   const [state, setState] = useState<LessonMachineState | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const questionSignature = useMemo(
+    () => listIdSignature(questions),
+    [questions],
+  );
 
   useEffect(() => {
+    if (questions.length === 0) {
+      setState(null);
+      setHydrated(false);
+      onAccessChange?.(true);
+      return;
+    }
+
     const stored = loadReviewProgress(studentScope, courseId, lessonId);
     const restored = storedToMachineState(stored);
     const base = restored ? { ...INITIAL_LESSON_STATE, ...restored } : INITIAL_LESSON_STATE;
@@ -55,7 +67,7 @@ export function ReviewQuestionsSection({
     );
     setState(hydratedState);
     setHydrated(true);
-  }, [courseId, lessonId, questions, studentScope]);
+  }, [courseId, lessonId, onAccessChange, questionSignature, questions, studentScope]);
 
   useEffect(() => {
     if (!state || !hydrated) return;
