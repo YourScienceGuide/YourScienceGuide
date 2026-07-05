@@ -1,4 +1,5 @@
 import { lessonKey } from "@/lib/admin/lesson-key";
+import { filterNewChapterQuestionsByLesson } from "@/lib/admin/csv-import-dedupe";
 import { countBlanks } from "@/lib/lesson/fill-in-blank";
 import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
@@ -60,6 +61,7 @@ export type CsvImportPreview = {
   /** @deprecated Use questionBankByLessonKey */
   chapterQuestionsByLessonKey: Record<string, never>;
   importableCount: number;
+  skippedDuplicateCount: number;
 };
 
 function normalizeImportKind(kind: CsvImportKind): "chapter" | "legacy-end" | "legacy-alcumus" {
@@ -556,10 +558,10 @@ export function buildImportPreview(
   kind: CsvImportKind,
   course: Course,
   fallbackLessonId: string,
+  existingQuestionBank: Record<string, ChapterQuestion[]> = {},
 ): CsvImportPreview {
   const { rows, errors } = parseQuestionCsv(csvText, kind);
-  const questionBankByLessonKey: Record<string, ChapterQuestion[]> = {};
-  let importableCount = 0;
+  const rawQuestionBankByLessonKey: Record<string, ChapterQuestion[]> = {};
 
   rows.forEach((row, index) => {
     const lessonId = findLessonId(course, row.chapter, row.section, fallbackLessonId);
@@ -572,10 +574,18 @@ export function buildImportPreview(
     }
 
     const key = lessonKey(course.id, lessonId);
-    if (!questionBankByLessonKey[key]) questionBankByLessonKey[key] = [];
-    questionBankByLessonKey[key].push(rowToChapterQuestion(row, index));
-    importableCount += 1;
+    if (!rawQuestionBankByLessonKey[key]) rawQuestionBankByLessonKey[key] = [];
+    rawQuestionBankByLessonKey[key].push(rowToChapterQuestion(row, index));
   });
+
+  const {
+    filteredByLesson: questionBankByLessonKey,
+    importableCount,
+    skippedDuplicateCount,
+  } = filterNewChapterQuestionsByLesson(
+    existingQuestionBank,
+    rawQuestionBankByLessonKey,
+  );
 
   return {
     kind,
@@ -585,6 +595,7 @@ export function buildImportPreview(
     alcumusByLessonKey: {},
     chapterQuestionsByLessonKey: {},
     importableCount,
+    skippedDuplicateCount,
   };
 }
 

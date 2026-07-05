@@ -9,7 +9,7 @@ import {
   parseQuestionCsv,
   serializeExampleRow,
 } from "@/lib/admin/csv-questions";
-import { makeCourse } from "../../helpers/factories";
+import { makeChapterChoice, makeCourse } from "../../helpers/factories";
 
 const CHAPTER_HEADERS =
   "Chapter,Section,Type,Question,Option 1,Option 2,Option 3,Option 4,Correct,Accepted Answers,Min Length,Hint,Level";
@@ -83,9 +83,34 @@ describe("buildImportPreview", () => {
 1,1,multiple-choice,Question?,A,B,,,1,,,,2`;
     const preview = buildImportPreview(csv, "chapter", course, "lesson-a");
     expect(preview.importableCount).toBe(1);
+    expect(preview.skippedDuplicateCount).toBe(0);
     expect(Object.keys(preview.questionBankByLessonKey)).toContain(
       "test-course/lesson-a",
     );
+  });
+
+  it("skips questions that already exist in the question bank", () => {
+    const course = makeCourse();
+    const lessonKey = "test-course/lesson-a";
+    const csv = `${CHAPTER_HEADERS}
+1,1,multiple-choice,Question?,A,B,,,1,,,,2
+1,1,multiple-choice,Question?,A,B,,,1,,,,2`;
+    const existing = {
+      [lessonKey]: [
+        makeChapterChoice({
+          id: "stored-1",
+          prompt: "Question?",
+          options: ["A", "B"],
+          correctIndex: 0,
+          difficulty: 2,
+        }),
+      ],
+    };
+
+    const preview = buildImportPreview(csv, "chapter", course, "lesson-a", existing);
+    expect(preview.importableCount).toBe(0);
+    expect(preview.skippedDuplicateCount).toBe(2);
+    expect(Object.keys(preview.questionBankByLessonKey)).toHaveLength(0);
   });
 });
 

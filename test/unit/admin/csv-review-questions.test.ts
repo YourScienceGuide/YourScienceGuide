@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildReviewImportPreview, REVIEW_QUESTION_CSV_HEADERS } from "@/lib/admin/csv-review-questions";
-import { makeCourse } from "../../helpers/factories";
+import { makeCourse, makeMultipleChoice } from "../../helpers/factories";
 
 describe("csv review questions", () => {
   const course = makeCourse();
@@ -24,5 +24,29 @@ describe("csv review questions", () => {
     const questions = Object.values(preview.reviewQuestionsByLessonKey)[0];
     expect(questions[0].type).toBe("multiple-choice");
     expect(questions[0]).not.toHaveProperty("difficulty");
+  });
+
+  it("skips review questions that already exist in the bank", () => {
+    const lessonKey = "test-course/lesson-a";
+    const csv = [
+      REVIEW_QUESTION_CSV_HEADERS.join(","),
+      '1,1,multiple-choice,"What is H2O?",Water,Air,,,1,,,Think chemistry',
+    ].join("\n");
+    const existing = {
+      [lessonKey]: [
+        makeMultipleChoice({
+          id: "stored-review",
+          prompt: "What is H2O?",
+          options: ["Water", "Air"],
+          correctIndex: 0,
+          hint: "Think chemistry",
+        }),
+      ],
+    };
+
+    const preview = buildReviewImportPreview(csv, course, fallbackLessonId, existing);
+    expect(preview.importableCount).toBe(0);
+    expect(preview.skippedDuplicateCount).toBe(1);
+    expect(Object.keys(preview.reviewQuestionsByLessonKey)).toHaveLength(0);
   });
 });

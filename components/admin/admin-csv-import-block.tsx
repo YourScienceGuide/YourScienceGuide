@@ -8,6 +8,10 @@ import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { questionTemplateFilename } from "@/lib/admin/csv-template";
 import {
+  formatCsvImportPreviewSummary,
+  formatCsvImportResultMessage,
+} from "@/lib/admin/csv-import-dedupe";
+import {
   CHAPTER_QUESTION_CSV_HEADERS,
   buildImportPreview,
   downloadCsv,
@@ -90,8 +94,8 @@ export function AdminCsvImportBlock({
   const course = getCourseFromStore(store, courseId);
   const preview = useMemo(() => {
     if (!csvText || !course || !lessonId) return null;
-    return buildImportPreview(csvText, kind, course, lessonId);
-  }, [csvText, course, kind, lessonId]);
+    return buildImportPreview(csvText, kind, course, lessonId, store.questionBank);
+  }, [csvText, course, kind, lessonId, store.questionBank]);
 
   const lessonBuckets = preview?.questionBankByLessonKey;
 
@@ -126,7 +130,11 @@ export function AdminCsvImportBlock({
       ];
     }
 
-    const message = `Imported ${preview.importableCount} ${kindLabel(preview.kind).toLowerCase()} question${preview.importableCount === 1 ? "" : "s"}.`;
+    const message = formatCsvImportResultMessage(
+      preview.importableCount,
+      preview.skippedDuplicateCount,
+      "question",
+    );
     const result = await persist(nextStore, { successMessage: message });
     if (!result.ok) return;
 
@@ -249,8 +257,11 @@ export function AdminCsvImportBlock({
       {preview && (
         <div className="space-y-3 rounded-md border border-sky-100 bg-sky-50/40 p-4 dark:border-stone-700 dark:bg-stone-950">
           <p className="text-sm text-slate-700 dark:text-stone-300">
-            {preview.importableCount} question{preview.importableCount === 1 ? "" : "s"}{" "}
-            ready to import
+            {formatCsvImportPreviewSummary(
+              preview.importableCount,
+              preview.skippedDuplicateCount,
+              "question",
+            )}
             {Object.keys(lessonBuckets ?? {}).length > 0 &&
               ` across ${Object.keys(lessonBuckets ?? {}).length} lesson${Object.keys(lessonBuckets ?? {}).length === 1 ? "" : "s"}`}
             .

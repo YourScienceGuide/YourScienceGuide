@@ -8,6 +8,10 @@ import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { questionTemplateFilename } from "@/lib/admin/csv-template";
 import {
+  formatCsvImportPreviewSummary,
+  formatCsvImportResultMessage,
+} from "@/lib/admin/csv-import-dedupe";
+import {
   REVIEW_QUESTION_CSV_HEADERS,
   buildReviewImportPreview,
   buildReviewTemplateCsv,
@@ -41,8 +45,13 @@ export function AdminReviewCsvImportBlock({
   const course = getCourseFromStore(store, courseId);
   const preview = useMemo(() => {
     if (!csvText || !course || !lessonId) return null;
-    return buildReviewImportPreview(csvText, course, lessonId);
-  }, [csvText, course, lessonId]);
+    return buildReviewImportPreview(
+      csvText,
+      course,
+      lessonId,
+      store.reviewQuestionsByLesson ?? {},
+    );
+  }, [csvText, course, lessonId, store.reviewQuestionsByLesson]);
 
   function handleFileChange(file: File | null) {
     setImportMessage(null);
@@ -75,7 +84,12 @@ export function AdminReviewCsvImportBlock({
       ];
     }
 
-    const message = `Imported ${preview.importableCount} review question${preview.importableCount === 1 ? "" : "s"}.`;
+    const message = formatCsvImportResultMessage(
+      preview.importableCount,
+      preview.skippedDuplicateCount,
+      "review question",
+      "review questions",
+    );
     const result = await persist(nextStore, { successMessage: message });
     if (!result.ok) return;
 
@@ -194,8 +208,11 @@ export function AdminReviewCsvImportBlock({
       {preview && (
         <div className="space-y-3 rounded-md border border-sky-100 bg-sky-50/40 p-4 dark:border-stone-700 dark:bg-stone-950">
           <p className="text-sm text-slate-700 dark:text-stone-300">
-            {preview.importableCount} question{preview.importableCount === 1 ? "" : "s"}{" "}
-            ready to import
+            {formatCsvImportPreviewSummary(
+              preview.importableCount,
+              preview.skippedDuplicateCount,
+              "question",
+            )}
             {Object.keys(preview.reviewQuestionsByLessonKey).length > 0 &&
               ` across ${Object.keys(preview.reviewQuestionsByLessonKey).length} lesson${Object.keys(preview.reviewQuestionsByLessonKey).length === 1 ? "" : "s"}`}
             .

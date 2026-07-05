@@ -22,4 +22,19 @@ describe("csv flashcards", () => {
     expect(preview.importableCount).toBe(0);
     expect(preview.errors[0].message).toContain("Term is required");
   });
+
+  it("skips flashcard terms that already exist in the bank", () => {
+    const lesson = course.lessons.find((entry) => entry.chapter === 3 && entry.section === 1);
+    expect(lesson).toBeTruthy();
+    const lessonKey = `${course.id}/${lesson!.id}`;
+    const csv = `Chapter,Section,Term\n3,1,Mitochondria\n`;
+    const existing = {
+      [lessonKey]: [{ id: "stored-card", term: "Mitochondria" }],
+    };
+
+    const preview = parseFlashcardCsv(csv, course, fallbackLessonId, existing);
+    expect(preview.importableCount).toBe(0);
+    expect(preview.skippedDuplicateCount).toBe(1);
+    expect(Object.keys(preview.flashcardsByLessonKey)).toHaveLength(0);
+  });
 });

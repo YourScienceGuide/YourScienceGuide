@@ -1,4 +1,5 @@
 import { lessonKey, slugifyId } from "@/lib/admin/lesson-key";
+import { filterNewFlashcardsByLesson } from "@/lib/admin/csv-import-dedupe";
 import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import type { Course } from "@/lib/student/curriculum-types";
 
@@ -21,6 +22,7 @@ export type FlashcardCsvImportPreview = {
   errors: FlashcardCsvRowError[];
   flashcardsByLessonKey: Record<string, AdminFlashcard[]>;
   importableCount: number;
+  skippedDuplicateCount: number;
 };
 
 function escapeCsvField(value: string): string {
@@ -122,14 +124,21 @@ export function parseFlashcardCsv(
   csvText: string,
   course: Course,
   fallbackLessonId: string,
+  existingFlashcardsByLesson: Record<string, AdminFlashcard[]> = {},
 ): FlashcardCsvImportPreview {
   const rows: ParsedFlashcardCsvRow[] = [];
   const errors: FlashcardCsvRowError[] = [];
-  const flashcardsByLessonKey: Record<string, AdminFlashcard[]> = {};
+  const rawFlashcardsByLessonKey: Record<string, AdminFlashcard[]> = {};
 
   const table = parseCsv(csvText.trim());
   if (table.length === 0) {
-    return { rows, errors, flashcardsByLessonKey, importableCount: 0 };
+    return {
+      rows,
+      errors,
+      flashcardsByLessonKey: {},
+      importableCount: 0,
+      skippedDuplicateCount: 0,
+    };
   }
 
   const headers = table[0].map((cell) => cell.trim());
@@ -142,7 +151,13 @@ export function parseFlashcardCsv(
       rowNumber: 1,
       message: 'Header row must include "Chapter", "Section", and "Term".',
     });
-    return { rows, errors, flashcardsByLessonKey, importableCount: 0 };
+    return {
+      rows,
+      errors,
+      flashcardsByLessonKey: {},
+      importableCount: 0,
+      skippedDuplicateCount: 0,
+    };
   }
 
   const dataRows = table.slice(1);
@@ -172,16 +187,21 @@ export function parseFlashcardCsv(
     rows.push(parsedRow);
 
     const key = lessonKey(course.id, lessonId);
-    const list = flashcardsByLessonKey[key] ?? [];
+    const list = rawFlashcardsByLessonKey[key] ?? [];
     list.push({
       id: uniqueCardId(term, rowNumber, list.length),
       term,
     });
-    flashcardsByLessonKey[key] = list;
+    rawFlashcardsByLessonKey[key] = list;
   });
 
-  const importableCount = rows.length;
-  return { rows, errors, flashcardsByLessonKey, importableCount };
+  const {
+    filteredByLesson: flashcardsByLessonKey,
+    importableCount,
+    skippedDuplicateCount,
+  } = filterNewFlashcardsByLesson(existingFlashcardsByLesson, rawFlashcardsByLessonKey);
+
+  return { rows, errors, flashcardsByLessonKey, importableCount, skippedDuplicateCount };
 }
 
 export function serializeFlashcardExampleRow(): string {

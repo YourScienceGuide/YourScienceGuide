@@ -8,6 +8,10 @@ import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { questionTemplateFilename } from "@/lib/admin/csv-template";
 import {
+  formatCsvImportPreviewSummary,
+  formatCsvImportResultMessage,
+} from "@/lib/admin/csv-import-dedupe";
+import {
   FLASHCARD_CSV_HEADERS,
   downloadFlashcardCsv,
   flashcardKindLabel,
@@ -41,8 +45,13 @@ export function AdminFlashcardCsvImportBlock({
   const course = getCourseFromStore(store, courseId);
   const preview = useMemo(() => {
     if (!csvText || !course || !lessonId) return null;
-    return parseFlashcardCsv(csvText, course, lessonId);
-  }, [csvText, course, lessonId]);
+    return parseFlashcardCsv(
+      csvText,
+      course,
+      lessonId,
+      store.flashcardsByLesson ?? {},
+    );
+  }, [csvText, course, lessonId, store.flashcardsByLesson]);
 
   function handleFileChange(file: File | null) {
     setImportMessage(null);
@@ -75,7 +84,12 @@ export function AdminFlashcardCsvImportBlock({
       ];
     }
 
-    const message = `Imported ${preview.importableCount} flashcard term${preview.importableCount === 1 ? "" : "s"}.`;
+    const message = formatCsvImportResultMessage(
+      preview.importableCount,
+      preview.skippedDuplicateCount,
+      "flashcard term",
+      "flashcard terms",
+    );
     const result = await persist(nextStore, { successMessage: message });
     if (!result.ok) return;
 
@@ -188,8 +202,11 @@ export function AdminFlashcardCsvImportBlock({
       {preview && (
         <div className="space-y-3 rounded-md border border-sky-100 bg-sky-50/40 p-4 dark:border-stone-700 dark:bg-stone-950">
           <p className="text-sm text-slate-700 dark:text-stone-300">
-            {preview.importableCount} term{preview.importableCount === 1 ? "" : "s"}{" "}
-            ready to import
+            {formatCsvImportPreviewSummary(
+              preview.importableCount,
+              preview.skippedDuplicateCount,
+              "term",
+            )}
             {Object.keys(preview.flashcardsByLessonKey).length > 0 &&
               ` across ${Object.keys(preview.flashcardsByLessonKey).length} lesson${Object.keys(preview.flashcardsByLessonKey).length === 1 ? "" : "s"}`}
             .

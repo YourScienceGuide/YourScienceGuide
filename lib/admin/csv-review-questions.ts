@@ -1,4 +1,5 @@
 import { lessonKey } from "@/lib/admin/lesson-key";
+import { filterNewLessonQuestionsByLesson } from "@/lib/admin/csv-import-dedupe";
 import {
   buildImportPreview,
   CHAPTER_QUESTION_CSV_HEADERS,
@@ -18,25 +19,37 @@ export type ReviewCsvImportPreview = {
   errors: CsvRowError[];
   reviewQuestionsByLessonKey: Record<string, LessonQuestion[]>;
   importableCount: number;
+  skippedDuplicateCount: number;
 };
 
 export function buildReviewImportPreview(
   csvText: string,
   course: Course,
   fallbackLessonId: string,
+  existingReviewQuestionsByLesson: Record<string, LessonQuestion[]> = {},
 ): ReviewCsvImportPreview {
   const preview = buildImportPreview(csvText, "chapter", course, fallbackLessonId);
-  const reviewQuestionsByLessonKey: Record<string, LessonQuestion[]> = {};
+  const rawReviewQuestionsByLessonKey: Record<string, LessonQuestion[]> = {};
 
   for (const [key, questions] of Object.entries(preview.questionBankByLessonKey)) {
-    reviewQuestionsByLessonKey[key] = questions.map(stripChapterDifficulty);
+    rawReviewQuestionsByLessonKey[key] = questions.map(stripChapterDifficulty);
   }
+
+  const {
+    filteredByLesson: reviewQuestionsByLessonKey,
+    importableCount,
+    skippedDuplicateCount,
+  } = filterNewLessonQuestionsByLesson(
+    existingReviewQuestionsByLesson,
+    rawReviewQuestionsByLessonKey,
+  );
 
   return {
     rows: preview.rows,
     errors: preview.errors,
     reviewQuestionsByLessonKey,
-    importableCount: preview.importableCount,
+    importableCount,
+    skippedDuplicateCount,
   };
 }
 
