@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   calculateLessonScore,
   applyMcResult,
+  applyReviewHeldForToday,
+  currentReviewQuestionId,
   INITIAL_GRADED_LESSON_PROGRESS,
+  reviewPhaseComplete,
 } from "@/lib/lesson/graded-lesson-machine";
 import { DEFAULT_GRADING_RUBRIC } from "@/lib/lesson/lesson-grade-config";
 import { maxLessonScore } from "@/lib/lesson/lesson-grade-config";
@@ -32,6 +35,28 @@ describe("graded lesson machine", () => {
     expect(next.mcCorrectCount).toBe(0);
     expect(next.mcCorrectIds).toEqual([]);
     expect(next.phase).toBe("multiple-choice");
+  });
+
+  it("skips held review questions and completes the review phase", () => {
+    const reviewQuestions = [{ id: "rev-1" }, { id: "rev-2" }];
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "review" as const,
+      reviewHeldIds: ["rev-1"],
+      fibQuestionIds: ["fib-1"],
+    };
+
+    expect(
+      currentReviewQuestionId(progress, reviewQuestions, (id) => id === "rev-1"),
+    ).toBe("rev-2");
+    expect(
+      reviewPhaseComplete(progress, reviewQuestions, (id) => id === "rev-1"),
+    ).toBe(false);
+
+    const allHeld = applyReviewHeldForToday(progress, "rev-2");
+    expect(
+      reviewPhaseComplete(allHeld, reviewQuestions, () => true),
+    ).toBe(true);
   });
 
   it("stops MC phase after 9 correct", () => {

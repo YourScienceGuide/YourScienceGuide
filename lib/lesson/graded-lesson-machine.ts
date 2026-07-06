@@ -16,12 +16,14 @@ export type GradedLessonPhase =
 export type GradedLessonProgress = {
   phase: GradedLessonPhase;
   reviewCorrectIds: string[];
+  reviewHeldIds: string[];
   mcQuestionIds: string[];
   mcIndex: number;
   mcCorrectCount: number;
   mcCorrectIds: string[];
   fibQuestionIds: string[];
   fibCorrectIds: string[];
+  fibHeldIds: string[];
   fibIndex: number;
   extraQuestionIds: string[];
   extraCorrectIds: string[];
@@ -48,12 +50,14 @@ export type LessonScoreBreakdown = {
 export const INITIAL_GRADED_LESSON_PROGRESS: GradedLessonProgress = {
   phase: "review",
   reviewCorrectIds: [],
+  reviewHeldIds: [],
   mcQuestionIds: [],
   mcIndex: 0,
   mcCorrectCount: 0,
   mcCorrectIds: [],
   fibQuestionIds: [],
   fibCorrectIds: [],
+  fibHeldIds: [],
   fibIndex: 0,
   extraQuestionIds: [],
   extraCorrectIds: [],
@@ -75,35 +79,43 @@ export function hydrateGradedProgress(
     extraPractice: { id: string }[];
     freeResponse: { id: string } | null;
   },
+  isLockedToday: (questionId: string) => boolean = () => false,
 ): GradedLessonProgress {
   const base = { ...INITIAL_GRADED_LESSON_PROGRESS, ...stored };
+  const reviewHeldIds = base.reviewHeldIds.filter(isLockedToday);
+  const fibHeldIds = base.fibHeldIds.filter(isLockedToday);
+  const normalized = { ...base, reviewHeldIds, fibHeldIds };
   const mcQuestionIds =
-    base.mcQuestionIds.length > 0
-      ? base.mcQuestionIds
+    normalized.mcQuestionIds.length > 0
+      ? normalized.mcQuestionIds
       : plan.multipleChoice.map((q) => q.id);
   const fibQuestionIds =
-    base.fibQuestionIds.length > 0
-      ? base.fibQuestionIds
+    normalized.fibQuestionIds.length > 0
+      ? normalized.fibQuestionIds
       : plan.fillInBlank.map((q) => q.id);
   const extraQuestionIds =
-    base.extraQuestionIds.length > 0
-      ? base.extraQuestionIds
+    normalized.extraQuestionIds.length > 0
+      ? normalized.extraQuestionIds
       : plan.extraPractice.map((q) => q.id);
 
-  let phase = base.phase;
-  if (phase === "review" && base.reviewCorrectIds.length >= plan.review.length && plan.review.length > 0) {
+  let phase = normalized.phase;
+  if (
+    phase === "review" &&
+    reviewPhaseComplete(normalized, plan.review, isLockedToday) &&
+    plan.review.length > 0
+  ) {
     phase = "multiple-choice";
   }
-  if (phase === "multiple-choice" && isMcPhaseComplete(base, plan.multipleChoice.length)) {
+  if (phase === "multiple-choice" && isMcPhaseComplete(normalized, plan.multipleChoice.length)) {
     phase = plan.fillInBlank.length > 0 ? "fill-in-blank" : nextAfterFib(plan);
   }
-  if (phase === "fill-in-blank" && base.fibCorrectIds.length >= plan.fillInBlank.length && plan.fillInBlank.length > 0) {
+  if (phase === "fill-in-blank" && normalized.fibCorrectIds.length >= plan.fillInBlank.length && plan.fillInBlank.length > 0) {
     phase = nextAfterFib(plan);
   }
-  if (phase === "extra-practice" && base.extraCorrectIds.length >= plan.extraPractice.length && plan.extraPractice.length > 0) {
+  if (phase === "extra-practice" && normalized.extraCorrectIds.length >= plan.extraPractice.length && plan.extraPractice.length > 0) {
     phase = plan.freeResponse ? "free-response" : "complete";
   }
-  if (phase === "free-response" && base.freeResponseSubmitted) {
+  if (phase === "free-response" && normalized.freeResponseSubmitted) {
     phase = "complete";
   }
   if (plan.review.length === 0 && phase === "review") {
@@ -111,22 +123,22 @@ export function hydrateGradedProgress(
   }
 
   const problemsSolved = countProblemsSolved({
-    ...base,
+    ...normalized,
     mcQuestionIds,
     fibQuestionIds,
     extraQuestionIds,
   });
 
   let hydratedProgress: GradedLessonProgress = {
-    ...base,
+    ...normalized,
     phase,
     mcQuestionIds,
     fibQuestionIds,
     extraQuestionIds,
     freeResponseQuestionId:
-      base.freeResponseQuestionId ?? plan.freeResponse?.id ?? null,
+      normalized.freeResponseQuestionId ?? plan.freeResponse?.id ?? null,
     problemsSolved,
-    graduated: base.graduated,
+    graduated: normalized.graduated,
   };
 
   hydratedProgress = skipEmptyPhases(hydratedProgress, plan);
@@ -214,11 +226,23 @@ export function applyReviewCorrect(
 ): GradedLessonProgress {
   if (progress.reviewCorrectIds.includes(questionId)) return progress;
   const reviewCorrectIds = [...progress.reviewCorrectIds, questionId];
+  const reviewHeldIds = progress.reviewHeldIds.filter((id) => id !== questionId);
   const phase =
     reviewCorrectIds.length >= reviewTotal && reviewTotal > 0
       ? "multiple-choice"
       : progress.phase;
-  return { ...progress, reviewCorrectIds, phase };
+  return { ...progress, reviewCorrectIds, reviewHeldIds, phase };
+}
+
+export function applyReviewHeldForToday(
+  progress: GradedLessonProgress,
+  questionId: string,
+): GradedLessonProgress {
+  if (progress.reviewCorrectIds.includes(questionId)) return progress;
+  const reviewHeldIds = progress.reviewHeldIds.includes(questionId)
+    ? progress.reviewHeldIds
+    : [...progress.reviewHeldIds, questionId];
+  return { ...progress, reviewHeldIds };
 }
 
 export function applyMcResult(
@@ -277,6 +301,27 @@ export function applyFibCorrect(
     else phase = "complete";
   }
   return { ...progress, fibCorrectIds, fibIndex: progress.fibIndex + 1, problemsSolved, phase };
+}
+
+export function applyFibHeldForToday(
+  progress: GradedLessonProgress,
+  questionId: string,
+  fibTotal: number,
+  hasExtra: boolean,
+  hasFreeResponse: boolean,
+): GradedLessonProgress {
+  if (progress.fibCorrectIds.includes(questionId)) return progress;
+  const fibHeldIds = progress.fibHeldIds.includes(questionId)
+    ? progress.fibHeldIds
+    : [...progress.fibHeldIds, questionId];
+  const fibIndex = progress.fibIndex + 1;
+  let phase: GradedLessonPhase = progress.phase;
+  if (fibIndex >= fibTotal) {
+    if (hasExtra) phase = "extra-practice";
+    else if (hasFreeResponse) phase = "free-response";
+    else phase = "complete";
+  }
+  return { ...progress, fibHeldIds, fibIndex, phase };
 }
 
 export function applyExtraCorrect(
@@ -355,11 +400,52 @@ export function calculateLessonScore(
   };
 }
 
+export function canAccessLessonDuringReview(
+  progress: GradedLessonProgress,
+  reviewQuestions: { id: string }[],
+  isLockedToday: (questionId: string) => boolean,
+): boolean {
+  if (reviewQuestions.length === 0) return true;
+  if (reviewPhaseComplete(progress, reviewQuestions, isLockedToday)) return true;
+  const currentReviewId = currentReviewQuestionId(
+    progress,
+    reviewQuestions,
+    isLockedToday,
+  );
+  return currentReviewId !== null && isLockedToday(currentReviewId);
+}
+
 export function reviewPhaseComplete(
   progress: GradedLessonProgress,
-  reviewTotal: number,
+  reviewQuestions: { id: string }[],
+  isLockedToday: (questionId: string) => boolean,
 ): boolean {
-  return reviewTotal === 0 || progress.reviewCorrectIds.length >= reviewTotal;
+  if (reviewQuestions.length === 0) return true;
+  return reviewQuestions.every(
+    (question) =>
+      progress.reviewCorrectIds.includes(question.id) ||
+      (progress.reviewHeldIds.includes(question.id) &&
+        isLockedToday(question.id)),
+  );
+}
+
+export function currentReviewQuestionId(
+  progress: GradedLessonProgress,
+  reviewQuestions: { id: string }[],
+  isLockedToday: (questionId: string) => boolean,
+): string | null {
+  if (progress.phase !== "review") return null;
+  for (const question of reviewQuestions) {
+    if (progress.reviewCorrectIds.includes(question.id)) continue;
+    if (
+      progress.reviewHeldIds.includes(question.id) &&
+      isLockedToday(question.id)
+    ) {
+      continue;
+    }
+    return question.id;
+  }
+  return null;
 }
 
 export function currentMcQuestionId(progress: GradedLessonProgress): string | null {

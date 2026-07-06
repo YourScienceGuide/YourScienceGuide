@@ -12,14 +12,18 @@ import { buildLessonAssessmentPlan } from "@/lib/lesson/lesson-assessment-plan";
 import {
   applyExtraCorrect,
   applyFibCorrect,
+  applyFibHeldForToday,
   applyFreeResponseSubmitted,
   applyMcResult,
   applyReviewCorrect,
+  applyReviewHeldForToday,
   calculateLessonScore,
+  canAccessLessonDuringReview,
   checkGraduation,
   currentExtraQuestionId,
   currentFibQuestionId,
   currentMcQuestionId,
+  currentReviewQuestionId,
   hydrateGradedProgress,
   reviewPhaseComplete,
   type GradedLessonProgress,
@@ -37,6 +41,7 @@ import {
   submitLongAnswer,
   syncLessonGrade,
 } from "@/lib/student/lesson-grades-client";
+import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { formatGradeLabel } from "@/components/grading/grading-rubric-summary";
 
@@ -63,6 +68,20 @@ function findQuestion(
     ...(plan.freeResponse ? [plan.freeResponse] : []),
   ];
   return all.find((q) => q.id === id) ?? null;
+}
+
+function advanceAfterReview(
+  progress: GradedLessonProgress,
+  plan: NonNullable<ReturnType<typeof buildLessonAssessmentPlan>>,
+  isLockedToday: (questionId: string) => boolean,
+): GradedLessonProgress {
+  if (!reviewPhaseComplete(progress, plan.review, isLockedToday)) {
+    return progress;
+  }
+  return {
+    ...progress,
+    phase: plan.multipleChoice.length > 0 ? "multiple-choice" : "fill-in-blank",
+  };
 }
 
 export function GradedLessonFlow({
@@ -102,8 +121,10 @@ export function GradedLessonFlow({
 
   useEffect(() => {
     if (!plan) return;
+    const isLockedToday = (questionId: string) =>
+      isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
     const stored = loadGradedLessonProgress(studentScope, courseId, lessonId);
-    const next = hydrateGradedProgress(stored, plan);
+    const next = hydrateGradedProgress(stored, plan, isLockedToday);
     setProgress(next);
     setHydrated(true);
   }, [courseId, lessonId, planIdentity, studentScope]);
@@ -140,17 +161,30 @@ export function GradedLessonFlow({
 
   useEffect(() => {
     if (!progress || !plan) return;
-    const canAccess =
-      plan.review.length === 0 || reviewPhaseComplete(progress, plan.review.length);
+    const isLockedToday = (questionId: string) =>
+      isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
+    const canAccess = canAccessLessonDuringReview(
+      progress,
+      plan.review,
+      isLockedToday,
+    );
     onAccessChange?.(canAccess);
     onScoreChange?.(calculateLessonScore(progress, rubric).percent);
-  }, [onAccessChange, onScoreChange, planIdentity, progress, rubric]);
+  }, [courseId, lessonId, onAccessChange, onScoreChange, planIdentity, progress, rubric, studentScope]);
 
   if (!course || !lesson || !plan || !progress || !hydrated) {
     return <p className="text-sm text-slate-600 dark:text-stone-400">Loading lesson…</p>;
   }
 
-  const reviewComplete = reviewPhaseComplete(progress, plan.review.length);
+  const isLockedToday = (questionId: string) =>
+    isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
+  const reviewComplete = reviewPhaseComplete(progress, plan.review, isLockedToday);
+  const reviewQuestionId = currentReviewQuestionId(
+    progress,
+    plan.review,
+    isLockedToday,
+  );
+  const reviewQuestion = findQuestion(plan, reviewQuestionId);
   const mcId = currentMcQuestionId(progress);
   const fibId = currentFibQuestionId(progress);
   const extraId = currentExtraQuestionId(progress);
@@ -186,40 +220,35 @@ export function GradedLessonFlow({
         </div>
       )}
 
-      {plan.review.length > 0 && progress.phase === "review" && (
+      {plan.review.length > 0 && progress.phase === "review" && reviewQuestion && (
         <PhaseSection
           title="Review questions"
           description={`${plan.review.length} warm-up questions before the video (${rubric.reviewPointsEach} pt each).`}
           progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} correct`}
         >
-          {(() => {
-            const current =
-              plan.review.find((q) => !progress.reviewCorrectIds.includes(q.id)) ??
-              null;
-            if (!current) return null;
-            return (
-              <QuestionPanel
-                key={`review-${current.id}`}
-                studentScope={studentScope}
-                courseId={courseId}
-                lessonId={lessonId}
-                question={current}
-                difficulty={1}
-                onSubmit={(correct) => {
-                  if (!correct) return;
-                  let next = applyReviewCorrect(
-                    progress,
-                    current.id,
-                    plan.review.length,
-                  );
-                  if (plan.review.length === 0 || reviewPhaseComplete(next, plan.review.length)) {
-                    next = { ...next, phase: plan.multipleChoice.length > 0 ? "multiple-choice" : "fill-in-blank" };
-                  }
-                  persist(next);
-                }}
-              />
-            );
-          })()}
+          <QuestionPanel
+            key={`review-${reviewQuestion.id}`}
+            studentScope={studentScope}
+            courseId={courseId}
+            lessonId={lessonId}
+            question={reviewQuestion}
+            difficulty={1}
+            onSubmit={(correct) => {
+              if (!correct) return;
+              let next = applyReviewCorrect(
+                progress,
+                reviewQuestion.id,
+                plan.review.length,
+              );
+              next = advanceAfterReview(next, plan, isLockedToday);
+              persist(next);
+            }}
+            onHeldForToday={() => {
+              let next = applyReviewHeldForToday(progress, reviewQuestion.id);
+              next = advanceAfterReview(next, plan, isLockedToday);
+              persist(next);
+            }}
+          />
         </PhaseSection>
       )}
 
@@ -287,6 +316,17 @@ export function GradedLessonFlow({
             onSubmit={(correct) => {
               if (!correct) return;
               let next = applyFibCorrect(
+                progress,
+                fibQuestion.id,
+                plan.fillInBlank.length,
+                plan.extraPractice.length > 0,
+                Boolean(plan.freeResponse),
+              );
+              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+              persist(next);
+            }}
+            onHeldForToday={() => {
+              let next = applyFibHeldForToday(
                 progress,
                 fibQuestion.id,
                 plan.fillInBlank.length,

@@ -81,6 +81,22 @@ export function hasHeldQuestionsRemaining(
   );
 }
 
+export function canAccessStandaloneReview(
+  state: LessonMachineState,
+  lesson: { id: string }[],
+  isLockedToday: (questionId: string) => boolean,
+): boolean {
+  if (state.isComplete) return true;
+  const activeIndex = resolveActiveQuestionIndex(lesson, state, isLockedToday);
+  const activeQuestion = activeIndex !== null ? lesson[activeIndex] : undefined;
+  const heldOnly =
+    activeIndex === null &&
+    hasHeldQuestionsRemaining(lesson, state, isLockedToday);
+  const exhaustedAwaitingAck =
+    activeQuestion != null && isLockedToday(activeQuestion.id);
+  return heldOnly || exhaustedAwaitingAck;
+}
+
 export function applyCorrectAnswer(
   state: LessonMachineState,
   questionId: string,

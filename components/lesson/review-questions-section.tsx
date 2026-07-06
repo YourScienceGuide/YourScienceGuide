@@ -11,6 +11,7 @@ import {
 } from "@/lib/lesson/review-state";
 import {
   clearToast,
+  canAccessStandaloneReview,
   hasHeldQuestionsRemaining,
   hydrateLessonState,
   INITIAL_LESSON_STATE,
@@ -78,12 +79,7 @@ export function ReviewQuestionsSection({
     if (!state || !hydrated) return;
     const isLockedToday = (questionId: string) =>
       isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
-    const activeIndex = resolveActiveQuestionIndex(questions, state, isLockedToday);
-    const heldOnly =
-      !state.isComplete &&
-      activeIndex === null &&
-      hasHeldQuestionsRemaining(questions, state, isLockedToday);
-    onAccessChange?.(state.isComplete || heldOnly);
+    onAccessChange?.(canAccessStandaloneReview(state, questions, isLockedToday));
   }, [courseId, lessonId, onAccessChange, questions, state, hydrated, studentScope]);
 
   const dismissToast = useCallback(() => {
