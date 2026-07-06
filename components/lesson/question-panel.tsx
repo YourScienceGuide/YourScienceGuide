@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AssessmentProtected } from "@/components/ai-guard/assessment-protected";
 import { CanvasText } from "@/components/ai-guard/canvas-text";
@@ -17,7 +17,9 @@ import {
   getMaxAttempts,
 } from "@/lib/lesson/question-attempt-limits";
 import {
+  CORRECT_ANSWER_MESSAGE,
   getQuestionHint,
+  INCORRECT_ANSWER_MESSAGE,
   LOCKED_UNTIL_TOMORROW_MESSAGE,
 } from "@/lib/lesson/question-hint";
 import { shuffleMultipleChoice } from "@/lib/lesson/shuffle-multiple-choice";
@@ -53,6 +55,8 @@ type QuestionPanelProps = {
   }) => void;
 };
 
+const ANSWER_FEEDBACK_DELAY_MS = 900;
+
 export function QuestionPanel({
   studentScope,
   courseId,
@@ -71,11 +75,14 @@ export function QuestionPanel({
   const [longAnswer, setLongAnswer] = useState("");
   const [blankAnswers, setBlankAnswers] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedbackDetail, setFeedbackDetail] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"success" | "retry" | null>(
     null,
   );
+  const [transitionPending, setTransitionPending] = useState(false);
   const [parentSubmitted, setParentSubmitted] = useState(false);
   const [attemptVersion, setAttemptVersion] = useState(0);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const maxAttempts = skipAttemptLimits ? null : getMaxAttempts(question);
   const limited = maxAttempts !== null;
@@ -92,7 +99,8 @@ export function QuestionPanel({
   }, [attemptVersion, studentScope, courseId, lessonId, limited, question.id]);
 
   const isLocked = limited && attemptState.isLocked;
-  const disabled = disabledExternal || isLocked;
+  const disabled =
+    disabledExternal || isLocked || transitionPending;
   const remaining = limited
     ? attemptsRemaining(attemptState.attemptsUsed, maxAttempts)
     : null;
@@ -118,15 +126,29 @@ export function QuestionPanel({
   }, [question, shuffledMc]);
 
   useEffect(() => {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
     setSelectedIndex(null);
     setTextAnswer("");
     setLongAnswer("");
     setBlankAnswers(Array(blankCount).fill(""));
     setFeedback(null);
+    setFeedbackDetail(null);
     setFeedbackTone(null);
+    setTransitionPending(false);
     setParentSubmitted(false);
     setAttemptVersion((v) => v + 1);
   }, [question.id, blankCount]);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) {
+        clearTimeout(advanceTimerRef.current);
+      }
+    };
+  }, []);
 
   function notifyChecked(isCorrect: boolean) {
     onAnswerChecked?.({
@@ -135,6 +157,25 @@ export function QuestionPanel({
       prompt: question.prompt,
       isCorrect,
     });
+  }
+
+  function scheduleAfterFeedback(callback: () => void) {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+    }
+    setTransitionPending(true);
+    advanceTimerRef.current = setTimeout(() => {
+      advanceTimerRef.current = null;
+      setTransitionPending(false);
+      callback();
+    }, ANSWER_FEEDBACK_DELAY_MS);
+  }
+
+  function showIncorrectFeedback(detail: string) {
+    setFeedback(INCORRECT_ANSWER_MESSAGE);
+    setFeedbackDetail(detail);
+    setFeedbackTone("retry");
+    notifyChecked(false);
   }
 
   function handleWrongAnswer(message: string, countsAsAttempt = true) {
@@ -156,17 +197,12 @@ export function QuestionPanel({
       setAttemptVersion((v) => v + 1);
 
       if (next.exhaustedOnDay) {
-        setFeedback(LOCKED_UNTIL_TOMORROW_MESSAGE);
-        setFeedbackTone("retry");
-        notifyChecked(false);
-        onHeldForToday?.();
+        showIncorrectFeedback(LOCKED_UNTIL_TOMORROW_MESSAGE);
         return;
       }
     }
 
-    setFeedback(message);
-    setFeedbackTone("retry");
-    notifyChecked(false);
+    showIncorrectFeedback(message);
   }
 
   function handleCorrectAnswer() {
@@ -187,19 +223,26 @@ export function QuestionPanel({
       );
       setAttemptVersion((v) => v + 1);
     }
-    setFeedback(null);
-    setFeedbackTone(null);
+    setFeedback(CORRECT_ANSWER_MESSAGE);
+    setFeedbackDetail(null);
+    setFeedbackTone("success");
     notifyChecked(true);
-    onSubmit(true);
+    scheduleAfterFeedback(() => onSubmit(true));
   }
 
   function resetInputs() {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+    setTransitionPending(false);
     setSelectedIndex(null);
     setTextAnswer("");
     setLongAnswer("");
     setBlankAnswers(Array(blankCount).fill(""));
     if (!isLocked) {
       setFeedback(null);
+      setFeedbackDetail(null);
       setFeedbackTone(null);
     }
     setParentSubmitted(false);
@@ -219,6 +262,14 @@ export function QuestionPanel({
     blankCount > 0 &&
     blankAnswers.length >= blankCount &&
     blankAnswers.slice(0, blankCount).every((value) => value.trim() !== "");
+  const exhaustedAwaitingAck = isLocked && Boolean(onHeldForToday);
+  const alertHeadline =
+    feedback ?? (exhaustedAwaitingAck ? INCORRECT_ANSWER_MESSAGE : null);
+  const alertDetail =
+    feedbackDetail ??
+    (exhaustedAwaitingAck ? LOCKED_UNTIL_TOMORROW_MESSAGE : null);
+  const alertTone =
+    feedbackTone ?? (exhaustedAwaitingAck ? ("retry" as const) : null);
 
   return (
     <article
@@ -335,26 +386,48 @@ export function QuestionPanel({
         </p>
       )}
 
-      {feedback && (
-        <p
+      {alertHeadline && (
+        <div
           role="alert"
           className={cn(
-            "text-sm font-medium",
-            feedbackTone === "retry"
-              ? "text-amber-700 dark:text-amber-300"
-              : "text-emerald-700 dark:text-emerald-300",
+            "rounded-md border px-4 py-3",
+            alertTone === "retry"
+              ? "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30"
+              : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30",
           )}
         >
-          {feedback}
-        </p>
+          <p
+            className={cn(
+              "text-base font-semibold",
+              alertTone === "retry"
+                ? "text-amber-800 dark:text-amber-200"
+                : "text-emerald-800 dark:text-emerald-200",
+            )}
+          >
+            {alertHeadline}
+          </p>
+          {alertDetail && (
+            <p
+              className={cn(
+                "mt-1 text-sm",
+                alertTone === "retry"
+                  ? "text-amber-900 dark:text-amber-100"
+                  : "text-emerald-900 dark:text-emerald-100",
+              )}
+            >
+              {alertDetail}
+            </p>
+          )}
+        </div>
       )}
 
-      {isLocked && onHeldForToday && (
+      {exhaustedAwaitingAck && (
         <Button type="button" onClick={onHeldForToday}>
-          Continue to next question
+          OK
         </Button>
       )}
 
+      {!exhaustedAwaitingAck && (
       <div className="flex flex-wrap gap-3">
         {question.type === "long-answer" ? (
           <Button
@@ -426,6 +499,7 @@ export function QuestionPanel({
           </Button>
         )}
       </div>
+      )}
     </article>
   );
 }

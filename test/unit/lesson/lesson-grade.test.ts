@@ -15,6 +15,25 @@ describe("lesson grade config", () => {
 });
 
 describe("graded lesson machine", () => {
+  it("advances to the next MC question when attempts are exhausted", () => {
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "multiple-choice" as const,
+      mcQuestionIds: ["mc-1", "mc-2", "mc-3"],
+      mcIndex: 0,
+      mcCorrectCount: 0,
+      mcCorrectIds: [],
+      fibQuestionIds: ["fib-1"],
+    };
+
+    const next = applyMcResult(progress, "mc-1", false, DEFAULT_GRADING_RUBRIC, 3);
+
+    expect(next.mcIndex).toBe(1);
+    expect(next.mcCorrectCount).toBe(0);
+    expect(next.mcCorrectIds).toEqual([]);
+    expect(next.phase).toBe("multiple-choice");
+  });
+
   it("stops MC phase after 9 correct", () => {
     const progress = {
       ...INITIAL_GRADED_LESSON_PROGRESS,

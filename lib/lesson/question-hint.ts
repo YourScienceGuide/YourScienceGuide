@@ -3,6 +3,9 @@ import type { LessonQuestion } from "@/lib/lesson/types";
 const DEFAULT_INCORRECT_HINT =
   "Review the lesson material, then try again.";
 
+export const CORRECT_ANSWER_MESSAGE = "Correct!";
+export const INCORRECT_ANSWER_MESSAGE = "Incorrect.";
+
 export function getQuestionHint(question: LessonQuestion): string {
   const hint = question.hint?.trim();
   return hint || DEFAULT_INCORRECT_HINT;

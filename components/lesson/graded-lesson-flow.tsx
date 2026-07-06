@@ -245,10 +245,22 @@ export function GradedLessonFlow({
             question={mcQuestion}
             difficulty={1}
             onSubmit={(correct) => {
+              if (!correct) return;
               let next = applyMcResult(
                 progress,
                 mcQuestion.id,
-                correct,
+                true,
+                rubric,
+                plan.multipleChoice.length,
+              );
+              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+              persist(next);
+            }}
+            onHeldForToday={() => {
+              let next = applyMcResult(
+                progress,
+                mcQuestion.id,
+                false,
                 rubric,
                 plan.multipleChoice.length,
               );
