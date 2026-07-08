@@ -7,6 +7,7 @@ import {
   applyReviewHeldForToday,
   currentReviewQuestionId,
   INITIAL_GRADED_LESSON_PROGRESS,
+  isGradedLessonPhasePast,
   reviewPhaseComplete,
 } from "@/lib/lesson/graded-lesson-machine";
 import { DEFAULT_GRADING_RUBRIC } from "@/lib/lesson/lesson-grade-config";
@@ -116,6 +117,13 @@ describe("graded lesson machine", () => {
     expect(
       calculateLessonCompletionPercent(progress, plan, (id) => id === "rev-1"),
     ).toBe(50);
+  });
+
+  it("identifies phases that are already behind the current phase", () => {
+    expect(isGradedLessonPhasePast("fill-in-blank", "review")).toBe(true);
+    expect(isGradedLessonPhasePast("fill-in-blank", "multiple-choice")).toBe(true);
+    expect(isGradedLessonPhasePast("fill-in-blank", "fill-in-blank")).toBe(false);
+    expect(isGradedLessonPhasePast("complete", "free-response")).toBe(true);
   });
 
   it("stops MC phase after 9 correct", () => {

@@ -3,6 +3,7 @@ import type { LessonGradeRecord, LongAnswerSubmission } from "@/lib/student/less
 
 export type ParentStudentProgressResponse = {
   source: "supabase" | "unavailable";
+  courseId: string;
   courseName: string;
   rubric: {
     config: GradingRubricConfig;

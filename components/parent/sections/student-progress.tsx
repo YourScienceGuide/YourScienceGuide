@@ -1,11 +1,18 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useCallback, useEffect, useState } from "react";
 
+import { useContentStore } from "@/components/admin/content-store-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  readParentProgressPreferences,
+  resolveParentProgressCourseId,
+  writeParentProgressPreferences,
+} from "@/lib/parent/parent-progress-preferences";
 import {
   fetchParentStudentProgress,
   gradeSubmission,
@@ -15,10 +22,14 @@ import type { LongAnswerSubmission } from "@/lib/student/lesson-grades.server";
 import { cn } from "@/lib/utils";
 
 export function StudentProgressSection() {
+  const { user, isLoaded: userLoaded } = useUser();
+  const { store, loading: storeLoading } = useContentStore();
   const { students, activeStudent } = useActiveStudent();
   const [viewingId, setViewingId] = useState(
     () => activeStudent?.id ?? students[0]?.id ?? "",
   );
+  const [courseId, setCourseIdState] = useState("");
+  const [courseReady, setCourseReady] = useState(false);
   const [data, setData] = useState<ParentStudentProgressResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,24 +37,56 @@ export function StudentProgressSection() {
 
   const student =
     students.find((s) => s.id === viewingId) ?? students[0] ?? null;
+  const courses = store.courses;
+
+  useEffect(() => {
+    if (!userLoaded || storeLoading || courseReady) return;
+
+    const prefs = user?.id ? readParentProgressPreferences(user.id) : {};
+    setCourseIdState(resolveParentProgressCourseId(store, prefs));
+    setCourseReady(true);
+  }, [courseReady, store, storeLoading, user?.id, userLoaded]);
+
+  useEffect(() => {
+    if (!courseReady || !user?.id) return;
+
+    const resolved = resolveParentProgressCourseId(
+      store,
+      readParentProgressPreferences(user.id),
+    );
+    if (resolved !== courseId) {
+      setCourseIdState(resolved);
+    }
+  }, [courseId, courseReady, store, user?.id]);
+
+  const setCourseId = useCallback(
+    (nextCourseId: string) => {
+      setCourseIdState(nextCourseId);
+      if (user?.id) {
+        writeParentProgressPreferences(user.id, { courseId: nextCourseId });
+      }
+    },
+    [user?.id],
+  );
 
   const load = useCallback(async () => {
-    if (!student) return;
+    if (!student || !courseId) return;
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchParentStudentProgress(student.id);
+      const response = await fetchParentStudentProgress(student.id, courseId);
       setData(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load progress");
     } finally {
       setLoading(false);
     }
-  }, [student]);
+  }, [courseId, student]);
 
   useEffect(() => {
+    if (!courseReady) return;
     void load();
-  }, [load]);
+  }, [courseReady, load]);
 
   if (!student) return null;
 
@@ -54,32 +97,62 @@ export function StudentProgressSection() {
         description="Points earned, rubric breakdown, and pending free-response reviews."
       />
 
-      {students.length > 1 && (
-        <div className="space-y-2">
-          <label
-            htmlFor="progress-student-select"
-            className="text-sm font-medium text-slate-700 dark:text-stone-300"
-          >
-            Viewing progress for
-          </label>
-          <select
-            id="progress-student-select"
-            value={viewingId}
-            onChange={(e) => setViewingId(e.target.value)}
-            className={cn(
-              "w-full max-w-md rounded-md border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
-              "dark:border-stone-600 dark:bg-stone-900 dark:text-stone-50",
-            )}
-          >
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.displayName}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+        {students.length > 1 && (
+          <div className="space-y-2">
+            <label
+              htmlFor="progress-student-select"
+              className="text-sm font-medium text-slate-700 dark:text-stone-300"
+            >
+              Viewing progress for
+            </label>
+            <select
+              id="progress-student-select"
+              value={viewingId}
+              onChange={(e) => setViewingId(e.target.value)}
+              className={cn(
+                "w-full min-w-[12rem] rounded-md border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
+                "dark:border-stone-600 dark:bg-stone-900 dark:text-stone-50",
+              )}
+            >
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {courses.length > 0 && (
+          <div className="space-y-2">
+            <label
+              htmlFor="progress-course-select"
+              className="text-sm font-medium text-slate-700 dark:text-stone-300"
+            >
+              Course
+            </label>
+            <select
+              id="progress-course-select"
+              value={courseId}
+              onChange={(e) => setCourseId(e.target.value)}
+              disabled={!courseReady}
+              className={cn(
+                "w-full min-w-[12rem] rounded-md border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500",
+                "dark:border-stone-600 dark:bg-stone-900 dark:text-stone-50",
+              )}
+            >
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {loading && (
         <p className="text-sm text-slate-600 dark:text-stone-400">Loading progress…</p>

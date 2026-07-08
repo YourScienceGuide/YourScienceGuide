@@ -49,6 +49,7 @@ export async function GET(request: Request) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({
         source: "unavailable",
+        courseId: resolvedCourseId,
         courseName: course?.title ?? "Course",
         rubric: { config: rubric, items: rubricItems, maxScore },
         lessonGrades: [],
@@ -59,10 +60,13 @@ export async function GET(request: Request) {
       });
     }
 
-    const [lessonGrades, pendingSubmissions] = await Promise.all([
+    const [lessonGrades, allPendingSubmissions] = await Promise.all([
       listLessonGradesForStudent(familyStudentId, resolvedCourseId || undefined),
       listPendingSubmissionsForStudent(familyStudentId),
     ]);
+    const pendingSubmissions = allPendingSubmissions.filter(
+      (submission) => submission.courseId === resolvedCourseId,
+    );
 
     const lessonCount = course?.lessons.length ?? 0;
     const { totalEarnedPoints, totalPossiblePoints, courseProgress } =
@@ -70,6 +74,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       source: "supabase",
+      courseId: resolvedCourseId,
       courseName: course?.title ?? "Course",
       rubric: { config: rubric, items: rubricItems, maxScore },
       lessonGrades,

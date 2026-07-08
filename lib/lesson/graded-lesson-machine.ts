@@ -13,6 +13,25 @@ export type GradedLessonPhase =
   | "free-response"
   | "complete";
 
+const GRADED_LESSON_PHASE_ORDER: GradedLessonPhase[] = [
+  "review",
+  "multiple-choice",
+  "fill-in-blank",
+  "extra-practice",
+  "free-response",
+  "complete",
+];
+
+export function isGradedLessonPhasePast(
+  currentPhase: GradedLessonPhase,
+  sectionPhase: GradedLessonPhase,
+): boolean {
+  const currentIndex = GRADED_LESSON_PHASE_ORDER.indexOf(currentPhase);
+  const sectionIndex = GRADED_LESSON_PHASE_ORDER.indexOf(sectionPhase);
+  if (currentIndex < 0 || sectionIndex < 0) return false;
+  return currentIndex > sectionIndex;
+}
+
 export type GradedLessonProgress = {
   phase: GradedLessonPhase;
   reviewCorrectIds: string[];

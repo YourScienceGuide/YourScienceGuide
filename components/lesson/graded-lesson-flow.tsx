@@ -26,6 +26,7 @@ import {
   currentMcQuestionId,
   currentReviewQuestionId,
   hydrateGradedProgress,
+  isGradedLessonPhasePast,
   reviewPhaseComplete,
   type GradedLessonProgress,
 } from "@/lib/lesson/graded-lesson-machine";
@@ -207,191 +208,234 @@ export function GradedLessonFlow({
         Lesson {lessonCompletionPercent}% complete
       </p>
 
-      {plan.review.length > 0 && progress.phase === "review" && reviewQuestion && (
-        <PhaseSection
-          title="Review questions"
-          description={`${plan.review.length} warm-up questions before the video.`}
-          progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
-        >
-          <QuestionPanel
-            key={`review-${reviewQuestion.id}`}
-            studentScope={studentScope}
-            courseId={courseId}
-            lessonId={lessonId}
-            question={reviewQuestion}
-            difficulty={1}
-            onSubmit={(correct) => {
-              if (!correct) return;
-              let next = applyReviewCorrect(
-                progress,
-                reviewQuestion.id,
-                plan.review.length,
-              );
-              next = advanceAfterReview(next, plan, isLockedToday);
-              persist(next);
-            }}
-            onHeldForToday={() => {
-              let next = applyReviewHeldForToday(progress, reviewQuestion.id);
-              next = advanceAfterReview(next, plan, isLockedToday);
-              persist(next);
-            }}
+      {plan.review.length > 0 &&
+        ((isGradedLessonPhasePast(progress.phase, "review") ||
+          (progress.phase === "review" && !reviewQuestion)) ? (
+          <CompletedPhaseSection
+            title="Review questions"
+            summary={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
           />
-        </PhaseSection>
-      )}
+        ) : progress.phase === "review" && reviewQuestion ? (
+          <PhaseSection
+            title="Review questions"
+            description={`${plan.review.length} warm-up questions before the video.`}
+            progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
+          >
+            <QuestionPanel
+              key={`review-${reviewQuestion.id}`}
+              studentScope={studentScope}
+              courseId={courseId}
+              lessonId={lessonId}
+              question={reviewQuestion}
+              difficulty={1}
+              onSubmit={(correct) => {
+                if (!correct) return;
+                let next = applyReviewCorrect(
+                  progress,
+                  reviewQuestion.id,
+                  plan.review.length,
+                );
+                next = advanceAfterReview(next, plan, isLockedToday);
+                persist(next);
+              }}
+              onHeldForToday={() => {
+                let next = applyReviewHeldForToday(progress, reviewQuestion.id);
+                next = advanceAfterReview(next, plan, isLockedToday);
+                persist(next);
+              }}
+            />
+          </PhaseSection>
+        ) : null)}
 
       {reviewComplete && children}
 
-      {reviewComplete && progress.phase === "multiple-choice" && !mcQuestion && plan.multipleChoice.length === 0 && (
+      {reviewComplete &&
+        progress.phase === "multiple-choice" &&
+        plan.multipleChoice.length === 0 && (
         <p className="text-sm text-slate-600 dark:text-stone-400">
           No multiple-choice questions configured for this lesson.
         </p>
       )}
 
-      {reviewComplete && progress.phase === "multiple-choice" && mcQuestion && (
-        <PhaseSection
-          title="Multiple choice"
-          description={`Work through ${plan.multipleChoice.length} questions. Answer ${rubric.mcTargetCorrect} correctly to finish this section.`}
-          progressLabel={`Question ${progress.mcIndex + 1} of ${plan.multipleChoice.length}`}
-        >
-          <QuestionPanel
-            key={`mc-${mcQuestion.id}`}
-            studentScope={studentScope}
-            courseId={courseId}
-            lessonId={lessonId}
-            question={mcQuestion}
-            difficulty={1}
-            onSubmit={(correct) => {
-              if (!correct) return;
-              let next = applyMcResult(
-                progress,
-                mcQuestion.id,
-                true,
-                rubric,
-                plan.multipleChoice.length,
-              );
-              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
-              persist(next);
-            }}
-            onHeldForToday={() => {
-              let next = applyMcResult(
-                progress,
-                mcQuestion.id,
-                false,
-                rubric,
-                plan.multipleChoice.length,
-              );
-              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
-              persist(next);
-            }}
+      {reviewComplete &&
+        plan.multipleChoice.length > 0 &&
+        ((isGradedLessonPhasePast(progress.phase, "multiple-choice") ||
+          (progress.phase === "multiple-choice" && !mcQuestion)) ? (
+          <CompletedPhaseSection
+            title="Multiple choice"
+            summary={`${progress.mcCorrectCount} correct of ${plan.multipleChoice.length} questions`}
           />
-        </PhaseSection>
-      )}
+        ) : progress.phase === "multiple-choice" && mcQuestion ? (
+          <PhaseSection
+            title="Multiple choice"
+            description={`Work through ${plan.multipleChoice.length} questions. Answer ${rubric.mcTargetCorrect} correctly to finish this section.`}
+            progressLabel={`Question ${progress.mcIndex + 1} of ${plan.multipleChoice.length}`}
+          >
+            <QuestionPanel
+              key={`mc-${mcQuestion.id}`}
+              studentScope={studentScope}
+              courseId={courseId}
+              lessonId={lessonId}
+              question={mcQuestion}
+              difficulty={1}
+              onSubmit={(correct) => {
+                if (!correct) return;
+                let next = applyMcResult(
+                  progress,
+                  mcQuestion.id,
+                  true,
+                  rubric,
+                  plan.multipleChoice.length,
+                );
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+              onHeldForToday={() => {
+                let next = applyMcResult(
+                  progress,
+                  mcQuestion.id,
+                  false,
+                  rubric,
+                  plan.multipleChoice.length,
+                );
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+            />
+          </PhaseSection>
+        ) : null)}
 
-      {reviewComplete && progress.phase === "fill-in-blank" && fibQuestion && (
-        <PhaseSection
-          title="Fill in the blank"
-          description={`${plan.fillInBlank.length} fill-in-the-blank questions.`}
-          progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
-        >
-          <QuestionPanel
-            key={`fib-${fibQuestion.id}`}
-            studentScope={studentScope}
-            courseId={courseId}
-            lessonId={lessonId}
-            question={fibQuestion}
-            difficulty={1}
-            onSubmit={(correct) => {
-              if (!correct) return;
-              let next = applyFibCorrect(
-                progress,
-                fibQuestion.id,
-                plan.fillInBlank.length,
-                plan.extraPractice.length > 0,
-                Boolean(plan.freeResponse),
-              );
-              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
-              persist(next);
-            }}
-            onHeldForToday={() => {
-              let next = applyFibHeldForToday(
-                progress,
-                fibQuestion.id,
-                plan.fillInBlank.length,
-                plan.extraPractice.length > 0,
-                Boolean(plan.freeResponse),
-              );
-              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
-              persist(next);
-            }}
+      {reviewComplete &&
+        plan.fillInBlank.length > 0 &&
+        ((isGradedLessonPhasePast(progress.phase, "fill-in-blank") ||
+          (progress.phase === "fill-in-blank" && !fibQuestion)) ? (
+          <CompletedPhaseSection
+            title="Fill in the blank"
+            summary={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
           />
-        </PhaseSection>
-      )}
+        ) : progress.phase === "fill-in-blank" && fibQuestion ? (
+          <PhaseSection
+            title="Fill in the blank"
+            description={`${plan.fillInBlank.length} fill-in-the-blank questions.`}
+            progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
+          >
+            <QuestionPanel
+              key={`fib-${fibQuestion.id}`}
+              studentScope={studentScope}
+              courseId={courseId}
+              lessonId={lessonId}
+              question={fibQuestion}
+              difficulty={1}
+              onSubmit={(correct) => {
+                if (!correct) return;
+                let next = applyFibCorrect(
+                  progress,
+                  fibQuestion.id,
+                  plan.fillInBlank.length,
+                  plan.extraPractice.length > 0,
+                  Boolean(plan.freeResponse),
+                );
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+              onHeldForToday={() => {
+                let next = applyFibHeldForToday(
+                  progress,
+                  fibQuestion.id,
+                  plan.fillInBlank.length,
+                  plan.extraPractice.length > 0,
+                  Boolean(plan.freeResponse),
+                );
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+            />
+          </PhaseSection>
+        ) : null)}
 
-      {reviewComplete && progress.phase === "extra-practice" && extraQuestion && (
-        <PhaseSection
-          title="Review / extra practice"
-          description={`${plan.extraPractice.length} mixed review questions.`}
-          progressLabel={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
-        >
-          <QuestionPanel
-            key={`extra-${extraQuestion.id}`}
-            studentScope={studentScope}
-            courseId={courseId}
-            lessonId={lessonId}
-            question={extraQuestion}
-            difficulty={2}
-            skipAttemptLimits
-            onSubmit={(correct) => {
-              if (!correct) return;
-              let next = applyExtraCorrect(
-                progress,
-                extraQuestion.id,
-                plan.extraPractice.length,
-                Boolean(plan.freeResponse),
-              );
-              next = checkGraduation(next, rubric, lesson.graduationProblemCount);
-              persist(next);
-            }}
+      {reviewComplete &&
+        plan.extraPractice.length > 0 &&
+        ((isGradedLessonPhasePast(progress.phase, "extra-practice") ||
+          (progress.phase === "extra-practice" && !extraQuestion)) ? (
+          <CompletedPhaseSection
+            title="Review / extra practice"
+            summary={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
           />
-        </PhaseSection>
-      )}
+        ) : progress.phase === "extra-practice" && extraQuestion ? (
+          <PhaseSection
+            title="Review / extra practice"
+            description={`${plan.extraPractice.length} mixed review questions.`}
+            progressLabel={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
+          >
+            <QuestionPanel
+              key={`extra-${extraQuestion.id}`}
+              studentScope={studentScope}
+              courseId={courseId}
+              lessonId={lessonId}
+              question={extraQuestion}
+              difficulty={2}
+              skipAttemptLimits
+              onSubmit={(correct) => {
+                if (!correct) return;
+                let next = applyExtraCorrect(
+                  progress,
+                  extraQuestion.id,
+                  plan.extraPractice.length,
+                  Boolean(plan.freeResponse),
+                );
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+            />
+          </PhaseSection>
+        ) : null)}
 
-      {reviewComplete && progress.phase === "free-response" && freeResponse && (
-        <PhaseSection
-          title="Free response"
-          description="Write a longer answer for your parent to review."
-          progressLabel={
-            progress.freeResponseSubmitted ? "Submitted for grading" : "Not submitted"
-          }
-        >
-          <QuestionPanel
-            key={`fr-${freeResponse.id}`}
-            studentScope={studentScope}
-            courseId={courseId}
-            lessonId={lessonId}
-            question={freeResponse}
-            difficulty={1}
-            disabled={progress.freeResponseSubmitted}
-            onLongAnswerSubmit={async (answerText) => {
-              if (!familyStudentId || progress.freeResponseSubmitted) return;
-              const { id } = await submitLongAnswer({
-                familyStudentId,
-                courseId,
-                lessonId,
-                questionId: freeResponse.id,
-                promptExcerpt: excerptPrompt(freeResponse.prompt),
-                answerText,
-                maxPoints: rubric.freeResponsePoints,
-              });
-              const next = applyFreeResponseSubmitted(progress, id);
-              persist(next);
-            }}
-            onSubmit={(correct) => {
-              if (!correct) return;
-            }}
+      {reviewComplete &&
+        freeResponse &&
+        ((isGradedLessonPhasePast(progress.phase, "free-response") ||
+          progress.freeResponseSubmitted) ? (
+          <CompletedPhaseSection
+            title="Free response"
+            summary={
+              progress.freeResponseSubmitted
+                ? "Submitted for your parent to review"
+                : "Complete"
+            }
           />
-        </PhaseSection>
-      )}
+        ) : progress.phase === "free-response" ? (
+          <PhaseSection
+            title="Free response"
+            description="Write a longer answer for your parent to review."
+            progressLabel="Not submitted"
+          >
+            <QuestionPanel
+              key={`fr-${freeResponse.id}`}
+              studentScope={studentScope}
+              courseId={courseId}
+              lessonId={lessonId}
+              question={freeResponse}
+              difficulty={1}
+              disabled={progress.freeResponseSubmitted}
+              onLongAnswerSubmit={async (answerText) => {
+                if (!familyStudentId || progress.freeResponseSubmitted) return;
+                const { id } = await submitLongAnswer({
+                  familyStudentId,
+                  courseId,
+                  lessonId,
+                  questionId: freeResponse.id,
+                  promptExcerpt: excerptPrompt(freeResponse.prompt),
+                  answerText,
+                  maxPoints: rubric.freeResponsePoints,
+                });
+                const next = applyFreeResponseSubmitted(progress, id);
+                persist(next);
+              }}
+              onSubmit={(correct) => {
+                if (!correct) return;
+              }}
+            />
+          </PhaseSection>
+        ) : null)}
 
       {progress.graduated && progress.phase !== "complete" && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
@@ -415,6 +459,27 @@ export function GradedLessonFlow({
         </div>
       )}
     </div>
+  );
+}
+
+function CompletedPhaseSection({
+  title,
+  summary,
+}: {
+  title: string;
+  summary: string;
+}) {
+  return (
+    <section
+      className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-4 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+      aria-label={`${title} completed`}
+    >
+      <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50">
+        {title}{" "}
+        <span className="text-emerald-700 dark:text-emerald-300">— Completed</span>
+      </h2>
+      <p className="mt-1 text-sm text-emerald-900 dark:text-emerald-100">{summary}</p>
+    </section>
   );
 }
 
