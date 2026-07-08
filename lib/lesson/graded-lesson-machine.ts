@@ -400,6 +400,42 @@ export function calculateLessonScore(
   };
 }
 
+export function calculateLessonCompletionPercent(
+  progress: GradedLessonProgress,
+  plan: {
+    review: { id: string }[];
+    multipleChoice: { id: string }[];
+    fillInBlank: { id: string }[];
+    extraPractice: { id: string }[];
+    freeResponse: { id: string } | null;
+  },
+  isLockedToday: (questionId: string) => boolean,
+): number {
+  if (progress.phase === "complete") return 100;
+
+  const totalSteps =
+    plan.review.length +
+    plan.multipleChoice.length +
+    plan.fillInBlank.length +
+    plan.extraPractice.length +
+    (plan.freeResponse ? 1 : 0);
+
+  if (totalSteps === 0) return 0;
+
+  const reviewDone = plan.review.filter(
+    (question) =>
+      progress.reviewCorrectIds.includes(question.id) ||
+      (progress.reviewHeldIds.includes(question.id) &&
+        isLockedToday(question.id)),
+  ).length;
+
+  let completedSteps =
+    reviewDone + progress.mcIndex + progress.fibIndex + progress.extraIndex;
+  if (progress.freeResponseSubmitted) completedSteps += 1;
+
+  return Math.min(100, Math.round((completedSteps / totalSteps) * 100));
+}
+
 export function canAccessLessonDuringReview(
   progress: GradedLessonProgress,
   reviewQuestions: { id: string }[],

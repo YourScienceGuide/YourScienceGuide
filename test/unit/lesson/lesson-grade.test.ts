@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateLessonCompletionPercent,
   calculateLessonScore,
   applyMcResult,
   applyReviewHeldForToday,
@@ -57,6 +58,64 @@ describe("graded lesson machine", () => {
     expect(
       reviewPhaseComplete(allHeld, reviewQuestions, () => true),
     ).toBe(true);
+  });
+
+  it("calculates lesson completion from work done, not points earned", () => {
+    const plan = {
+      review: [{ id: "rev-1" }, { id: "rev-2" }],
+      multipleChoice: [{ id: "mc-1" }, { id: "mc-2" }],
+      fillInBlank: [{ id: "fib-1" }],
+      extraPractice: [],
+      freeResponse: null,
+    };
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "multiple-choice" as const,
+      reviewCorrectIds: ["rev-1", "rev-2"],
+      mcIndex: 1,
+      mcCorrectIds: [],
+      mcCorrectCount: 0,
+    };
+
+    expect(calculateLessonCompletionPercent(progress, plan, () => false)).toBe(60);
+    expect(calculateLessonScore(progress, DEFAULT_GRADING_RUBRIC).percent).toBe(4);
+  });
+
+  it("returns 100% completion when the lesson phase is complete", () => {
+    const plan = {
+      review: [{ id: "rev-1" }],
+      multipleChoice: [{ id: "mc-1" }],
+      fillInBlank: [],
+      extraPractice: [],
+      freeResponse: null,
+    };
+
+    expect(
+      calculateLessonCompletionPercent(
+        { ...INITIAL_GRADED_LESSON_PROGRESS, phase: "complete" },
+        plan,
+        () => true,
+      ),
+    ).toBe(100);
+  });
+
+  it("counts held review questions toward completion when locked today", () => {
+    const plan = {
+      review: [{ id: "rev-1" }, { id: "rev-2" }],
+      multipleChoice: [],
+      fillInBlank: [],
+      extraPractice: [],
+      freeResponse: null,
+    };
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "review" as const,
+      reviewHeldIds: ["rev-1"],
+    };
+
+    expect(
+      calculateLessonCompletionPercent(progress, plan, (id) => id === "rev-1"),
+    ).toBe(50);
   });
 
   it("stops MC phase after 9 correct", () => {

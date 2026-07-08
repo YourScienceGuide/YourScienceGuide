@@ -1,9 +1,5 @@
 import type { GradedLessonProgress } from "@/lib/lesson/graded-lesson-machine";
-import { calculateLessonScore } from "@/lib/lesson/graded-lesson-machine";
-import {
-  normalizeGradingRubric,
-  type GradingRubricConfig,
-} from "@/lib/lesson/lesson-grade-config";
+import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import type { LessonStatus } from "@/lib/student/lesson-progress";
 import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
@@ -79,11 +75,54 @@ export function getGradedLessonStatus(
   return "not_started";
 }
 
+export function gradedLessonCompletionPercent(
+  progress: GradedLessonProgress | null | undefined,
+): number {
+  if (!progress) return 0;
+  if (progress.phase === "complete") return 100;
+
+  const phases = [
+    "review",
+    "multiple-choice",
+    "fill-in-blank",
+    "extra-practice",
+    "free-response",
+  ] as const;
+  const phaseIndex = phases.indexOf(progress.phase);
+  if (phaseIndex < 0) return 0;
+
+  const phaseShare = 100 / phases.length;
+  const phaseStart = phaseIndex * phaseShare;
+  let withinPhase = 0;
+
+  switch (progress.phase) {
+    case "review":
+      withinPhase = progress.reviewCorrectIds.length + progress.reviewHeldIds.length;
+      break;
+    case "multiple-choice":
+      withinPhase = progress.mcIndex;
+      break;
+    case "fill-in-blank":
+      withinPhase = progress.fibIndex;
+      break;
+    case "extra-practice":
+      withinPhase = progress.extraIndex;
+      break;
+    case "free-response":
+      withinPhase = progress.freeResponseSubmitted ? 1 : 0;
+      break;
+  }
+
+  const bump =
+    withinPhase > 0 ? Math.min(phaseShare * 0.85, phaseShare * 0.5) : 0;
+  return Math.min(99, Math.round(phaseStart + bump));
+}
+
+/** @deprecated Use gradedLessonCompletionPercent for student-facing progress. */
 export function gradedLessonProgressPercent(
   progress: GradedLessonProgress | null | undefined,
   rubric: GradingRubricConfig,
 ): number {
-  if (!progress) return 0;
-  if (progress.phase === "complete") return 100;
-  return calculateLessonScore(progress, normalizeGradingRubric(rubric)).percent;
+  void rubric;
+  return gradedLessonCompletionPercent(progress);
 }

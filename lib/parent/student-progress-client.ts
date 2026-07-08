@@ -11,8 +11,8 @@ export type ParentStudentProgressResponse = {
   };
   lessonGrades: LessonGradeRecord[];
   pendingSubmissions: LongAnswerSubmission[];
-  overallPercent: number;
-  gradeLabel: string;
+  totalEarnedPoints: number;
+  totalPossiblePoints: number;
   courseProgress: number;
 };
 

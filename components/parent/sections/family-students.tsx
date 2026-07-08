@@ -370,8 +370,8 @@ function StudentPreferencesForm({
       />
       <Switch
         id={`${student.id}-grade-dashboard`}
-        label="Show grade on parent dashboard"
-        description="Include letter grade in the progress summary for this student."
+        label="Show points on parent dashboard"
+        description="Include earned and attempted points in the progress summary for this student."
         checked={prefs.showGradeOnDashboard}
         onCheckedChange={(showGradeOnDashboard) =>
           setPrefs((p) => ({ ...p, showGradeOnDashboard }))

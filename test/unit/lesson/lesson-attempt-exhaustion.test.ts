@@ -17,11 +17,10 @@ import {
 } from "@/lib/lesson/graded-lesson-machine";
 import { DEFAULT_GRADING_RUBRIC } from "@/lib/lesson/lesson-grade-config";
 import {
-  applyQuestionHeldForToday,
+  canAccessLessonDuringReview,
   canAccessStandaloneReview,
-  hydrateLessonState,
+  applyQuestionHeldForToday,
   INITIAL_LESSON_STATE,
-  resolveActiveQuestionIndex,
   withAssignmentCount,
 } from "@/lib/lesson/state-machine";
 import type { LessonQuestion } from "@/lib/lesson/types";

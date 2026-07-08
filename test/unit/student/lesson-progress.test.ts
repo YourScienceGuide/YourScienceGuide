@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { INITIAL_LESSON_STATE } from "@/lib/lesson/state-machine";
 import { INITIAL_GRADED_LESSON_PROGRESS } from "@/lib/lesson/graded-lesson-machine";
+import { DEFAULT_GRADING_RUBRIC } from "@/lib/lesson/lesson-grade-config";
 import {
+  getLessonPartialPercent,
   getLessonStatus,
   getLessonStatusForLesson,
   lessonProgressPercent,
@@ -95,5 +97,25 @@ describe("lesson progress (localStorage)", () => {
 
     expect(getLessonStatusForLesson(studentA, courseId, lessonId)).toBe("in_progress");
     expect(getLessonStatusForLesson(studentB, courseId, lessonId)).toBe("not_started");
+  });
+
+  it("uses graded lesson completion for partial percent, not grade percent", () => {
+    saveGradedLessonProgress(studentA, courseId, lessonId, {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "multiple-choice",
+      mcIndex: 4,
+      mcCorrectIds: [],
+      mcCorrectCount: 0,
+    });
+
+    const partial = getLessonPartialPercent(
+      studentA,
+      courseId,
+      lessonId,
+      DEFAULT_GRADING_RUBRIC,
+    );
+
+    expect(partial).toBeGreaterThan(0);
+    expect(partial).toBeLessThan(100);
   });
 });

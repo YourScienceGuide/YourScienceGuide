@@ -4,7 +4,6 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 
 import { useActiveStudent } from "@/components/family/active-student-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
-import { formatGradeLabel } from "@/components/grading/grading-rubric-summary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -52,7 +51,7 @@ export function StudentProgressSection() {
     <div className="space-y-8">
       <SectionIntro
         title="Student progress"
-        description="Grades, rubric breakdown, and pending free-response reviews."
+        description="Points earned, rubric breakdown, and pending free-response reviews."
       />
 
       {students.length > 1 && (
@@ -94,13 +93,16 @@ export function StudentProgressSection() {
       {data && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard label="Current grade" value={data.gradeLabel}>
+            <StatCard
+              label="Points"
+              value={`${data.totalEarnedPoints}/${data.totalPossiblePoints}`}
+            >
               <p className="mt-1 text-sm text-slate-600 dark:text-stone-400">
-                {data.overallPercent}% across graded lessons
+                Earned / attempted across graded lessons
               </p>
             </StatCard>
             <StatCard label="Course" value={data.courseName} />
-            <StatCard label="Progress" value={`${data.courseProgress}%`}>
+            <StatCard label="Lessons started" value={`${data.courseProgress}%`}>
               <ProgressBar percent={data.courseProgress} />
             </StatCard>
           </div>
@@ -117,7 +119,7 @@ export function StudentProgressSection() {
 
           <section className="space-y-3">
             <h3 className="text-sm font-medium text-slate-900 dark:text-stone-50">
-              Lesson scores
+              Lesson points
               <span className="ml-2 font-normal text-slate-500 dark:text-stone-500">
                 ({student.displayName})
               </span>
@@ -132,7 +134,7 @@ export function StudentProgressSection() {
                   <thead className="border-b border-sky-200 bg-sky-50/80 dark:border-stone-700 dark:bg-stone-800/80">
                     <tr>
                       <th className="px-4 py-3 font-medium">Lesson</th>
-                      <th className="px-4 py-3 font-medium">Score</th>
+                      <th className="px-4 py-3 font-medium">Points</th>
                       <th className="px-4 py-3 font-medium">Breakdown</th>
                     </tr>
                   </thead>
@@ -143,8 +145,7 @@ export function StudentProgressSection() {
                           {grade.lessonId}
                         </td>
                         <td className="px-4 py-3 align-top tabular-nums">
-                          {grade.earnedPoints}/{grade.possiblePoints} ·{" "}
-                          {formatGradeLabel(grade.percent)}
+                          {grade.earnedPoints}/{grade.possiblePoints}
                         </td>
                         <td className="px-4 py-3 align-top text-slate-600 dark:text-stone-400">
                           Review {grade.scoreBreakdown.review} · MC{" "}

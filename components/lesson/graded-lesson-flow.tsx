@@ -17,6 +17,7 @@ import {
   applyMcResult,
   applyReviewCorrect,
   applyReviewHeldForToday,
+  calculateLessonCompletionPercent,
   calculateLessonScore,
   canAccessLessonDuringReview,
   checkGraduation,
@@ -30,7 +31,6 @@ import {
 } from "@/lib/lesson/graded-lesson-machine";
 import {
   graduationThresholdForLesson,
-  maxLessonScore,
 } from "@/lib/lesson/lesson-grade-config";
 import { excerptPrompt } from "@/lib/student/question-history.types";
 import {
@@ -43,7 +43,6 @@ import {
 } from "@/lib/student/lesson-grades-client";
 import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
 import type { LessonQuestion } from "@/lib/lesson/types";
-import { formatGradeLabel } from "@/components/grading/grading-rubric-summary";
 
 type GradedLessonFlowProps = {
   studentScope: string;
@@ -51,7 +50,8 @@ type GradedLessonFlowProps = {
   courseId: string;
   lessonId: string;
   onAccessChange?: (canAccessLesson: boolean) => void;
-  onScoreChange?: (percent: number) => void;
+  /** Notifies listeners when lesson completion changes (for course progress refresh). */
+  onCompletionChange?: (percent: number) => void;
   children?: ReactNode;
 };
 
@@ -90,7 +90,7 @@ export function GradedLessonFlow({
   courseId,
   lessonId,
   onAccessChange,
-  onScoreChange,
+  onCompletionChange,
   children,
 }: GradedLessonFlowProps) {
   const { store } = useContentStore();
@@ -129,7 +129,6 @@ export function GradedLessonFlow({
     setHydrated(true);
   }, [courseId, lessonId, planIdentity, studentScope]);
 
-  const score = progress ? calculateLessonScore(progress, rubric) : null;
   const graduationThreshold = graduationThresholdForLesson(
     rubric,
     lesson?.graduationProblemCount,
@@ -169,8 +168,12 @@ export function GradedLessonFlow({
       isLockedToday,
     );
     onAccessChange?.(canAccess);
-    onScoreChange?.(calculateLessonScore(progress, rubric).percent);
-  }, [courseId, lessonId, onAccessChange, onScoreChange, planIdentity, progress, rubric, studentScope]);
+    if (plan) {
+      onCompletionChange?.(
+        calculateLessonCompletionPercent(progress, plan, isLockedToday),
+      );
+    }
+  }, [courseId, lessonId, onAccessChange, onCompletionChange, planIdentity, plan, progress, studentScope]);
 
   if (!course || !lesson || !plan || !progress || !hydrated) {
     return <p className="text-sm text-slate-600 dark:text-stone-400">Loading lesson…</p>;
@@ -192,39 +195,23 @@ export function GradedLessonFlow({
   const fibQuestion = findQuestion(plan, fibId);
   const extraQuestion = findQuestion(plan, extraId);
   const freeResponse = plan.freeResponse;
+  const lessonCompletionPercent = calculateLessonCompletionPercent(
+    progress,
+    plan,
+    isLockedToday,
+  );
 
   return (
     <div className="space-y-8">
-      {score && (
-        <div className="rounded-lg border border-sky-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-slate-800 dark:text-stone-200">
-              Lesson score
-            </p>
-            <p className="text-lg font-semibold tabular-nums text-slate-900 dark:text-stone-50">
-              {score.earned}/{score.possible} · {formatGradeLabel(score.percent)}
-            </p>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-sky-100 dark:bg-stone-800">
-            <div
-              className="h-full rounded-full bg-sky-500 transition-[width] dark:bg-sky-400"
-              style={{ width: `${score.percent}%` }}
-            />
-          </div>
-          {progress.graduated && (
-            <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">
-              Section graduated — you solved {progress.problemsSolved} of{" "}
-              {graduationThreshold} required problems.
-            </p>
-          )}
-        </div>
-      )}
+      <p className="text-sm tabular-nums text-slate-600 dark:text-stone-400">
+        Lesson {lessonCompletionPercent}% complete
+      </p>
 
       {plan.review.length > 0 && progress.phase === "review" && reviewQuestion && (
         <PhaseSection
           title="Review questions"
-          description={`${plan.review.length} warm-up questions before the video (${rubric.reviewPointsEach} pt each).`}
-          progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} correct`}
+          description={`${plan.review.length} warm-up questions before the video.`}
+          progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
         >
           <QuestionPanel
             key={`review-${reviewQuestion.id}`}
@@ -263,7 +250,7 @@ export function GradedLessonFlow({
       {reviewComplete && progress.phase === "multiple-choice" && mcQuestion && (
         <PhaseSection
           title="Multiple choice"
-          description={`Answer ${rubric.mcTargetCorrect} correctly from ${plan.multipleChoice.length} questions (${rubric.mcPointsEach} pts each). ${progress.mcCorrectCount} correct so far.`}
+          description={`Work through ${plan.multipleChoice.length} questions. Answer ${rubric.mcTargetCorrect} correctly to finish this section.`}
           progressLabel={`Question ${progress.mcIndex + 1} of ${plan.multipleChoice.length}`}
         >
           <QuestionPanel
@@ -303,7 +290,7 @@ export function GradedLessonFlow({
       {reviewComplete && progress.phase === "fill-in-blank" && fibQuestion && (
         <PhaseSection
           title="Fill in the blank"
-          description={`${rubric.fibCount} questions (${rubric.fibPointsEach} pts each).`}
+          description={`${plan.fillInBlank.length} fill-in-the-blank questions.`}
           progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
         >
           <QuestionPanel
@@ -343,7 +330,7 @@ export function GradedLessonFlow({
       {reviewComplete && progress.phase === "extra-practice" && extraQuestion && (
         <PhaseSection
           title="Review / extra practice"
-          description={`${rubric.extraCount} mixed review questions (${rubric.extraPointsEach} pts each).`}
+          description={`${plan.extraPractice.length} mixed review questions.`}
           progressLabel={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
         >
           <QuestionPanel
@@ -372,7 +359,7 @@ export function GradedLessonFlow({
       {reviewComplete && progress.phase === "free-response" && freeResponse && (
         <PhaseSection
           title="Free response"
-          description={`Write a longer answer (${rubric.freeResponsePoints} pts — your parent will grade this).`}
+          description="Write a longer answer for your parent to review."
           progressLabel={
             progress.freeResponseSubmitted ? "Submitted for grading" : "Not submitted"
           }
@@ -406,16 +393,25 @@ export function GradedLessonFlow({
         </PhaseSection>
       )}
 
+      {progress.graduated && progress.phase !== "complete" && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
+          <p className="font-medium">
+            Section graduated — you solved {progress.problemsSolved} of{" "}
+            {graduationThreshold} required problems.
+          </p>
+        </div>
+      )}
+
       {progress.phase === "complete" && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-4 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
           <p className="font-medium">Lesson work complete!</p>
-          <p className="mt-1">
-            Score: {score?.earned}/{maxLessonScore(rubric)} points
-            {progress.freeResponseSubmitted && progress.freeResponseParentScore == null
-              ? " (free response pending parent grade)"
-              : ""}
-            .
-          </p>
+          {progress.freeResponseSubmitted &&
+            progress.freeResponseParentScore == null && (
+              <p className="mt-1">
+                Your free response has been submitted and is waiting for your
+                parent to review.
+              </p>
+            )}
         </div>
       )}
     </div>

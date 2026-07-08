@@ -4,7 +4,7 @@ import { MAX_END_OF_CHAPTER_QUESTIONS } from "@/lib/lesson/types";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import type { Course } from "@/lib/student/curriculum";
 import {
-  gradedLessonProgressPercent,
+  gradedLessonCompletionPercent,
   getGradedLessonStatus,
   loadGradedLessonProgress,
 } from "@/lib/student/graded-lesson-progress";
@@ -120,7 +120,7 @@ export function getLessonPartialPercent(
 
   const graded = loadGradedLessonProgress(studentScope, courseId, lessonId);
   if (graded) {
-    return gradedLessonProgressPercent(graded, rubric);
+    return gradedLessonCompletionPercent(graded);
   }
 
   return lessonProgressPercent(

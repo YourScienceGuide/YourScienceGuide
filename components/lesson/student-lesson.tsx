@@ -20,7 +20,6 @@ import {
 } from "@/lib/student/curriculum-client";
 import { getLessonReadings } from "@/lib/student/textbook";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
-import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
 import { LessonVideo } from "@/components/lesson/lesson-video";
 import { Button } from "@/components/ui/button";
 import { lessonFlashcardsPath, lessonPracticePath } from "@/lib/student/paths";
@@ -36,7 +35,6 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   const { activeStudentId } = useActiveStudent();
   const { store } = useContentStore();
   const [canAccessLesson, setCanAccessLesson] = useState(false);
-  const [gradePercent, setGradePercent] = useState(0);
   const course = getCourseClient(store, courseId);
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const textbook = getTextbookClient(store, courseId);
@@ -46,7 +44,6 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
 
   useEffect(() => {
     setCanAccessLesson(false);
-    setGradePercent(0);
   }, [lessonId]);
 
   if (!course || !lessonMeta) {
@@ -79,11 +76,6 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
   return (
     <GuestLessonGuard courseId={courseId} lessonId={lessonId}>
       <div className="space-y-10">
-        <LessonProgressRail
-          percent={gradePercent}
-          stepLabel={`Lesson grade · ${gradePercent}%`}
-        />
-
         <LessonNav
           courseId={courseId}
           courseTitle={course.title}
@@ -93,8 +85,8 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
         />
 
         <p className="text-base text-slate-600 dark:text-stone-400">
-          Complete review questions, watch the video, then work through each graded
-          section. Your parent can see your score on their dashboard.
+          Complete review questions, watch the video, then work through each section
+          of the lesson.
         </p>
 
         <GradedLessonFlow
@@ -103,7 +95,6 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
           courseId={courseId}
           lessonId={lessonId}
           onAccessChange={setCanAccessLesson}
-          onScoreChange={setGradePercent}
         >
           {canAccessLesson ? (
             <>
@@ -139,7 +130,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
                     Bonus extra practice
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-stone-400">
-                    Optional harder problems — not counted toward your lesson grade.
+                    Optional harder problems — not required to finish the lesson.
                   </p>
                 </div>
                 {hasExtraPractice ? (
@@ -176,7 +167,7 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
                     Flashcard Review
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-stone-400">
-                    Optional spaced repetition — not counted toward your lesson grade.
+                    Optional spaced repetition — not required to finish the lesson.
                   </p>
                 </div>
                 <Button asChild className="shrink-0">

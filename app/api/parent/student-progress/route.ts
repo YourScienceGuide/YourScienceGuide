@@ -4,7 +4,6 @@ import { loadContentStoreFromDatabase } from "@/lib/admin/content-store.server";
 import { getGradingConfigFromStore } from "@/lib/admin/content-store";
 import { requireFamilyStudentAccess } from "@/lib/auth/require-authenticated";
 import {
-  letterGradeFromPercent,
   maxLessonScore,
   rubricLineItems,
 } from "@/lib/lesson/lesson-grade-config";
@@ -12,6 +11,7 @@ import {
   listLessonGradesForStudent,
   listPendingSubmissionsForStudent,
 } from "@/lib/student/lesson-grades.server";
+import { summarizeLessonGrades } from "@/lib/parent/summarize-lesson-grades";
 import { getCourseFromStore } from "@/lib/admin/content-store";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
@@ -53,8 +53,8 @@ export async function GET(request: Request) {
         rubric: { config: rubric, items: rubricItems, maxScore },
         lessonGrades: [],
         pendingSubmissions: [],
-        overallPercent: 0,
-        gradeLabel: "—",
+        totalEarnedPoints: 0,
+        totalPossiblePoints: 0,
         courseProgress: 0,
       });
     }
@@ -65,19 +65,8 @@ export async function GET(request: Request) {
     ]);
 
     const lessonCount = course?.lessons.length ?? 0;
-    const courseProgress =
-      lessonCount > 0
-        ? Math.round(
-            lessonGrades.reduce((sum, grade) => sum + grade.percent, 0) / lessonCount,
-          )
-        : 0;
-    const overallPercent =
-      lessonGrades.length > 0
-        ? Math.round(
-            lessonGrades.reduce((sum, grade) => sum + grade.percent, 0) /
-              lessonGrades.length,
-          )
-        : 0;
+    const { totalEarnedPoints, totalPossiblePoints, courseProgress } =
+      summarizeLessonGrades(lessonGrades, lessonCount);
 
     return NextResponse.json({
       source: "supabase",
@@ -85,8 +74,8 @@ export async function GET(request: Request) {
       rubric: { config: rubric, items: rubricItems, maxScore },
       lessonGrades,
       pendingSubmissions,
-      overallPercent,
-      gradeLabel: letterGradeFromPercent(overallPercent),
+      totalEarnedPoints,
+      totalPossiblePoints,
       courseProgress,
     });
   } catch (error) {
