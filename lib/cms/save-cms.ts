@@ -57,6 +57,8 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
         csv_section: lesson.section ?? null,
         access_tier: normalizeLessonAccessTier(lesson.accessTier, lesson.id),
         graduation_problem_count: lesson.graduationProblemCount ?? null,
+        parent_engagement_prompt: lesson.parentEngagementPrompt ?? null,
+        free_response_rubric: lesson.freeResponseRubric ?? null,
         updated_at: timestamp,
       }));
 

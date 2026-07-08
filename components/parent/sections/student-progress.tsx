@@ -1,6 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useContentStore } from "@/components/admin/content-store-provider";
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 export function StudentProgressSection() {
   const { user, isLoaded: userLoaded } = useUser();
+  const searchParams = useSearchParams();
   const { store, loading: storeLoading } = useContentStore();
   const { students, activeStudent } = useActiveStudent();
   const [viewingId, setViewingId] = useState(
@@ -34,6 +36,17 @@ export function StudentProgressSection() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gradingId, setGradingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const studentId = searchParams.get("familyStudentId");
+    const submissionId = searchParams.get("submissionId");
+    if (studentId && students.some((entry) => entry.id === studentId)) {
+      setViewingId(studentId);
+    }
+    if (submissionId) {
+      setGradingId(submissionId);
+    }
+  }, [searchParams, students]);
 
   const student =
     students.find((s) => s.id === viewingId) ?? students[0] ?? null;

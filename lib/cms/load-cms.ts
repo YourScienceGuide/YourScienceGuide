@@ -221,6 +221,8 @@ function mapLessonRow(row: LessonRow): CurriculumLesson {
     section: row.csv_section ?? undefined,
     accessTier: normalizeLessonAccessTier(row.access_tier, row.id),
     graduationProblemCount: row.graduation_problem_count ?? undefined,
+    parentEngagementPrompt: row.parent_engagement_prompt ?? undefined,
+    freeResponseRubric: row.free_response_rubric ?? undefined,
   };
 }
 

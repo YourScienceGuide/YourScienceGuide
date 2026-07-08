@@ -9,6 +9,7 @@ export const ADMIN_TABS = [
   "assignment",
   "flashcards",
   "videos",
+  "emails",
 ] as const;
 
 export type AdminTabId = (typeof ADMIN_TABS)[number];

@@ -21,6 +21,8 @@ export type LessonRow = {
   csv_section: number | null;
   access_tier: "preview" | "subscriber" | null;
   graduation_problem_count: number | null;
+  parent_engagement_prompt: string | null;
+  free_response_rubric: string | null;
 };
 
 export type CourseGradingConfigRow = {

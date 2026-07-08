@@ -15,6 +15,10 @@ export type CurriculumLesson = {
   accessTier?: LessonAccessTier;
   /** Override course default; problems solved to graduate this section. */
   graduationProblemCount?: number;
+  /** Discussion prompt included in the daily parent email. */
+  parentEngagementPrompt?: string;
+  /** Rubric text parents see when grading the lesson free response. */
+  freeResponseRubric?: string;
 };
 
 export type Course = {

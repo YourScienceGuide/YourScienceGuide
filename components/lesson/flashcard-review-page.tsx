@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AnkiFlashcardReview } from "@/components/lesson/anki-flashcard-review";
 import { LessonProgressRail } from "@/components/lesson/lesson-progress-rail";
+import { useActiveStudent } from "@/components/family/active-student-provider";
 import { useStudentScope } from "@/components/student/use-student-scope";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,10 @@ import {
   loadFlashcardDefinitions,
   saveFlashcardDefinition,
 } from "@/lib/student/flashcard-definitions";
+import {
+  recordFlashcardStudyEventClient,
+  saveFlashcardDefinitionClient,
+} from "@/lib/student/flashcard-progress-client";
 import { lessonPath } from "@/lib/student/paths";
 import { shouldPersistStudentData } from "@/lib/student/student-scope";
 import { EMPTY_FLASHCARDS, listIdSignature } from "@/lib/utils/collections";
@@ -82,6 +87,7 @@ export function FlashcardReviewPage({
 }: FlashcardReviewPageProps) {
   const { store } = useContentStore();
   const studentScope = useStudentScope();
+  const { activeStudentId } = useActiveStudent();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const flashcardKey = lessonKey(courseId, lessonId);
   const storedFlashcards = store.flashcardsByLesson?.[flashcardKey];
@@ -138,8 +144,37 @@ export function FlashcardReviewPage({
     (cardId: string, definition: string) => {
       if (!studentScope) return;
       saveFlashcardDefinition(studentScope, courseId, lessonId, cardId, definition);
+      if (!activeStudentId) return;
+      const card = adminCards.find((entry) => entry.id === cardId);
+      void saveFlashcardDefinitionClient({
+        familyStudentId: activeStudentId,
+        courseId,
+        lessonId,
+        cardId,
+        frontText: card?.term ?? "",
+        definition,
+      }).catch(() => {
+        // Local definition is still saved; server sync is best-effort.
+      });
     },
-    [courseId, lessonId, studentScope],
+    [activeStudentId, adminCards, courseId, lessonId, studentScope],
+  );
+
+  const onCardRated = useCallback(
+    (input: { cardId: string; front: string; isCorrect: boolean }) => {
+      if (!activeStudentId) return;
+      void recordFlashcardStudyEventClient({
+        familyStudentId: activeStudentId,
+        courseId,
+        lessonId,
+        cardId: input.cardId,
+        frontText: input.front,
+        isCorrect: input.isCorrect,
+      }).catch(() => {
+        // Best-effort server logging for parent digest emails.
+      });
+    },
+    [activeStudentId, courseId, lessonId],
   );
 
   if (!studentScope) {
@@ -229,6 +264,7 @@ export function FlashcardReviewPage({
         state={state}
         onStateChange={onStateChange}
         onDefinitionSaved={onDefinitionSaved}
+        onCardRated={onCardRated}
       />
     </div>
     </GuestLessonGuard>

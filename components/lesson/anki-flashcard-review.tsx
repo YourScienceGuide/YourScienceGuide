@@ -21,12 +21,19 @@ type AnkiFlashcardReviewProps = {
   state: DeckState;
   onStateChange: (state: DeckState) => void;
   onDefinitionSaved?: (cardId: string, definition: string) => void;
+  onCardRated?: (input: {
+    cardId: string;
+    front: string;
+    rating: AnkiRating;
+    isCorrect: boolean;
+  }) => void;
 };
 
 export function AnkiFlashcardReview({
   state,
   onStateChange,
   onDefinitionSaved,
+  onCardRated,
 }: AnkiFlashcardReviewProps) {
   const current = getCurrentCard(state);
   const counts = deckCounts(state);
@@ -42,9 +49,18 @@ export function AnkiFlashcardReview({
 
   const handleRate = useCallback(
     (rating: AnkiRating) => {
+      const currentCard = getCurrentCard(state);
       onStateChange(rateCard(state, rating));
+      if (currentCard) {
+        onCardRated?.({
+          cardId: currentCard.id,
+          front: currentCard.front,
+          rating,
+          isCorrect: rating === "good" || rating === "easy",
+        });
+      }
     },
-    [onStateChange, state],
+    [onCardRated, onStateChange, state],
   );
 
   useEffect(() => {

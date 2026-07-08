@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { StudentProgressSection } from "@/components/parent/sections/student-progress";
 
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function ParentProgressPage() {
-  return <StudentProgressSection />;
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-600">Loading progress…</p>}>
+      <StudentProgressSection />
+    </Suspense>
+  );
 }
