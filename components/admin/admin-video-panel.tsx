@@ -1,59 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
 
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
-import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { AdminSaveBar } from "@/components/admin/admin-save-bar";
+import { AdminStatusBar } from "@/components/admin/admin-status-bar";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import {
   applyPersistResult,
   confirmDiscardUnsavedChanges,
+  errorSaveFeedback,
+  successSaveFeedback,
 } from "@/lib/admin/admin-save-feedback";
 import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
 import {
   getVideoFromStore,
   type LessonVideoMeta,
 } from "@/lib/admin/content-store";
-import { formatSaveError } from "@/lib/admin/format-save-error";
-import { Button } from "@/components/ui/button";
+import {
+  uploadLessonVideoFile,
+  validateVideoUploadFile,
+  VIDEO_UPLOAD_PHASE_MESSAGES,
+  type VideoUploadPhase,
+} from "@/lib/admin/video-upload-client";
 import { MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/config";
-
-const POLL_INTERVAL_MS = 2000;
-const POLL_MAX_ATTEMPTS = 90;
-
-async function pollForPlaybackId(uploadId: string): Promise<string> {
-  for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(`/api/videos/upload/${uploadId}`);
-    if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? "Failed to check upload status");
-    }
-
-    const data = (await res.json()) as {
-      status: string;
-      playbackId?: string;
-      error?: string;
-    };
-
-    if (data.status === "ready" && data.playbackId) {
-      return data.playbackId;
-    }
-    if (data.status === "errored") {
-      throw new Error(data.error ?? "Video processing failed");
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-  }
-
-  throw new Error("Timed out waiting for video processing. Try again in a moment.");
-}
+import { Button } from "@/components/ui/button";
 
 export function AdminVideoPanel() {
   const { store, persist, saving } = useContentStore();
   const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const savedMeta = useMemo(
     () =>
       getVideoFromStore(store, courseId, lessonId) ?? {
@@ -65,14 +43,21 @@ export function AdminVideoPanel() {
   const savedKey = useMemo(() => JSON.stringify(savedMeta), [savedMeta]);
   const [draft, setDraft] = useState<LessonVideoMeta>(savedMeta);
   const [saveFeedback, setSaveFeedback] = useState<AdminFeedback | null>(null);
-  const [uploadError, setUploadError] = useState<AdminFeedback | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadFeedback, setUploadFeedback] = useState<AdminFeedback | null>(null);
+  const [uploadPhase, setUploadPhase] = useState<VideoUploadPhase | null>(null);
+  const [removingVideo, setRemovingVideo] = useState(false);
 
+  const uploading = uploadPhase !== null;
   const isDirty = JSON.stringify(draft) !== savedKey;
 
   useEffect(() => {
     setDraft(savedMeta);
     setSaveFeedback(null);
+    setUploadFeedback(null);
+    setUploadPhase(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }, [courseId, lessonId]);
 
   useEffect(() => {
@@ -82,13 +67,19 @@ export function AdminVideoPanel() {
   }, [savedKey, savedMeta, isDirty]);
 
   function handleCourseChange(nextCourseId: string) {
-    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    if ((isDirty || uploading) && !confirmDiscardUnsavedChanges()) return;
     setCourseId(nextCourseId);
   }
 
   function handleLessonChange(nextLessonId: string) {
-    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    if ((isDirty || uploading) && !confirmDiscardUnsavedChanges()) return;
     setLessonId(nextLessonId);
+  }
+
+  function resetFileInput() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   async function saveChanges() {
@@ -119,78 +110,104 @@ export function AdminVideoPanel() {
         ...store,
         videos: { ...store.videos, [key]: next },
       },
-      { successMessage },
+      { silent: true },
     );
+
     if (result.ok) {
       setDraft(next);
+      setUploadFeedback(successSaveFeedback(successMessage));
       return true;
     }
-    setSaveFeedback(applyPersistResult(result));
+
+    setUploadFeedback(applyPersistResult(result));
     return false;
   }
 
   async function handleFile(file: File | null) {
     if (!file) return;
-    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
-      setUploadError({
-        type: "error",
-        message: `File must be under ${MAX_VIDEO_UPLOAD_MB} MB.`,
-        tips: ["Choose a smaller video file or compress it before uploading."],
-      });
+
+    const validationError = validateVideoUploadFile(
+      file,
+      MAX_VIDEO_UPLOAD_BYTES,
+      MAX_VIDEO_UPLOAD_MB,
+    );
+    if (validationError) {
+      setUploadFeedback(validationError);
+      resetFileInput();
       return;
     }
 
-    setUploadError(null);
-    setUploadStatus("Requesting upload URL…");
+    setUploadFeedback(null);
+    setSaveFeedback(null);
+    setUploadPhase("starting");
 
     try {
-      const createRes = await fetch("/api/videos/upload", { method: "POST" });
-      if (!createRes.ok) {
-        const body = (await createRes.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? "Failed to start upload");
-      }
-
-      const { url, uploadId } = (await createRes.json()) as {
-        url: string;
-        uploadId: string;
+      const { playbackId } = await uploadLessonVideoFile(file, setUploadPhase);
+      const nextMeta: LessonVideoMeta = {
+        ...draft,
+        muxPlaybackId: playbackId,
+        fileName: file.name,
+        sourceUrl: undefined,
       };
 
-      setUploadStatus("Uploading video…");
-      const putRes = await fetch(url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type || "video/mp4" },
-      });
-      if (!putRes.ok) {
-        throw new Error("Upload failed. Check your connection and try again.");
+      const saved = await persistVideoMeta(
+        nextMeta,
+        "Video uploaded and saved for this lesson.",
+      );
+
+      if (!saved) {
+        setDraft(nextMeta);
+        setUploadFeedback({
+          type: "error",
+          message:
+            "Video uploaded, but we couldn't save it to this lesson.",
+          tips: [
+            "Your video finished uploading — click Save changes above to try again.",
+            "If this keeps happening, check your connection or try again later.",
+          ],
+        });
       }
+    } catch (error) {
+      setUploadFeedback(errorSaveFeedback(error));
+    } finally {
+      setUploadPhase(null);
+      resetFileInput();
+    }
+  }
 
-      setUploadStatus("Processing video…");
-      const playbackId = await pollForPlaybackId(uploadId);
+  async function handleRemoveVideo() {
+    if (
+      !window.confirm(
+        "Remove the uploaded video from this lesson? Students will no longer see it until you upload again.",
+      )
+    ) {
+      return;
+    }
 
+    setUploadFeedback(null);
+    setSaveFeedback(null);
+    setRemovingVideo(true);
+
+    try {
       const ok = await persistVideoMeta(
         {
-          ...draft,
-          muxPlaybackId: playbackId,
-          fileName: file.name,
-          sourceUrl: undefined,
+          title: draft.title,
+          description: draft.description,
         },
-        "Video uploaded for this lesson.",
+        "Removed uploaded video from this lesson.",
       );
       if (!ok) return;
-      setUploadStatus(null);
-    } catch (error) {
-      setUploadStatus(null);
-      const formatted = formatSaveError(error);
-      setUploadError({
-        type: "error",
-        message: formatted.message,
-        tips: formatted.tips,
-      });
+    } finally {
+      setRemovingVideo(false);
+      resetFileInput();
     }
   }
 
   const hasVideo = Boolean(draft.muxPlaybackId || draft.sourceUrl);
+  const uploadBusy = uploading || removingVideo;
+  const uploadBusyMessage = uploading
+    ? VIDEO_UPLOAD_PHASE_MESSAGES[uploadPhase]
+    : "Removing video…";
 
   return (
     <div className="space-y-6">
@@ -204,12 +221,19 @@ export function AdminVideoPanel() {
 
       <AdminSaveBar
         isDirty={isDirty}
-        saving={saving}
+        saving={saving && !uploadBusy}
         feedback={saveFeedback}
         dirtyMessage="You have unsaved video title or description changes."
         onSave={saveChanges}
         onDiscard={discardChanges}
         onDismissFeedback={() => setSaveFeedback(null)}
+      />
+
+      <AdminStatusBar
+        busy={uploadBusy}
+        busyMessage={uploadBusyMessage}
+        feedback={uploadFeedback}
+        onDismissFeedback={() => setUploadFeedback(null)}
       />
 
       <div className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
@@ -240,26 +264,25 @@ export function AdminVideoPanel() {
             Upload video file
           </label>
           <p className="text-xs text-slate-500 dark:text-stone-500">
-            MP4 or similar video files. Max {MAX_VIDEO_UPLOAD_MB} MB.
+            MP4, MOV, WebM, or similar video files. Max {MAX_VIDEO_UPLOAD_MB} MB.
           </p>
           <input
+            ref={fileInputRef}
             type="file"
             accept="video/*"
-            disabled={Boolean(uploadStatus)}
+            disabled={uploadBusy || saving}
             onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
             className="block w-full text-sm disabled:opacity-50"
           />
-          {hasVideo && (
-            <p className="text-xs text-slate-500">A video is attached to this lesson.</p>
+          {hasVideo && draft.fileName && (
+            <p className="text-xs text-slate-500 dark:text-stone-500">
+              Current file: {draft.fileName}
+            </p>
           )}
-          {uploadStatus && (
-            <p className="text-sm text-slate-600 dark:text-stone-400">{uploadStatus}</p>
-          )}
-          {uploadError && (
-            <AdminActionFeedback
-              feedback={uploadError}
-              onDismiss={() => setUploadError(null)}
-            />
+          {hasVideo && !draft.fileName && (
+            <p className="text-xs text-slate-500 dark:text-stone-500">
+              A video is attached to this lesson.
+            </p>
           )}
         </div>
         {draft.muxPlaybackId ? (
@@ -275,18 +298,10 @@ export function AdminVideoPanel() {
             type="button"
             variant="ghost"
             size="sm"
-            disabled={Boolean(uploadStatus)}
-            onClick={() =>
-              void persistVideoMeta(
-                {
-                  title: draft.title,
-                  description: draft.description,
-                },
-                "Removed uploaded video from this lesson.",
-              )
-            }
+            disabled={uploadBusy || saving}
+            onClick={() => void handleRemoveVideo()}
           >
-            Remove uploaded file
+            {removingVideo ? "Removing…" : "Remove uploaded file"}
           </Button>
         )}
       </div>
