@@ -14,6 +14,7 @@ export const ADMIN_TAB_ROUTES: ReadonlyArray<{
   { id: "flashcards", label: "Flashcards", href: "/admin/flashcards" },
   { id: "videos", label: "Lesson videos", href: "/admin/videos" },
   { id: "emails", label: "Parent emails", href: "/admin/emails" },
+  { id: "faq", label: "FAQ", href: "/admin/faq" },
 ];
 
 const ADMIN_TAB_BY_SEGMENT = new Map(

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 const baseLinks = [
   { href: "/student", label: "Student" },
   { href: "/parent", label: "Parent" },
+  { href: "/faq", label: "FAQ" },
   { href: "/settings", label: "Settings" },
 ] as const;
 

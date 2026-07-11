@@ -21,6 +21,9 @@ export default function HomePage() {
         <Button asChild variant="ghost">
           <Link href="/parent">Parent portal</Link>
         </Button>
+        <Button asChild variant="ghost">
+          <Link href="/faq">FAQ</Link>
+        </Button>
       </div>
     </div>
   );
