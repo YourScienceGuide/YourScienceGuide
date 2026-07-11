@@ -59,7 +59,13 @@ export function AdminAssignmentPanel() {
   useEffect(() => {
     setDraft(savedQuestions);
     setSaveFeedback(null);
-  }, [courseId, lessonId, savedKey, savedQuestions]);
+  }, [courseId, lessonId]);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setDraft(savedQuestions);
+    }
+  }, [savedKey, savedQuestions, isDirty]);
 
   function handleCourseChange(nextCourseId: string) {
     if (isDirty && !confirmDiscardUnsavedChanges()) return;
@@ -107,9 +113,7 @@ export function AdminAssignmentPanel() {
       },
       { silent: true },
     );
-    setSaveFeedback(
-      applyPersistResult(result, "Chapter questions saved for this lesson."),
-    );
+    setSaveFeedback(applyPersistResult(result));
   }
 
   function discardChanges() {

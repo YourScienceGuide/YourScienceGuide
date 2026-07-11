@@ -21,6 +21,7 @@ import {
 } from "@/lib/lesson/lesson-grade-config";
 import { buildLessonAssessmentPlan } from "@/lib/lesson/lesson-assessment-plan";
 import { getCourseFromStore } from "@/lib/admin/content-store";
+import { ADMIN_SAVE_PUBLISHED_MESSAGE } from "@/lib/admin/admin-save-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -73,7 +74,7 @@ export function AdminGradingPanel() {
   async function saveRubric() {
     const normalized = normalizeGradingRubric(draft);
     const result = await persist(setGradingConfigInStore(store, courseId, normalized), {
-      successMessage: "Saved grading rubric for this course.",
+      successMessage: ADMIN_SAVE_PUBLISHED_MESSAGE,
     });
     if (result.ok) setDraft(normalized);
   }
@@ -102,7 +103,7 @@ export function AdminGradingPanel() {
         c.id === courseId ? { ...c, lessons } : c,
       ),
     }, {
-      successMessage: "Saved graduation threshold for this lesson.",
+      successMessage: ADMIN_SAVE_PUBLISHED_MESSAGE,
     });
     if (!result.ok) return;
   }

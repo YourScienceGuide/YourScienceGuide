@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
+import {
+  AdminActionFeedback,
+  type AdminFeedback,
+} from "@/components/admin/admin-action-feedback";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
@@ -17,10 +20,13 @@ import {
   PARENT_DAILY_EMAIL_VARIABLES,
   type ParentDailyEmailTemplate,
 } from "@/lib/email/default-parent-daily-template";
+import { formatSaveError } from "@/lib/admin/format-save-error";
+import {
+  ADMIN_SAVE_PUBLISHED_MESSAGE,
+  successSaveFeedback,
+} from "@/lib/admin/admin-save-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
-import { formatSaveError } from "@/lib/admin/format-save-error";
 
 export function AdminEmailsPanel() {
   const { store, persist, saving, actionFeedback, clearActionFeedback } =
@@ -76,10 +82,7 @@ export function AdminEmailsPanel() {
     try {
       const saved = await saveParentDailyEmailTemplate(draft);
       setDraft(saved);
-      setTemplateFeedback({
-        type: "success",
-        message: "Saved daily parent email template.",
-      });
+      setTemplateFeedback(successSaveFeedback(ADMIN_SAVE_PUBLISHED_MESSAGE));
     } catch (error) {
       const formatted = formatSaveError(error);
       setTemplateFeedback({

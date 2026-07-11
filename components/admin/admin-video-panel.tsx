@@ -73,7 +73,13 @@ export function AdminVideoPanel() {
   useEffect(() => {
     setDraft(savedMeta);
     setSaveFeedback(null);
-  }, [courseId, lessonId, savedKey, savedMeta]);
+  }, [courseId, lessonId]);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setDraft(savedMeta);
+    }
+  }, [savedKey, savedMeta, isDirty]);
 
   function handleCourseChange(nextCourseId: string) {
     if (isDirty && !confirmDiscardUnsavedChanges()) return;
@@ -95,9 +101,7 @@ export function AdminVideoPanel() {
       },
       { silent: true },
     );
-    setSaveFeedback(
-      applyPersistResult(result, "Video details saved for this lesson."),
-    );
+    setSaveFeedback(applyPersistResult(result));
   }
 
   function discardChanges() {
@@ -121,7 +125,7 @@ export function AdminVideoPanel() {
       setDraft(next);
       return true;
     }
-    setSaveFeedback(applyPersistResult(result, successMessage));
+    setSaveFeedback(applyPersistResult(result));
     return false;
   }
 

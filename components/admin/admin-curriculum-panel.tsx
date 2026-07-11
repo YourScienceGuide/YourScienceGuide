@@ -88,7 +88,13 @@ export function AdminCurriculumPanel() {
   useEffect(() => {
     setLessonDrafts(savedLessons);
     setLessonSaveFeedback(null);
-  }, [selectedCourseId, savedLessonsKey, savedLessons]);
+  }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!isLessonDraftDirty) {
+      setLessonDrafts(savedLessons);
+    }
+  }, [savedLessonsKey, savedLessons, isLessonDraftDirty]);
 
   async function saveCourses(courses: Course[], options?: PersistOptions) {
     return persist({ ...store, courses }, options);
@@ -206,9 +212,7 @@ export function AdminCurriculumPanel() {
       entry.id === course.id ? { ...entry, lessons: lessonDrafts } : entry,
     );
     const result = await saveCourses(courses, { silent: true });
-    setLessonSaveFeedback(
-      applyPersistResult(result, "Saved lesson titles and descriptions."),
-    );
+    setLessonSaveFeedback(applyPersistResult(result));
   }
 
   function discardLessonDetails() {

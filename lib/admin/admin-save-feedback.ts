@@ -2,7 +2,12 @@ import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
 import { toAdminErrorFeedback } from "@/lib/admin/format-save-error";
 import type { PersistResult } from "@/components/admin/content-store-provider";
 
-export function successSaveFeedback(message: string): AdminFeedback {
+export const ADMIN_SAVE_PUBLISHED_MESSAGE =
+  "Save successful — your changes have been published for students.";
+
+export function successSaveFeedback(
+  message: string = ADMIN_SAVE_PUBLISHED_MESSAGE,
+): AdminFeedback {
   return { type: "success", message };
 }
 
@@ -12,7 +17,7 @@ export function errorSaveFeedback(error: unknown): AdminFeedback {
 
 export function applyPersistResult(
   result: PersistResult,
-  successMessage: string,
+  successMessage: string = ADMIN_SAVE_PUBLISHED_MESSAGE,
 ): AdminFeedback | null {
   if (result.ok) {
     return successSaveFeedback(successMessage);

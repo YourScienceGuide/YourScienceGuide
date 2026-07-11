@@ -18,7 +18,12 @@ import {
   type AdminContentStore,
 } from "@/lib/admin/content-store";
 import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
+import { ADMIN_SAVE_PUBLISHED_MESSAGE } from "@/lib/admin/admin-save-feedback";
 import { formatSaveError } from "@/lib/admin/format-save-error";
+import {
+  persistAdminContent,
+  resetAdminContent,
+} from "@/lib/admin/persist-admin-content-client";
 
 export type PersistOptions = {
   /** Shown in the admin banner when save succeeds. */
@@ -113,31 +118,27 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       setSaving(true);
       setSaveError(null);
 
-      const sanitized = sanitizeContentStore(next);
-
       try {
-        const res = await fetch("/api/admin/content", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(sanitized),
-        });
+        const result = await persistAdminContent(next);
 
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(body?.error ?? "Failed to save content");
+        if (!result.ok) {
+          setSaveError(result.error);
+          setActionFeedback({
+            type: "error",
+            message: result.error,
+            tips: result.tips,
+          });
+          return { ok: false, error: result.error };
         }
 
-        const saved = sanitizeContentStore((await res.json()) as AdminContentStore);
-        setStore(saved);
+        setStore(result.store);
         setSource("supabase");
         notifyContentUpdated();
 
         if (!options?.silent) {
           setActionFeedback({
             type: "success",
-            message: options?.successMessage ?? "Changes saved.",
+            message: options?.successMessage ?? ADMIN_SAVE_PUBLISHED_MESSAGE,
           });
         }
 
@@ -163,19 +164,19 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
     setSaveError(null);
 
     try {
-      const res = await fetch("/api/admin/content?action=reset", {
-        method: "POST",
-      });
+      const result = await resetAdminContent();
 
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? "Failed to reset content");
+      if (!result.ok) {
+        setSaveError(result.error);
+        setActionFeedback({
+          type: "error",
+          message: result.error,
+          tips: result.tips,
+        });
+        return { ok: false, error: result.error };
       }
 
-      const saved = sanitizeContentStore((await res.json()) as AdminContentStore);
-      setStore(saved);
+      setStore(result.store);
       setSource("supabase");
       notifyContentUpdated();
       setActionFeedback({

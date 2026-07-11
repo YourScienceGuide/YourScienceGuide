@@ -52,7 +52,13 @@ export function AdminReviewQuestionsPanel() {
   useEffect(() => {
     setDraft(savedQuestions);
     setSaveFeedback(null);
-  }, [courseId, lessonId, savedKey, savedQuestions]);
+  }, [courseId, lessonId]);
+
+  useEffect(() => {
+    if (!isDirty) {
+      setDraft(savedQuestions);
+    }
+  }, [savedKey, savedQuestions, isDirty]);
 
   function handleCourseChange(nextCourseId: string) {
     if (isDirty && !confirmDiscardUnsavedChanges()) return;
@@ -93,9 +99,7 @@ export function AdminReviewQuestionsPanel() {
       setReviewQuestionsInStore(store, courseId, lessonId, draft),
       { silent: true },
     );
-    setSaveFeedback(
-      applyPersistResult(result, "Review questions saved for this lesson."),
-    );
+    setSaveFeedback(applyPersistResult(result));
   }
 
   function discardChanges() {

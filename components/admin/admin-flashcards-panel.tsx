@@ -11,7 +11,6 @@ import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import {
   applyPersistResult,
-  errorSaveFeedback,
 } from "@/lib/admin/admin-save-feedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,15 +28,13 @@ export function AdminFlashcardsPanel() {
 
   const flashcards = getFlashcardsFromStore(store, courseId, lessonId);
 
-  async function saveFlashcards(nextCards: typeof flashcards, message: string) {
+  async function saveFlashcards(nextCards: typeof flashcards) {
     setFeedback(null);
     const result = await persist(
       setFlashcardsInStore(store, courseId, lessonId, nextCards),
-      { successMessage: message },
+      { silent: true },
     );
-    if (!result.ok) {
-      setFeedback(errorSaveFeedback(result.error));
-    }
+    setFeedback(applyPersistResult(result));
   }
 
   async function handleAddTerm(e: React.FormEvent) {
@@ -54,16 +51,13 @@ export function AdminFlashcardsPanel() {
       return;
     }
 
-    await saveFlashcards([...flashcards, { id, term }], `Added flashcard "${term}".`);
+    await saveFlashcards([...flashcards, { id, term }]);
     setNewTerm("");
   }
 
   async function handleDelete(cardId: string, term: string) {
     if (!window.confirm(`Delete flashcard "${term}"?`)) return;
-    await saveFlashcards(
-      flashcards.filter((card) => card.id !== cardId),
-      `Deleted flashcard "${term}".`,
-    );
+    await saveFlashcards(flashcards.filter((card) => card.id !== cardId));
   }
 
   return (

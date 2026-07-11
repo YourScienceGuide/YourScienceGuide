@@ -9,6 +9,7 @@ import { getCourseFromStore } from "@/lib/admin/content-store";
 import { getLessonAccessTier } from "@/lib/student/lesson-access";
 import type { LessonAccessTier } from "@/lib/student/curriculum-types";
 import { lessonPositionLabel, sortLessons } from "@/lib/student/lesson-sort";
+import { ADMIN_SAVE_PUBLISHED_MESSAGE } from "@/lib/admin/admin-save-feedback";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -87,10 +88,7 @@ export function AdminAccessPanel() {
     await persist(
       { ...store, courses },
       {
-        successMessage:
-          dirtyLessonIds.length === 1
-            ? "Saved access for 1 lesson."
-            : `Saved access for ${dirtyLessonIds.length} lessons.`,
+        successMessage: ADMIN_SAVE_PUBLISHED_MESSAGE,
       },
     );
   }
