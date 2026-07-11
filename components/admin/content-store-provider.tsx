@@ -133,7 +133,6 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
 
         setStore(result.store);
         setSource("supabase");
-        notifyContentUpdated();
 
         if (!options?.silent) {
           setActionFeedback({

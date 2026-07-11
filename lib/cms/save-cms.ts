@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
@@ -21,7 +23,7 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
   const courseIds = store.courses.map((course) => course.id);
   const timestamp = now();
 
-  await deleteCoursesNotInList(courseIds);
+  await deleteCoursesNotInList(supabase, courseIds);
 
   for (let courseIndex = 0; courseIndex < store.courses.length; courseIndex++) {
     const course = store.courses[courseIndex];
@@ -42,7 +44,7 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
     }
 
     const lessonIds = course.lessons.map((lesson) => lesson.id);
-    await deleteLessonsNotInList(course.id, lessonIds);
+    await deleteLessonsNotInList(supabase, course.id, lessonIds);
 
     if (course.lessons.length > 0) {
       const lessonRows = course.lessons.map((lesson) => ({
@@ -105,28 +107,42 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
       }
     }
 
-    await syncCourseGradingConfig(course.id, store.gradingConfigByCourse?.[course.id]);
+    await syncCourseGradingConfig(
+      supabase,
+      course.id,
+      store.gradingConfigByCourse?.[course.id],
+    );
 
-    for (const lesson of course.lessons) {
-      const key = lessonKey(course.id, lesson.id);
-      await syncChapterQuestionBank(course.id, lesson.id, store.questionBank[key] ?? []);
-      await syncLessonVideo(course.id, lesson.id, store.videos[key]);
-      await syncLessonFlashcards(
-        course.id,
-        lesson.id,
-        store.flashcardsByLesson?.[key] ?? [],
-      );
-      await syncLessonReviewQuestions(
-        course.id,
-        lesson.id,
-        store.reviewQuestionsByLesson?.[key] ?? [],
-      );
-    }
+    await Promise.all(
+      course.lessons.map((lesson) => syncLessonContent(supabase, store, course.id, lesson.id)),
+    );
   }
 }
 
-async function deleteCoursesNotInList(courseIds: string[]): Promise<void> {
-  const supabase = createSupabaseAdmin();
+async function syncLessonContent(
+  supabase: SupabaseClient,
+  store: AdminContentStore,
+  courseId: string,
+  lessonId: string,
+): Promise<void> {
+  const key = lessonKey(courseId, lessonId);
+  await Promise.all([
+    syncChapterQuestionBank(supabase, courseId, lessonId, store.questionBank[key] ?? []),
+    syncLessonVideo(supabase, courseId, lessonId, store.videos[key]),
+    syncLessonFlashcards(supabase, courseId, lessonId, store.flashcardsByLesson?.[key] ?? []),
+    syncLessonReviewQuestions(
+      supabase,
+      courseId,
+      lessonId,
+      store.reviewQuestionsByLesson?.[key] ?? [],
+    ),
+  ]);
+}
+
+async function deleteCoursesNotInList(
+  supabase: SupabaseClient,
+  courseIds: string[],
+): Promise<void> {
   const { data: existing, error } = await supabase.from("courses").select("id");
 
   if (error) {
@@ -144,8 +160,11 @@ async function deleteCoursesNotInList(courseIds: string[]): Promise<void> {
   }
 }
 
-async function deleteLessonsNotInList(courseId: string, lessonIds: string[]): Promise<void> {
-  const supabase = createSupabaseAdmin();
+async function deleteLessonsNotInList(
+  supabase: SupabaseClient,
+  courseId: string,
+  lessonIds: string[],
+): Promise<void> {
   const { data: existing, error } = await supabase
     .from("lessons")
     .select("id")
@@ -158,25 +177,25 @@ async function deleteLessonsNotInList(courseId: string, lessonIds: string[]): Pr
   const keep = new Set(lessonIds);
   const toDelete = (existing ?? []).map((row) => row.id).filter((id) => !keep.has(id));
 
-  for (const lessonId of toDelete) {
-    const { error: deleteError } = await supabase
-      .from("lessons")
-      .delete()
-      .eq("course_id", courseId)
-      .eq("id", lessonId);
+  if (toDelete.length === 0) return;
 
-    if (deleteError) {
-      throw new Error(`Failed to delete lesson ${lessonId}: ${deleteError.message}`);
-    }
+  const { error: deleteError } = await supabase
+    .from("lessons")
+    .delete()
+    .eq("course_id", courseId)
+    .in("id", toDelete);
+
+  if (deleteError) {
+    throw new Error(`Failed to delete removed lessons: ${deleteError.message}`);
   }
 }
 
 async function syncChapterQuestionBank(
+  supabase: SupabaseClient,
   courseId: string,
   lessonId: string,
   questions: AdminContentStore["questionBank"][string],
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
   const { error: deleteAssignmentError } = await supabase
     .from("assignment_questions")
     .delete()
@@ -187,6 +206,8 @@ async function syncChapterQuestionBank(
     throw new Error(`Failed to clear chapter questions: ${deleteAssignmentError.message}`);
   }
 
+  if (!questions?.length) return;
+
   const { error: deleteAlcumusError } = await supabase
     .from("alcumus_problems")
     .delete()
@@ -196,8 +217,6 @@ async function syncChapterQuestionBank(
   if (deleteAlcumusError) {
     throw new Error(`Failed to clear legacy Alcumus rows: ${deleteAlcumusError.message}`);
   }
-
-  if (!questions?.length) return;
 
   const rows = questions.map((question, index) => ({
     course_id: courseId,
@@ -217,11 +236,11 @@ async function syncChapterQuestionBank(
 }
 
 async function syncLessonFlashcards(
+  supabase: SupabaseClient,
   courseId: string,
   lessonId: string,
   flashcards: AdminFlashcard[],
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
   const { error: deleteError } = await supabase
     .from("lesson_flashcards")
     .delete()
@@ -250,10 +269,10 @@ async function syncLessonFlashcards(
 }
 
 async function syncCourseGradingConfig(
+  supabase: SupabaseClient,
   courseId: string,
   config: GradingRubricConfig | undefined,
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
   if (!config) {
     const { error } = await supabase
       .from("course_grading_config")
@@ -291,11 +310,11 @@ async function syncCourseGradingConfig(
 }
 
 async function syncLessonReviewQuestions(
+  supabase: SupabaseClient,
   courseId: string,
   lessonId: string,
   questions: LessonQuestion[],
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
   const { error: deleteError } = await supabase
     .from("lesson_review_questions")
     .delete()
@@ -326,12 +345,11 @@ async function syncLessonReviewQuestions(
 }
 
 async function syncLessonVideo(
+  supabase: SupabaseClient,
   courseId: string,
   lessonId: string,
   video: AdminContentStore["videos"][string] | undefined,
 ): Promise<void> {
-  const supabase = createSupabaseAdmin();
-
   if (!video) {
     const { error } = await supabase
       .from("lesson_videos")

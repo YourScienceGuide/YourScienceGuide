@@ -92,7 +92,7 @@ export async function saveContentStoreToDatabase(
 
   const sanitized = sanitizeContentStore(store);
   await saveCmsFromStore(sanitized);
-  return loadCmsAsStore();
+  return sanitized;
 }
 
 export async function resetContentStoreInDatabase(): Promise<AdminContentStore> {
@@ -102,5 +102,5 @@ export async function resetContentStoreInDatabase(): Promise<AdminContentStore> 
   }
 
   await resetCmsToDefault(defaultStore);
-  return loadCmsAsStore();
+  return sanitizeContentStore(defaultStore);
 }
