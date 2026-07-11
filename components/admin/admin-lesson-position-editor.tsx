@@ -16,6 +16,7 @@ import {
   lessonChapterNumber,
   lessonSectionNumber,
 } from "@/lib/student/lesson-sort";
+import { formatSaveError } from "@/lib/admin/format-save-error";
 import { cn } from "@/lib/utils";
 
 type AdminLessonPositionEditorProps = {
@@ -166,9 +167,11 @@ export function AdminLessonPositionEditor({
     setIsApplying(false);
 
     if (!ok) {
+      const formatted = formatSaveError(new Error("Failed to save lesson position"));
       setFeedback({
         type: "error",
-        message: "Could not save position. Check your connection and try again.",
+        message: formatted.message,
+        tips: formatted.tips,
       });
     }
   }

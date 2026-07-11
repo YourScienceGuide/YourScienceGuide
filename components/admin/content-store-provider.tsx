@@ -18,6 +18,7 @@ import {
   type AdminContentStore,
 } from "@/lib/admin/content-store";
 import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
+import { formatSaveError } from "@/lib/admin/format-save-error";
 
 export type PersistOptions = {
   /** Shown in the admin banner when save succeeds. */
@@ -85,8 +86,8 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       setStore(result.store);
       setSource(result.source);
       setError(null);
-    } catch {
-      setError("Could not load curriculum content. Showing defaults.");
+    } catch (err) {
+      setError(formatSaveError(err).message);
     } finally {
       setLoading(false);
     }
@@ -142,11 +143,14 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
 
         return { ok: true };
       } catch (err) {
-        const error =
-          err instanceof Error ? err.message : "Failed to save content";
-        setSaveError(error);
-        setActionFeedback({ type: "error", message: error });
-        return { ok: false, error };
+        const formatted = formatSaveError(err);
+        setSaveError(formatted.message);
+        setActionFeedback({
+          type: "error",
+          message: formatted.message,
+          tips: formatted.tips,
+        });
+        return { ok: false, error: formatted.message };
       } finally {
         setSaving(false);
       }
@@ -180,11 +184,14 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       });
       return { ok: true };
     } catch (err) {
-      const error =
-        err instanceof Error ? err.message : "Failed to reset content";
-      setSaveError(error);
-      setActionFeedback({ type: "error", message: error });
-      return { ok: false, error };
+      const formatted = formatSaveError(err);
+      setSaveError(formatted.message);
+      setActionFeedback({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
+      return { ok: false, error: formatted.message };
     } finally {
       setSaving(false);
     }

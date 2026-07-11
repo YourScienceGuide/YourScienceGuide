@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AdminConfirmDeleteDialog } from "@/components/admin/admin-confirm-delete-dialog";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
 import { AdminReviewCsvImportBlock } from "@/components/admin/admin-review-csv-import-block";
-import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
+import { AdminSaveBar } from "@/components/admin/admin-save-bar";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
+import {
+  applyPersistResult,
+  confirmDiscardUnsavedChanges,
+} from "@/lib/admin/admin-save-feedback";
+import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
 import {
   getLessonFromStore,
   getReviewQuestionsFromStore,
@@ -27,50 +32,75 @@ function newQuestionId() {
 }
 
 export function AdminReviewQuestionsPanel() {
-  const { store, persist, saving, actionFeedback, clearActionFeedback } =
-    useContentStore();
+  const { store, persist, saving } = useContentStore();
   const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
-  const [questions, setQuestions] = useState<LessonQuestion[]>([]);
+  const savedQuestions = useMemo(
+    () => getReviewQuestionsFromStore(store, courseId, lessonId),
+    [store, courseId, lessonId],
+  );
+  const savedKey = useMemo(() => JSON.stringify(savedQuestions), [savedQuestions]);
+  const [draft, setDraft] = useState<LessonQuestion[]>(savedQuestions);
+  const [saveFeedback, setSaveFeedback] = useState<AdminFeedback | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const lessonTitle =
     getLessonFromStore(store, courseId, lessonId)?.title ?? "this lesson";
+  const isDirty = JSON.stringify(draft) !== savedKey;
 
   useEffect(() => {
-    setQuestions(getReviewQuestionsFromStore(store, courseId, lessonId));
-  }, [courseId, lessonId, store]);
+    setDraft(savedQuestions);
+    setSaveFeedback(null);
+  }, [courseId, lessonId, savedKey, savedQuestions]);
 
-  function commit(next: LessonQuestion[], successMessage?: string) {
-    setQuestions(next);
-    void persist(
-      setReviewQuestionsInStore(store, courseId, lessonId, next),
-      successMessage ? { successMessage } : { silent: true },
-    );
+  function handleCourseChange(nextCourseId: string) {
+    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    setCourseId(nextCourseId);
+  }
+
+  function handleLessonChange(nextLessonId: string) {
+    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    setLessonId(nextLessonId);
   }
 
   function updateQ(index: number, patch: Partial<LessonQuestion>) {
-    const next = questions.map((q, i) =>
-      i === index ? ({ ...q, ...patch } as LessonQuestion) : q,
+    setSaveFeedback(null);
+    setDraft((current) =>
+      current.map((q, i) =>
+        i === index ? ({ ...q, ...patch } as LessonQuestion) : q,
+      ),
     );
-    commit(next);
   }
 
   function addQuestion() {
-    commit(
-      [
-        ...questions,
-        {
-          type: "multiple-choice",
-          id: newQuestionId(),
-          prompt: "New review question prompt",
-          options: ["Option A", "Option B"],
-          correctIndex: 0,
-        },
-      ],
-      "Added a new review question.",
+    setSaveFeedback(null);
+    setDraft((current) => [
+      ...current,
+      {
+        type: "multiple-choice",
+        id: newQuestionId(),
+        prompt: "New review question prompt",
+        options: ["Option A", "Option B"],
+        correctIndex: 0,
+      },
+    ]);
+  }
+
+  async function saveChanges() {
+    setSaveFeedback(null);
+    const result = await persist(
+      setReviewQuestionsInStore(store, courseId, lessonId, draft),
+      { silent: true },
     );
+    setSaveFeedback(
+      applyPersistResult(result, "Review questions saved for this lesson."),
+    );
+  }
+
+  function discardChanges() {
+    setDraft(savedQuestions);
+    setSaveFeedback(null);
   }
 
   function openDeleteDialog(target: DeleteTarget) {
@@ -91,9 +121,8 @@ export function AdminReviewQuestionsPanel() {
     const next =
       deleteTarget.kind === "all"
         ? []
-        : questions.filter((_, index) => index !== deleteTarget.index);
+        : draft.filter((_, index) => index !== deleteTarget.index);
 
-    setQuestions(next);
     const result = await persist(
       setReviewQuestionsInStore(store, courseId, lessonId, next),
       {
@@ -104,6 +133,7 @@ export function AdminReviewQuestionsPanel() {
       },
     );
     if (!result.ok) return;
+    setDraft(next);
     closeDeleteDialog();
   }
 
@@ -123,11 +153,6 @@ export function AdminReviewQuestionsPanel() {
 
   return (
     <div className="space-y-6">
-      <AdminActionFeedback
-        feedback={actionFeedback}
-        onDismiss={clearActionFeedback}
-      />
-
       <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-4 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
         <p className="font-medium text-slate-900 dark:text-stone-50">
           Warm-up before the lesson
@@ -142,8 +167,19 @@ export function AdminReviewQuestionsPanel() {
         store={store}
         courseId={courseId}
         lessonId={lessonId}
-        onCourseChange={setCourseId}
-        onLessonChange={setLessonId}
+        onCourseChange={handleCourseChange}
+        onLessonChange={handleLessonChange}
+      />
+
+      <AdminSaveBar
+        isDirty={isDirty}
+        saving={saving}
+        feedback={saveFeedback}
+        dirtyMessage="You have unsaved review question changes. Save to publish them for students."
+        saveLabel="Save changes"
+        onSave={saveChanges}
+        onDiscard={discardChanges}
+        onDismissFeedback={() => setSaveFeedback(null)}
       />
 
       <details className="rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
@@ -162,13 +198,13 @@ export function AdminReviewQuestionsPanel() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-700 dark:text-stone-300">
-          {questions.length} review question{questions.length === 1 ? "" : "s"}
+          {draft.length} review question{draft.length === 1 ? "" : "s"}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" onClick={addQuestion}>
             Add question
           </Button>
-          {questions.length > 0 && (
+          {draft.length > 0 && (
             <Button
               type="button"
               variant="outline"
@@ -182,13 +218,13 @@ export function AdminReviewQuestionsPanel() {
         </div>
       </div>
 
-      {questions.length === 0 ? (
+      {draft.length === 0 ? (
         <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
           No review questions for this lesson yet.
         </p>
       ) : (
         <ol className="space-y-6">
-          {questions.map((q, index) => (
+          {draft.map((q, index) => (
             <li
               key={q.id}
               className="space-y-3 rounded-lg border border-sky-200 p-4 dark:border-stone-700"
@@ -359,8 +395,8 @@ export function AdminReviewQuestionsPanel() {
           deleteTarget?.kind === "all" ? (
             <>
               <p>
-                This permanently removes all {questions.length} review question
-                {questions.length === 1 ? "" : "s"} for <strong>{lessonTitle}</strong>.
+                This permanently removes all {draft.length} review question
+                {draft.length === 1 ? "" : "s"} for <strong>{lessonTitle}</strong>.
               </p>
               <p className="text-sm font-medium text-slate-800 dark:text-stone-200">
                 Type the following to confirm:

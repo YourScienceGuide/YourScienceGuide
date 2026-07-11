@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   AdminActionFeedback,
   type AdminFeedback,
 } from "@/components/admin/admin-action-feedback";
+import { AdminSaveBar } from "@/components/admin/admin-save-bar";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import type { PersistOptions } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import { AdminLessonPositionEditor } from "@/components/admin/admin-lesson-position-editor";
 import { AdminTextbookSection } from "@/components/admin/admin-textbook-section";
+import {
+  applyPersistResult,
+  confirmDiscardUnsavedChanges,
+  errorSaveFeedback,
+} from "@/lib/admin/admin-save-feedback";
 import {
   courseDeleteConfirmationPhrase,
   lessonDeleteConfirmationPhrase,
@@ -68,9 +74,29 @@ export function AdminCurriculumPanel() {
   const [addLessonFeedback, setAddLessonFeedback] = useState<AdminFeedback | null>(
     null,
   );
+  const savedLessons = course?.lessons ?? [];
+  const savedLessonsKey = useMemo(
+    () => JSON.stringify(savedLessons),
+    [savedLessons],
+  );
+  const [lessonDrafts, setLessonDrafts] = useState<CurriculumLesson[]>(savedLessons);
+  const [lessonSaveFeedback, setLessonSaveFeedback] = useState<AdminFeedback | null>(
+    null,
+  );
+  const isLessonDraftDirty = JSON.stringify(lessonDrafts) !== savedLessonsKey;
+
+  useEffect(() => {
+    setLessonDrafts(savedLessons);
+    setLessonSaveFeedback(null);
+  }, [selectedCourseId, savedLessonsKey, savedLessons]);
 
   async function saveCourses(courses: Course[], options?: PersistOptions) {
     return persist({ ...store, courses }, options);
+  }
+
+  function handleSelectedCourseChange(nextCourseId: string) {
+    if (isLessonDraftDirty && !confirmDiscardUnsavedChanges()) return;
+    setSelectedCourseId(nextCourseId);
   }
 
   async function handleAddCourse(e: React.FormEvent) {
@@ -88,7 +114,7 @@ export function AdminCurriculumPanel() {
       successMessage: `Added course "${courseEntry.title}".`,
     });
     if (!result.ok) {
-      setAddCourseFeedback({ type: "error", message: result.error });
+      setAddCourseFeedback(errorSaveFeedback(result.error));
       return;
     }
     setAddCourseFeedback({
@@ -139,7 +165,7 @@ export function AdminCurriculumPanel() {
       successMessage: `Added lesson "${lesson.title}" to ${course.title}.`,
     });
     if (!result.ok) {
-      setAddLessonFeedback({ type: "error", message: result.error });
+      setAddLessonFeedback(errorSaveFeedback(result.error));
       return;
     }
     setAddLessonFeedback({
@@ -156,23 +182,38 @@ export function AdminCurriculumPanel() {
     });
   }
 
-  function updateLesson(lessonId: string, patch: Partial<CurriculumLesson>) {
+  function updateLessonDraft(lessonId: string, patch: Partial<CurriculumLesson>) {
     if (!course) return;
 
-    const current = course.lessons.find((lesson) => lesson.id === lessonId);
-    if (!current) return;
-
-    const next = { ...current, ...patch, order: sortOrderForLesson({ ...current, ...patch }) };
-
-    const courses = store.courses.map((c) =>
-      c.id === course.id
-        ? {
-            ...c,
-            lessons: c.lessons.map((l) => (l.id === lessonId ? next : l)),
-          }
-        : c,
+    setLessonSaveFeedback(null);
+    setLessonDrafts((current) =>
+      current.map((lesson) => {
+        if (lesson.id !== lessonId) return lesson;
+        const next = {
+          ...lesson,
+          ...patch,
+          order: sortOrderForLesson({ ...lesson, ...patch }),
+        };
+        return next;
+      }),
     );
-    void saveCourses(courses, { silent: true });
+  }
+
+  async function saveLessonDetails() {
+    if (!course || !isLessonDraftDirty) return;
+
+    const courses = store.courses.map((entry) =>
+      entry.id === course.id ? { ...entry, lessons: lessonDrafts } : entry,
+    );
+    const result = await saveCourses(courses, { silent: true });
+    setLessonSaveFeedback(
+      applyPersistResult(result, "Saved lesson titles and descriptions."),
+    );
+  }
+
+  function discardLessonDetails() {
+    setLessonDrafts(savedLessons);
+    setLessonSaveFeedback(null);
   }
 
   async function saveLessonPosition(
@@ -204,7 +245,14 @@ export function AdminCurriculumPanel() {
           }
         : c,
     );
-    const result = await saveCourses(courses, { silent: true });
+    const result = await saveCourses(courses, {
+      successMessage: "Saved lesson position.",
+    });
+    if (result.ok) {
+      setLessonDrafts((current) =>
+        current.map((lesson) => (lesson.id === lessonId ? next : lesson)),
+      );
+    }
     return result.ok;
   }
 
@@ -311,7 +359,7 @@ export function AdminCurriculumPanel() {
           <select
             id="edit-course"
             value={selectedCourseId}
-            onChange={(e) => setSelectedCourseId(e.target.value)}
+            onChange={(e) => handleSelectedCourseChange(e.target.value)}
             className="rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
           >
             {store.courses.map((c) => (
@@ -460,8 +508,18 @@ export function AdminCurriculumPanel() {
               )}
             </section>
 
+            <AdminSaveBar
+              isDirty={isLessonDraftDirty}
+              saving={saving}
+              feedback={lessonSaveFeedback}
+              dirtyMessage="You have unsaved lesson title or description changes."
+              onSave={saveLessonDetails}
+              onDiscard={discardLessonDetails}
+              onDismissFeedback={() => setLessonSaveFeedback(null)}
+            />
+
             <ul className="space-y-3">
-              {sortLessons(course.lessons).map((lesson) => (
+              {sortLessons(lessonDrafts).map((lesson) => (
                 <li
                   key={lesson.id}
                   className="space-y-2 rounded-lg border border-sky-200 p-4 dark:border-stone-700"
@@ -483,20 +541,22 @@ export function AdminCurriculumPanel() {
                   </div>
                   <input
                     value={lesson.title}
-                    onChange={(e) => updateLesson(lesson.id, { title: e.target.value })}
+                    onChange={(e) =>
+                      updateLessonDraft(lesson.id, { title: e.target.value })
+                    }
                     className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm font-medium dark:border-stone-600 dark:bg-stone-950"
                   />
                   <textarea
                     value={lesson.description}
                     onChange={(e) =>
-                      updateLesson(lesson.id, { description: e.target.value })
+                      updateLessonDraft(lesson.id, { description: e.target.value })
                     }
                     rows={2}
                     className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
                   />
                   <AdminLessonPositionEditor
                     lesson={lesson}
-                    courseLessons={course.lessons}
+                    courseLessons={lessonDrafts}
                     saving={saving}
                     onSave={saveLessonPosition}
                   />

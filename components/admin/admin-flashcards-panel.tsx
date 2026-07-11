@@ -10,12 +10,16 @@ import {
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
 import {
+  applyPersistResult,
+  errorSaveFeedback,
+} from "@/lib/admin/admin-save-feedback";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { slugifyId } from "@/lib/admin/lesson-key";
+import {
   getFlashcardsFromStore,
   setFlashcardsInStore,
 } from "@/lib/admin/content-store";
-import { slugifyId } from "@/lib/admin/lesson-key";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export function AdminFlashcardsPanel() {
   const { store, persist, saving } = useContentStore();
@@ -32,7 +36,7 @@ export function AdminFlashcardsPanel() {
       { successMessage: message },
     );
     if (!result.ok) {
-      setFeedback({ type: "error", message: result.error });
+      setFeedback(errorSaveFeedback(result.error));
     }
   }
 

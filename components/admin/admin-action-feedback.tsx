@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 export type AdminFeedback = {
   type: "success" | "error";
   message: string;
+  tips?: string[];
 };
 
 type AdminActionFeedbackProps = {
@@ -33,7 +34,16 @@ export function AdminActionFeedback({
         className,
       )}
     >
-      <p className="font-medium leading-snug">{feedback.message}</p>
+      <div className="space-y-2">
+        <p className="font-medium leading-snug">{feedback.message}</p>
+        {feedback.tips && feedback.tips.length > 0 && (
+          <ul className="list-disc space-y-1 pl-5 text-sm font-normal leading-snug opacity-90">
+            {feedback.tips.map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        )}
+      </div>
       {onDismiss && (
         <button
           type="button"

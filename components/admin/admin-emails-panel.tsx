@@ -19,7 +19,8 @@ import {
 } from "@/lib/email/default-parent-daily-template";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
+import { formatSaveError } from "@/lib/admin/format-save-error";
 
 export function AdminEmailsPanel() {
   const { store, persist, saving, actionFeedback, clearActionFeedback } =
@@ -36,23 +37,26 @@ export function AdminEmailsPanel() {
   const [previewSubject, setPreviewSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [templateFeedback, setTemplateFeedback] = useState<AdminFeedback | null>(null);
+  const [loadFeedback, setLoadFeedback] = useState<AdminFeedback | null>(null);
   const [engagementDraft, setEngagementDraft] = useState("");
   const [rubricDraft, setRubricDraft] = useState("");
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
-    setSaveError(null);
+    setLoadFeedback(null);
     try {
       const settings = await fetchParentDailyEmailSettings();
       setDraft(settings.template);
       setEmailFrom(settings.emailFrom);
       setSendingConfigured(settings.sendingConfigured);
     } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "Failed to load email settings",
-      );
+      const formatted = formatSaveError(error);
+      setLoadFeedback({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
     } finally {
       setLoading(false);
     }
@@ -68,22 +72,27 @@ export function AdminEmailsPanel() {
   }, [lesson?.parentEngagementPrompt, lesson?.freeResponseRubric, lessonId]);
 
   async function handleSaveTemplate() {
-    setSaveMessage(null);
-    setSaveError(null);
+    setTemplateFeedback(null);
     try {
       const saved = await saveParentDailyEmailTemplate(draft);
       setDraft(saved);
-      setSaveMessage("Saved daily parent email template.");
+      setTemplateFeedback({
+        type: "success",
+        message: "Saved daily parent email template.",
+      });
     } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "Failed to save email template",
-      );
+      const formatted = formatSaveError(error);
+      setTemplateFeedback({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
     }
   }
 
   async function handlePreview() {
     setPreviewLoading(true);
-    setSaveError(null);
+    setTemplateFeedback(null);
     try {
       const preview = await previewParentDailyEmail({
         subject: draft.subject,
@@ -92,9 +101,12 @@ export function AdminEmailsPanel() {
       setPreviewSubject(preview.subject);
       setPreviewText(preview.text);
     } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "Failed to preview email",
-      );
+      const formatted = formatSaveError(error);
+      setTemplateFeedback({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
     } finally {
       setPreviewLoading(false);
     }
@@ -177,17 +189,18 @@ export function AdminEmailsPanel() {
         </dl>
       </section>
 
-      {(saveMessage || saveError) && (
-        <p
-          className={cn(
-            "text-sm",
-            saveError
-              ? "text-red-600 dark:text-red-400"
-              : "text-emerald-700 dark:text-emerald-300",
-          )}
-        >
-          {saveError ?? saveMessage}
-        </p>
+      {loadFeedback && (
+        <AdminActionFeedback
+          feedback={loadFeedback}
+          onDismiss={() => setLoadFeedback(null)}
+        />
+      )}
+
+      {templateFeedback && (
+        <AdminActionFeedback
+          feedback={templateFeedback}
+          onDismiss={() => setTemplateFeedback(null)}
+        />
       )}
 
       <section className="space-y-4">

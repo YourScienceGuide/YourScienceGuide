@@ -5,9 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminConfirmDeleteDialog } from "@/components/admin/admin-confirm-delete-dialog";
 import { AdminCsvImportBlock } from "@/components/admin/admin-csv-import-block";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
-import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
+import { AdminSaveBar } from "@/components/admin/admin-save-bar";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
+import {
+  applyPersistResult,
+  confirmDiscardUnsavedChanges,
+} from "@/lib/admin/admin-save-feedback";
+import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
 import {
   chapterQuestionDeletePhrase,
   chapterQuestionsDeleteAllPhrase,
@@ -31,10 +36,16 @@ function newQuestionId() {
 }
 
 export function AdminAssignmentPanel() {
-  const { store, persist, saving, actionFeedback, clearActionFeedback } =
-    useContentStore();
+  const { store, persist, saving } = useContentStore();
   const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
-  const [questions, setQuestions] = useState<ChapterQuestion[]>([]);
+  const bankKey = lessonKey(courseId, lessonId);
+  const savedQuestions = useMemo(
+    () => store.questionBank[bankKey] ?? [],
+    [store.questionBank, bankKey],
+  );
+  const savedKey = useMemo(() => JSON.stringify(savedQuestions), [savedQuestions]);
+  const [draft, setDraft] = useState<ChapterQuestion[]>(savedQuestions);
+  const [saveFeedback, setSaveFeedback] = useState<AdminFeedback | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -42,40 +53,37 @@ export function AdminAssignmentPanel() {
   const lessonTitle =
     getLessonFromStore(store, courseId, lessonId)?.title ?? "this lesson";
 
-  const splitPreview = useMemo(() => previewChapterSplit(questions), [questions]);
+  const splitPreview = useMemo(() => previewChapterSplit(draft), [draft]);
+  const isDirty = JSON.stringify(draft) !== savedKey;
 
   useEffect(() => {
-    const key = lessonKey(courseId, lessonId);
-    setQuestions(store.questionBank[key] ?? []);
-  }, [courseId, lessonId, store]);
+    setDraft(savedQuestions);
+    setSaveFeedback(null);
+  }, [courseId, lessonId, savedKey, savedQuestions]);
 
-  function commit(next: ChapterQuestion[], successMessage?: string) {
-    setQuestions(next);
-    void persist(
-      {
-        ...store,
-        questionBank: {
-          ...store.questionBank,
-          [lessonKey(courseId, lessonId)]: next,
-        },
-      },
-      successMessage
-        ? { successMessage }
-        : { silent: true },
-    );
+  function handleCourseChange(nextCourseId: string) {
+    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    setCourseId(nextCourseId);
+  }
+
+  function handleLessonChange(nextLessonId: string) {
+    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    setLessonId(nextLessonId);
   }
 
   function updateQ(index: number, patch: Partial<ChapterQuestion>) {
-    const next = questions.map((q, i) =>
-      i === index ? ({ ...q, ...patch } as ChapterQuestion) : q,
+    setSaveFeedback(null);
+    setDraft((current) =>
+      current.map((q, i) =>
+        i === index ? ({ ...q, ...patch } as ChapterQuestion) : q,
+      ),
     );
-    commit(next);
   }
 
   function addQuestion() {
-    commit(
-      [
-      ...questions,
+    setSaveFeedback(null);
+    setDraft((current) => [
+      ...current,
       {
         type: "multiple-choice",
         id: newQuestionId(),
@@ -84,9 +92,29 @@ export function AdminAssignmentPanel() {
         correctIndex: 0,
         difficulty: 1,
       },
-    ],
-      "Added a new question.",
+    ]);
+  }
+
+  async function saveChanges() {
+    setSaveFeedback(null);
+    const result = await persist(
+      {
+        ...store,
+        questionBank: {
+          ...store.questionBank,
+          [bankKey]: draft,
+        },
+      },
+      { silent: true },
     );
+    setSaveFeedback(
+      applyPersistResult(result, "Chapter questions saved for this lesson."),
+    );
+  }
+
+  function discardChanges() {
+    setDraft(savedQuestions);
+    setSaveFeedback(null);
   }
 
   function openDeleteDialog(target: DeleteTarget) {
@@ -107,15 +135,14 @@ export function AdminAssignmentPanel() {
     const next =
       deleteTarget.kind === "all"
         ? []
-        : questions.filter((_, index) => index !== deleteTarget.index);
+        : draft.filter((_, index) => index !== deleteTarget.index);
 
-    setQuestions(next);
     const result = await persist(
       {
         ...store,
         questionBank: {
           ...store.questionBank,
-          [lessonKey(courseId, lessonId)]: next,
+          [bankKey]: next,
         },
       },
       {
@@ -126,6 +153,7 @@ export function AdminAssignmentPanel() {
       },
     );
     if (!result.ok) return;
+    setDraft(next);
     closeDeleteDialog();
   }
 
@@ -145,16 +173,22 @@ export function AdminAssignmentPanel() {
 
   return (
     <div className="space-y-6">
-      <AdminActionFeedback
-        feedback={actionFeedback}
-        onDismiss={clearActionFeedback}
-      />
       <AdminLessonPicker
         store={store}
         courseId={courseId}
         lessonId={lessonId}
-        onCourseChange={setCourseId}
-        onLessonChange={setLessonId}
+        onCourseChange={handleCourseChange}
+        onLessonChange={handleLessonChange}
+      />
+
+      <AdminSaveBar
+        isDirty={isDirty}
+        saving={saving}
+        feedback={saveFeedback}
+        dirtyMessage="You have unsaved chapter question changes. Save to publish them for students."
+        onSave={saveChanges}
+        onDiscard={discardChanges}
+        onDismissFeedback={() => setSaveFeedback(null)}
       />
 
       <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-4 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
@@ -194,13 +228,13 @@ export function AdminAssignmentPanel() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-700 dark:text-stone-300">
-          {questions.length} question{questions.length === 1 ? "" : "s"} in the bank
+          {draft.length} question{draft.length === 1 ? "" : "s"} in the bank
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" onClick={addQuestion}>
             Add question
           </Button>
-          {questions.length > 0 && (
+          {draft.length > 0 && (
             <Button
               type="button"
               variant="outline"
@@ -214,13 +248,13 @@ export function AdminAssignmentPanel() {
         </div>
       </div>
 
-      {questions.length === 0 ? (
+      {draft.length === 0 ? (
         <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
           No chapter questions for this lesson yet.
         </p>
       ) : (
         <ol className="space-y-6">
-          {questions.map((q, index) => (
+          {draft.map((q, index) => (
             <li
               key={q.id}
               className="space-y-3 rounded-lg border border-sky-200 p-4 dark:border-stone-700"
@@ -372,8 +406,8 @@ export function AdminAssignmentPanel() {
           deleteTarget?.kind === "all" ? (
             <>
               <p>
-                This permanently removes all {questions.length} chapter question
-                {questions.length === 1 ? "" : "s"} for <strong>{lessonTitle}</strong>.
+                This permanently removes all {draft.length} chapter question
+                {draft.length === 1 ? "" : "s"} for <strong>{lessonTitle}</strong>.
               </p>
               <p className="text-sm font-medium text-slate-800 dark:text-stone-200">
                 Type the following to confirm:

@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
 
-import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
 import { AdminLessonPicker } from "@/components/admin/admin-lesson-picker";
+import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
+import { AdminSaveBar } from "@/components/admin/admin-save-bar";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useAdminWorkspace } from "@/components/admin/admin-workspace-provider";
+import {
+  applyPersistResult,
+  confirmDiscardUnsavedChanges,
+} from "@/lib/admin/admin-save-feedback";
+import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
 import {
   getVideoFromStore,
   type LessonVideoMeta,
 } from "@/lib/admin/content-store";
+import { formatSaveError } from "@/lib/admin/format-save-error";
 import { Button } from "@/components/ui/button";
 import { MAX_VIDEO_UPLOAD_BYTES, MAX_VIDEO_UPLOAD_MB } from "@/lib/config";
 
@@ -45,45 +52,87 @@ async function pollForPlaybackId(uploadId: string): Promise<string> {
 }
 
 export function AdminVideoPanel() {
-  const { store, persist, saving, actionFeedback, clearActionFeedback } =
-    useContentStore();
+  const { store, persist, saving } = useContentStore();
   const { courseId, lessonId, setCourseId, setLessonId } = useAdminWorkspace();
-  const [meta, setMeta] = useState<LessonVideoMeta>({
-    title: "",
-    description: "",
-  });
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-
-  useEffect(() => {
-    const existing = getVideoFromStore(store, courseId, lessonId);
-    setMeta(
-      existing ?? {
+  const savedMeta = useMemo(
+    () =>
+      getVideoFromStore(store, courseId, lessonId) ?? {
         title: "Lesson video",
         description: "Overview for this lesson.",
       },
-    );
-  }, [courseId, lessonId, store]);
+    [store, courseId, lessonId],
+  );
+  const savedKey = useMemo(() => JSON.stringify(savedMeta), [savedMeta]);
+  const [draft, setDraft] = useState<LessonVideoMeta>(savedMeta);
+  const [saveFeedback, setSaveFeedback] = useState<AdminFeedback | null>(null);
+  const [uploadError, setUploadError] = useState<AdminFeedback | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
-  function commit(
-    next: LessonVideoMeta,
-    options?: { successMessage?: string; silent?: boolean },
-  ) {
-    setMeta(next);
+  const isDirty = JSON.stringify(draft) !== savedKey;
+
+  useEffect(() => {
+    setDraft(savedMeta);
+    setSaveFeedback(null);
+  }, [courseId, lessonId, savedKey, savedMeta]);
+
+  function handleCourseChange(nextCourseId: string) {
+    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    setCourseId(nextCourseId);
+  }
+
+  function handleLessonChange(nextLessonId: string) {
+    if (isDirty && !confirmDiscardUnsavedChanges()) return;
+    setLessonId(nextLessonId);
+  }
+
+  async function saveChanges() {
+    setSaveFeedback(null);
     const key = `${courseId}/${lessonId}`;
-    void persist(
+    const result = await persist(
+      {
+        ...store,
+        videos: { ...store.videos, [key]: draft },
+      },
+      { silent: true },
+    );
+    setSaveFeedback(
+      applyPersistResult(result, "Video details saved for this lesson."),
+    );
+  }
+
+  function discardChanges() {
+    setDraft(savedMeta);
+    setSaveFeedback(null);
+  }
+
+  async function persistVideoMeta(
+    next: LessonVideoMeta,
+    successMessage: string,
+  ): Promise<boolean> {
+    const key = `${courseId}/${lessonId}`;
+    const result = await persist(
       {
         ...store,
         videos: { ...store.videos, [key]: next },
       },
-      options ?? { silent: true },
+      { successMessage },
     );
+    if (result.ok) {
+      setDraft(next);
+      return true;
+    }
+    setSaveFeedback(applyPersistResult(result, successMessage));
+    return false;
   }
 
   async function handleFile(file: File | null) {
     if (!file) return;
     if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
-      setUploadError(`File must be under ${MAX_VIDEO_UPLOAD_MB} MB.`);
+      setUploadError({
+        type: "error",
+        message: `File must be under ${MAX_VIDEO_UPLOAD_MB} MB.`,
+        tips: ["Choose a smaller video file or compress it before uploading."],
+      });
       return;
     }
 
@@ -115,36 +164,48 @@ export function AdminVideoPanel() {
       setUploadStatus("Processing video…");
       const playbackId = await pollForPlaybackId(uploadId);
 
-      commit(
+      const ok = await persistVideoMeta(
         {
-          ...meta,
+          ...draft,
           muxPlaybackId: playbackId,
           fileName: file.name,
           sourceUrl: undefined,
         },
-        { successMessage: `Video uploaded for this lesson.` },
+        "Video uploaded for this lesson.",
       );
+      if (!ok) return;
       setUploadStatus(null);
     } catch (error) {
       setUploadStatus(null);
-      setUploadError(error instanceof Error ? error.message : "Upload failed.");
+      const formatted = formatSaveError(error);
+      setUploadError({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
     }
   }
 
-  const hasVideo = Boolean(meta.muxPlaybackId || meta.sourceUrl);
+  const hasVideo = Boolean(draft.muxPlaybackId || draft.sourceUrl);
 
   return (
     <div className="space-y-6">
-      <AdminActionFeedback
-        feedback={actionFeedback}
-        onDismiss={clearActionFeedback}
-      />
       <AdminLessonPicker
         store={store}
         courseId={courseId}
         lessonId={lessonId}
-        onCourseChange={setCourseId}
-        onLessonChange={setLessonId}
+        onCourseChange={handleCourseChange}
+        onLessonChange={handleLessonChange}
+      />
+
+      <AdminSaveBar
+        isDirty={isDirty}
+        saving={saving}
+        feedback={saveFeedback}
+        dirtyMessage="You have unsaved video title or description changes."
+        onSave={saveChanges}
+        onDiscard={discardChanges}
+        onDismissFeedback={() => setSaveFeedback(null)}
       />
 
       <div className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
@@ -152,14 +213,20 @@ export function AdminVideoPanel() {
           Lesson video
         </h2>
         <input
-          value={meta.title}
-          onChange={(e) => commit({ ...meta, title: e.target.value })}
+          value={draft.title}
+          onChange={(e) => {
+            setSaveFeedback(null);
+            setDraft((current) => ({ ...current, title: e.target.value }));
+          }}
           placeholder="Video title"
           className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
         />
         <textarea
-          value={meta.description}
-          onChange={(e) => commit({ ...meta, description: e.target.value })}
+          value={draft.description}
+          onChange={(e) => {
+            setSaveFeedback(null);
+            setDraft((current) => ({ ...current, description: e.target.value }));
+          }}
           placeholder="Video description"
           rows={2}
           className="w-full rounded-md border border-sky-200 px-3 py-2 text-sm dark:border-stone-600 dark:bg-stone-950"
@@ -185,16 +252,19 @@ export function AdminVideoPanel() {
             <p className="text-sm text-slate-600 dark:text-stone-400">{uploadStatus}</p>
           )}
           {uploadError && (
-            <p className="text-sm text-red-700 dark:text-red-300">{uploadError}</p>
+            <AdminActionFeedback
+              feedback={uploadError}
+              onDismiss={() => setUploadError(null)}
+            />
           )}
         </div>
-        {meta.muxPlaybackId ? (
+        {draft.muxPlaybackId ? (
           <MuxPlayer
-            playbackId={meta.muxPlaybackId}
+            playbackId={draft.muxPlaybackId}
             className="aspect-video w-full rounded-md"
           />
-        ) : meta.sourceUrl ? (
-          <video src={meta.sourceUrl} controls className="aspect-video w-full rounded-md" />
+        ) : draft.sourceUrl ? (
+          <video src={draft.sourceUrl} controls className="aspect-video w-full rounded-md" />
         ) : null}
         {hasVideo && (
           <Button
@@ -203,12 +273,12 @@ export function AdminVideoPanel() {
             size="sm"
             disabled={Boolean(uploadStatus)}
             onClick={() =>
-              commit(
+              void persistVideoMeta(
                 {
-                  title: meta.title,
-                  description: meta.description,
+                  title: draft.title,
+                  description: draft.description,
                 },
-                { successMessage: "Removed uploaded video from this lesson." },
+                "Removed uploaded video from this lesson.",
               )
             }
           >
