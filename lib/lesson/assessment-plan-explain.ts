@@ -6,8 +6,11 @@ import {
 import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
 import {
   DEFAULT_ASSIGNMENT_ALGORITHM,
+  getChapterOverride,
+  lessonIsReviewOnly,
   lessonUsesPriorReviewForMcFib,
   normalizeAssignmentAlgorithm,
+  resolveRubricForLesson,
 } from "@/lib/lesson/assignment-algorithm-config";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
@@ -265,13 +268,17 @@ export function explainLessonAssessmentPlan(
   rubricInput?: Partial<GradingRubricConfig> | null,
   algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonAlgorithmExplanation {
-  const rubric = normalizeGradingRubric(rubricInput);
   const algorithm = normalizeAssignmentAlgorithm(algorithmInput);
+  const rubric = resolveRubricForLesson(rubricInput, algorithm, lesson);
   const bank = getQuestionBankFromStore(store, course.id, lesson.id);
   const reviewAll = getReviewQuestionsFromStore(store, course.id, lesson.id);
   const seed = `${course.id}/${lesson.id}/extra`;
   const chapter = lessonChapterNumber(lesson);
   const section = lessonSectionNumber(lesson);
+  const reviewOnly = lessonIsReviewOnly(algorithm, lesson);
+  const usePriorReviews =
+    !reviewOnly && lessonUsesPriorReviewForMcFib(algorithm, lesson);
+  const chapterOverride = getChapterOverride(algorithm, chapter);
 
   const reviewSelected = reviewAll.slice(0, rubric.reviewCount);
   const reviewPhase: PhaseExplanation = {
@@ -294,13 +301,58 @@ export function explainLessonAssessmentPlan(
       .map((q) => truncatePrompt(q.prompt)),
   };
 
-  const usePriorReviews = lessonUsesPriorReviewForMcFib(algorithm, lesson);
+  const usePriorReviewsFlag = usePriorReviews;
   const excludeIds = new Set(reviewSelected.map((q) => q.id));
 
   let mcPhase: PhaseExplanation;
   let fibPhase: PhaseExplanation;
+  let frPhase: PhaseExplanation;
+  let extraPhase: PhaseExplanation;
 
-  if (usePriorReviews) {
+  if (reviewOnly) {
+    const skippedRule =
+      "Chapter is set to review-only: no MC, fill-in-blank, graded extra, or free response.";
+    mcPhase = {
+      id: "multiple-choice",
+      label: "Multiple choice (skipped)",
+      rule: skippedRule,
+      requested: 0,
+      selected: 0,
+      available: 0,
+      sources: [],
+      samplePrompts: [],
+    };
+    fibPhase = {
+      id: "fill-in-blank",
+      label: "Fill in the blank (skipped)",
+      rule: skippedRule,
+      requested: 0,
+      selected: 0,
+      available: 0,
+      sources: [],
+      samplePrompts: [],
+    };
+    extraPhase = {
+      id: "extra-practice",
+      label: "Graded extra (skipped)",
+      rule: skippedRule,
+      requested: 0,
+      selected: 0,
+      available: 0,
+      sources: [],
+      samplePrompts: [],
+    };
+    frPhase = {
+      id: "free-response",
+      label: "Free response (skipped)",
+      rule: skippedRule,
+      requested: 0,
+      selected: 0,
+      available: 0,
+      sources: [],
+      samplePrompts: [],
+    };
+  } else if (usePriorReviewsFlag) {
     const mcTagged = selectFromPriorReviews(
       store,
       course,
@@ -378,50 +430,52 @@ export function explainLessonAssessmentPlan(
     );
   }
 
-  const frPhase = phaseFromBank(
-    "free-response",
-    "Free response",
-    `Take up to ${rubric.freeResponseCount} long-answer item(s) from this lesson’s chapter bank (parent-graded).`,
-    lesson,
-    bank,
-    "long-answer",
-    rubric.freeResponseCount,
-  );
+  if (!reviewOnly) {
+    frPhase = phaseFromBank(
+      "free-response",
+      "Free response",
+      `Take up to ${rubric.freeResponseCount} long-answer item(s) from this lesson’s chapter bank (parent-graded).`,
+      lesson,
+      bank,
+      "long-answer",
+      rubric.freeResponseCount,
+    );
 
-  const extra = selectExtraWithSources(
-    store,
-    course,
-    lesson,
-    rubric.extraCount,
-    seed,
-    algorithm,
-  );
-  const extraSources = mergeSources(
-    extra.questions.map((q) =>
-      sourceFromLesson(q.fromLesson, 1, q.role),
-    ),
-  );
-  const extraPhase: PhaseExplanation = {
-    id: "extra-practice",
-    label: "Graded extra / cross-lesson review",
-    rule: extra.narrative,
-    requested: rubric.extraCount,
-    selected: extra.questions.length,
-    available: Math.max(
-      0,
-      sortLessons(course.lessons)
-        .filter((entry) => entry.id !== lesson.id)
-        .reduce(
-          (sum, entry) =>
-            sum + getQuestionBankFromStore(store, course.id, entry.id).length,
-          0,
-        ),
-    ),
-    sources: extraSources,
-    samplePrompts: extra.questions
-      .slice(0, 3)
-      .map((q) => truncatePrompt(q.prompt)),
-  };
+    const extra = selectExtraWithSources(
+      store,
+      course,
+      lesson,
+      rubric.extraCount,
+      seed,
+      algorithm,
+    );
+    const extraSources = mergeSources(
+      extra.questions.map((q) =>
+        sourceFromLesson(q.fromLesson, 1, q.role),
+      ),
+    );
+    extraPhase = {
+      id: "extra-practice",
+      label: "Graded extra / cross-lesson review",
+      rule: extra.narrative,
+      requested: rubric.extraCount,
+      selected: extra.questions.length,
+      available: Math.max(
+        0,
+        sortLessons(course.lessons)
+          .filter((entry) => entry.id !== lesson.id)
+          .reduce(
+            (sum, entry) =>
+              sum + getQuestionBankFromStore(store, course.id, entry.id).length,
+            0,
+          ),
+      ),
+      sources: extraSources,
+      samplePrompts: extra.questions
+        .slice(0, 3)
+        .map((q) => truncatePrompt(q.prompt)),
+    };
+  }
 
   const easyAvailable = bank.filter(
     (q) => q.difficulty <= algorithm.easyDifficultyMax,
@@ -435,11 +489,16 @@ export function explainLessonAssessmentPlan(
   const narrative = [
     `Lesson ${chapter}.${section}: ${lesson.title}`,
     "Graded order: Review → Multiple choice → Fill-in-blank → Extra practice → Free response (empty phases skipped).",
-    usePriorReviews
-      ? `Chapter ${chapter} uses prior lessons’ review banks for MC and fill-in-blank (admin Algorithm setting).`
-      : `Chapter bank has ${bank.length} question(s); review bank has ${reviewAll.length}.`,
+    reviewOnly
+      ? `Chapter ${chapter} is review-only: students only answer warm-up review questions (no new MC/FIB/extra/free response).`
+      : usePriorReviews
+        ? `Chapter ${chapter} uses prior lessons’ review banks for MC and fill-in-blank (admin Algorithm chapter setting).`
+        : `Chapter bank has ${bank.length} question(s); review bank has ${reviewAll.length}.`,
+    chapterOverride.reviewCount !== undefined
+      ? `Chapter review count override: ${chapterOverride.reviewCount} (course default may differ).`
+      : null,
     `Bonus practice path (optional /practice): up to ${assignmentSlots} sticky easy questions (difficulty ≤ ${algorithm.easyDifficultyMax}); leftover ${Math.max(0, practicePool)} feed Alcumus sessions of ${algorithm.extraPracticeSessionSize}.`,
-  ];
+  ].filter((line): line is string => Boolean(line));
 
   return {
     lessonId: lesson.id,

@@ -5,8 +5,10 @@ import {
 } from "@/lib/admin/content-store";
 import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
 import {
+  lessonIsReviewOnly,
   lessonUsesPriorReviewForMcFib,
   normalizeAssignmentAlgorithm,
+  resolveRubricForLesson,
 } from "@/lib/lesson/assignment-algorithm-config";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
@@ -214,67 +216,76 @@ export function buildLessonAssessmentPlan(
   rubric: GradingRubricConfig = normalizeGradingRubric(),
   algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonAssessmentPlan {
-  const config = normalizeGradingRubric(rubric);
   const algorithm = normalizeAssignmentAlgorithm(algorithmInput);
+  const config = resolveRubricForLesson(rubric, algorithm, lesson);
   const bank = collectBankQuestions(store, course.id, lesson.id);
   const reviewAll = getReviewQuestionsFromStore(store, course.id, lesson.id);
   const seed = `${course.id}/${lesson.id}/extra`;
-  const usePriorReviews = lessonUsesPriorReviewForMcFib(algorithm, lesson);
+  const reviewOnly = lessonIsReviewOnly(algorithm, lesson);
+  const usePriorReviews =
+    !reviewOnly && lessonUsesPriorReviewForMcFib(algorithm, lesson);
 
   const review = reviewAll.slice(0, config.reviewCount);
   const excludeIds = new Set(review.map((question) => question.id));
 
-  let multipleChoice: LessonQuestion[];
-  let fillInBlank: LessonQuestion[];
+  let multipleChoice: LessonQuestion[] = [];
+  let fillInBlank: LessonQuestion[] = [];
+  let freeResponse: LessonQuestion | null = null;
+  let extraPractice: LessonQuestion[] = [];
 
-  if (usePriorReviews) {
-    const mcTagged = selectFromPriorReviews(
-      store,
-      course,
-      lesson,
-      "multiple-choice",
-      config.mcBankSize,
-      `${seed}-mc-prior`,
-      excludeIds,
-    );
-    for (const question of mcTagged) excludeIds.add(question.id);
+  if (!reviewOnly) {
+    if (usePriorReviews) {
+      const mcTagged = selectFromPriorReviews(
+        store,
+        course,
+        lesson,
+        "multiple-choice",
+        config.mcBankSize,
+        `${seed}-mc-prior`,
+        excludeIds,
+      );
+      for (const question of mcTagged) excludeIds.add(question.id);
 
-    const fibTagged = selectFromPriorReviews(
-      store,
-      course,
-      lesson,
-      "fill-in-the-blank",
-      config.fibCount,
-      `${seed}-fib-prior`,
-      excludeIds,
-    );
+      const fibTagged = selectFromPriorReviews(
+        store,
+        course,
+        lesson,
+        "fill-in-the-blank",
+        config.fibCount,
+        `${seed}-fib-prior`,
+        excludeIds,
+      );
 
-    multipleChoice =
-      mcTagged.length > 0
-        ? untag(mcTagged)
-        : takeByType(bank, "multiple-choice", config.mcBankSize);
-    fillInBlank =
-      fibTagged.length > 0
-        ? untag(fibTagged)
-        : takeByType(bank, "fill-in-the-blank", config.fibCount);
-  } else {
-    multipleChoice = takeByType(bank, "multiple-choice", config.mcBankSize);
-    fillInBlank = takeByType(bank, "fill-in-the-blank", config.fibCount);
-  }
+      multipleChoice =
+        mcTagged.length > 0
+          ? untag(mcTagged)
+          : takeByType(bank, "multiple-choice", config.mcBankSize);
+      fillInBlank =
+        fibTagged.length > 0
+          ? untag(fibTagged)
+          : takeByType(bank, "fill-in-the-blank", config.fibCount);
+    } else {
+      multipleChoice = takeByType(bank, "multiple-choice", config.mcBankSize);
+      fillInBlank = takeByType(bank, "fill-in-the-blank", config.fibCount);
+    }
 
-  return {
-    review,
-    multipleChoice,
-    fillInBlank,
-    extraPractice: selectExtraPracticeQuestions(
+    extraPractice = selectExtraPracticeQuestions(
       store,
       course,
       lesson,
       config.extraCount,
       seed,
       algorithm,
-    ),
-    freeResponse:
-      takeByType(bank, "long-answer", config.freeResponseCount)[0] ?? null,
+    );
+    freeResponse =
+      takeByType(bank, "long-answer", config.freeResponseCount)[0] ?? null;
+  }
+
+  return {
+    review,
+    multipleChoice,
+    fillInBlank,
+    extraPractice,
+    freeResponse,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import { AdminActionFeedback } from "@/components/admin/admin-action-feedback";
@@ -24,8 +24,11 @@ import {
 import {
   ALGORITHM_FIELD_META,
   DEFAULT_ASSIGNMENT_ALGORITHM,
+  getChapterOverride,
   normalizeAssignmentAlgorithm,
+  setChapterOverride,
   type AssignmentAlgorithmConfig,
+  type ChapterAlgorithmOverride,
 } from "@/lib/lesson/assignment-algorithm-config";
 import { explainCourseAssessmentByChapter } from "@/lib/lesson/assessment-plan-explain";
 import {
@@ -52,12 +55,12 @@ const COUNT_FIELDS: Array<{
   {
     key: "reviewCount",
     label: "Review count",
-    description: "Warm-up questions from the lesson review bank.",
+    description: "Default warm-up questions from each lesson review bank.",
   },
   {
     key: "mcBankSize",
     label: "MC bank size",
-    description: "Multiple-choice items drawn from this lesson’s chapter bank.",
+    description: "Default MC items from the chapter bank (or prior reviews).",
   },
   {
     key: "mcTargetCorrect",
@@ -67,17 +70,17 @@ const COUNT_FIELDS: Array<{
   {
     key: "fibCount",
     label: "Fill-in-blank count",
-    description: "FIB items from this lesson’s chapter bank.",
+    description: "Default FIB items per lesson.",
   },
   {
     key: "extraCount",
     label: "Graded extra count",
-    description: "Cross-lesson review questions for the graded path.",
+    description: "Default cross-lesson review questions.",
   },
   {
     key: "freeResponseCount",
     label: "Free response count",
-    description: "Long-answer items from this lesson (usually 0–1).",
+    description: "Default long-answer items (usually 0–1).",
   },
 ];
 
@@ -89,6 +92,25 @@ const ROLE_LABELS: Record<string, string> = {
   "other-lesson": "Elsewhere in the course",
   "prior-review": "Prior lesson review bank",
 };
+
+type ChapterCountKey = keyof Pick<
+  ChapterAlgorithmOverride,
+  | "reviewCount"
+  | "mcBankSize"
+  | "mcTargetCorrect"
+  | "fibCount"
+  | "extraCount"
+  | "freeResponseCount"
+>;
+
+const CHAPTER_COUNT_FIELDS: Array<{ key: ChapterCountKey; label: string }> = [
+  { key: "reviewCount", label: "Review" },
+  { key: "mcBankSize", label: "MC bank" },
+  { key: "mcTargetCorrect", label: "MC target" },
+  { key: "fibCount", label: "FIB" },
+  { key: "extraCount", label: "Extra" },
+  { key: "freeResponseCount", label: "Free response" },
+];
 
 export function AdminAlgorithmPanel() {
   const { store, persist, saving, actionFeedback, clearActionFeedback } =
@@ -102,6 +124,7 @@ export function AdminAlgorithmPanel() {
   );
   const [saveFeedback, setSaveFeedback] = useState<AdminFeedback | null>(null);
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
+  const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
 
   const course = getCourseFromStore(store, courseId);
   const storedAlgorithm = store.algorithmConfigByCourse?.[courseId];
@@ -117,15 +140,14 @@ export function AdminAlgorithmPanel() {
 
   const isDirty =
     JSON.stringify(algorithmDraft) !== JSON.stringify(savedAlgorithm) ||
-    COUNT_FIELDS.some(
-      ({ key }) => countsDraft[key] !== savedRubric[key],
-    );
+    COUNT_FIELDS.some(({ key }) => countsDraft[key] !== savedRubric[key]);
 
   useEffect(() => {
     setAlgorithmDraft(savedAlgorithm);
     setCountsDraft(savedRubric);
     setSaveFeedback(null);
     setExpandedLessonId(null);
+    setExpandedChapter(null);
   }, [courseId, savedAlgorithm, savedRubric]);
 
   const chapterGroups = useMemo(() => {
@@ -152,16 +174,31 @@ export function AdminAlgorithmPanel() {
       .map(([chapter, title]) => ({ chapter, title }));
   }, [course]);
 
-  function togglePriorReviewChapter(chapter: number, enabled: boolean) {
+  function patchChapter(chapter: number, patch: ChapterAlgorithmOverride) {
     setSaveFeedback(null);
     setAlgorithmDraft((current) => {
-      const set = new Set(current.priorReviewChapterNumbers);
-      if (enabled) set.add(chapter);
-      else set.delete(chapter);
-      return {
-        ...current,
-        priorReviewChapterNumbers: [...set].sort((a, b) => a - b),
-      };
+      const existing = { ...getChapterOverride(current, chapter) };
+      const next: ChapterAlgorithmOverride = { ...existing };
+
+      for (const key of Object.keys(patch) as Array<keyof ChapterAlgorithmOverride>) {
+        const value = patch[key];
+        if (value === undefined) {
+          delete next[key];
+        } else {
+          (next as Record<string, unknown>)[key] = value;
+        }
+      }
+
+      return setChapterOverride(current, chapter, next);
+    });
+  }
+
+  function clearChapterCount(chapter: number, key: ChapterCountKey) {
+    setSaveFeedback(null);
+    setAlgorithmDraft((current) => {
+      const existing = { ...getChapterOverride(current, chapter) };
+      delete existing[key];
+      return setChapterOverride(current, chapter, existing);
     });
   }
 
@@ -214,9 +251,9 @@ export function AdminAlgorithmPanel() {
           Question assignment algorithm
         </h2>
         <p className="max-w-3xl text-sm text-slate-600 dark:text-stone-400">
-          Shows how each lesson builds its graded plan from the review bank and
-          chapter question banks, then lets you tune the selection rules.
-          Points and letter grades stay on{" "}
+          Set course-wide defaults, then override individual chapters — for
+          example more warm-up review, or review-only chapters with no new
+          MC/FIB. Points stay on{" "}
           <Link
             href="/admin/grading"
             className="font-medium text-sky-700 underline dark:text-sky-300"
@@ -244,36 +281,39 @@ export function AdminAlgorithmPanel() {
 
       <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
         <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
-          How the graded path works
+          Course defaults
         </h3>
-        <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700 dark:text-stone-300">
-          <li>
-            <strong>Review</strong> — first N questions from the lesson’s Review
-            bank (admin → Review questions).
-          </li>
-          <li>
-            <strong>Multiple choice / fill-in-blank / free response</strong> —
-            by default, first N items of each type from this lesson’s Chapter
-            questions bank. Chapters marked below can reuse prior lessons’
-            review banks for MC and fill-in-blank instead.
-          </li>
-          <li>
-            <strong>Graded extra</strong> — prefer prior sections in the same
-            chapter (or the previous chapter on section 1), then fill from the
-            rest of the course.
-          </li>
-          <li>
-            <strong>Optional bonus /practice</strong> — sticky easy questions +
-            leftover Alcumus pool (separate from the graded path).
-          </li>
-        </ol>
-      </section>
-
-      <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
-          Selection knobs
-        </h3>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <p className="text-sm text-slate-600 dark:text-stone-400">
+          Used when a chapter does not set its own override.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {COUNT_FIELDS.map((field) => (
+            <label key={field.key} className="block space-y-1 text-sm">
+              <span className="font-medium text-slate-800 dark:text-stone-200">
+                {field.label}
+              </span>
+              <p className="text-xs text-slate-500 dark:text-stone-500">
+                {field.description}
+              </p>
+              <Input
+                type="number"
+                min={0}
+                value={countsDraft[field.key]}
+                onChange={(event) => {
+                  setSaveFeedback(null);
+                  const value = Number.parseInt(event.target.value, 10);
+                  setCountsDraft((current) => ({
+                    ...current,
+                    [field.key]: Number.isFinite(value)
+                      ? value
+                      : current[field.key],
+                  }));
+                }}
+              />
+            </label>
+          ))}
+        </div>
+        <div className="grid gap-4 border-t border-sky-100 pt-4 sm:grid-cols-2 dark:border-stone-800">
           {ALGORITHM_FIELD_META.map((field) => (
             <label key={field.key} className="block space-y-1 text-sm">
               <span className="font-medium text-slate-800 dark:text-stone-200">
@@ -303,240 +343,266 @@ export function AdminAlgorithmPanel() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
+      <section className="space-y-4">
         <div className="space-y-1">
           <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
-            Chapters that reuse prior review questions
+            Edit by chapter
           </h3>
           <p className="text-sm text-slate-600 dark:text-stone-400">
-            For chapters that don’t lend themselves to new MC or fill-in-blank
-            items (for example philosophy of science), enable this so MC and
-            fill-in-blank draw from earlier lessons’ review banks. Stored in the
-            course algorithm config — not hardcoded. Warm-up review and free
-            response still use this lesson’s own content when present.
+            Expand a chapter to change its review count, mark it review-only
+            (no new questions), or reuse prior review banks for MC/FIB. Leave
+            count fields blank to use the course default.
           </p>
         </div>
 
         {courseChapters.length === 0 ? (
           <p className="text-sm text-slate-500">No chapters in this course yet.</p>
         ) : (
-          <ul className="space-y-2">
+          <div className="space-y-4">
             {courseChapters.map(({ chapter, title }) => {
-              const enabled =
-                algorithmDraft.priorReviewChapterNumbers.includes(chapter);
+              const override = getChapterOverride(algorithmDraft, chapter);
+              const open = expandedChapter === chapter;
+              const group = chapterGroups.find((entry) => entry.chapter === chapter);
               return (
-                <li key={chapter}>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-md border border-sky-100 px-3 py-2.5 text-sm hover:bg-sky-50 dark:border-stone-800 dark:hover:bg-stone-800/60">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={enabled}
-                      onChange={(event) =>
-                        togglePriorReviewChapter(chapter, event.target.checked)
-                      }
-                    />
-                    <span>
-                      <span className="font-medium text-slate-900 dark:text-stone-50">
+                <div
+                  key={chapter}
+                  className="rounded-lg border border-sky-200 bg-white dark:border-stone-700 dark:bg-stone-900"
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                    aria-expanded={open}
+                    onClick={() =>
+                      setExpandedChapter(open ? null : chapter)
+                    }
+                  >
+                    <span className="space-y-1">
+                      <span className="block text-sm font-semibold text-slate-900 dark:text-stone-50">
                         Chapter {chapter}
                         {title ? ` · ${title}` : ""}
                       </span>
-                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-stone-500">
-                        {enabled
-                          ? "MC & fill-in-blank come from prior lessons’ review banks."
-                          : "Uses this chapter’s own question bank for MC & fill-in-blank."}
+                      <span className="flex flex-wrap gap-1.5">
+                        {override.reviewOnly ? (
+                          <Badge>Review only</Badge>
+                        ) : null}
+                        {override.usePriorReviewsForMcFib ? (
+                          <Badge>Prior reviews for MC/FIB</Badge>
+                        ) : null}
+                        {override.reviewCount !== undefined ? (
+                          <Badge>Review ×{override.reviewCount}</Badge>
+                        ) : null}
                       </span>
                     </span>
-                  </label>
-                </li>
+                    <span className="text-xs text-slate-500">
+                      {open ? "Hide" : "Edit"}
+                    </span>
+                  </button>
+
+                  {open && (
+                    <div className="space-y-4 border-t border-sky-100 px-4 py-4 dark:border-stone-800">
+                      <label className="flex items-start gap-3 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={Boolean(override.reviewOnly)}
+                          onChange={(event) =>
+                            patchChapter(chapter, {
+                              reviewOnly: event.target.checked || undefined,
+                              ...(event.target.checked
+                                ? { usePriorReviewsForMcFib: undefined }
+                                : {}),
+                            })
+                          }
+                        />
+                        <span>
+                          <span className="font-medium text-slate-900 dark:text-stone-50">
+                            Review only — no new questions
+                          </span>
+                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-stone-500">
+                            Students only do this chapter’s warm-up review.
+                            MC, fill-in-blank, graded extra, and free response
+                            are skipped.
+                          </span>
+                        </span>
+                      </label>
+
+                      <label
+                        className={cn(
+                          "flex items-start gap-3 text-sm",
+                          override.reviewOnly && "opacity-50",
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          disabled={Boolean(override.reviewOnly)}
+                          checked={Boolean(override.usePriorReviewsForMcFib)}
+                          onChange={(event) =>
+                            patchChapter(chapter, {
+                              usePriorReviewsForMcFib: event.target.checked
+                                ? true
+                                : undefined,
+                            })
+                          }
+                        />
+                        <span>
+                          <span className="font-medium text-slate-900 dark:text-stone-50">
+                            Reuse prior lessons’ review banks for MC & FIB
+                          </span>
+                          <span className="mt-0.5 block text-xs text-slate-500 dark:text-stone-500">
+                            Useful when the chapter doesn’t lend itself to new
+                            multiple-choice or fill-in-blank items.
+                          </span>
+                        </span>
+                      </label>
+
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {CHAPTER_COUNT_FIELDS.map(({ key, label }) => {
+                          const inherited = countsDraft[key];
+                          const value = override[key];
+                          const disabled =
+                            Boolean(override.reviewOnly) &&
+                            key !== "reviewCount";
+                          return (
+                            <label
+                              key={key}
+                              className={cn(
+                                "block space-y-1 text-sm",
+                                disabled && "opacity-50",
+                              )}
+                            >
+                              <span className="font-medium text-slate-800 dark:text-stone-200">
+                                {label}
+                              </span>
+                              <span className="block text-xs text-slate-500">
+                                Default {inherited}
+                                {value === undefined ? " (using default)" : ""}
+                              </span>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  disabled={disabled}
+                                  placeholder={String(inherited)}
+                                  value={value ?? ""}
+                                  onChange={(event) => {
+                                    const raw = event.target.value.trim();
+                                    if (raw === "") {
+                                      clearChapterCount(chapter, key);
+                                      return;
+                                    }
+                                    const parsed = Number.parseInt(raw, 10);
+                                    if (!Number.isFinite(parsed) || parsed < 0) {
+                                      return;
+                                    }
+                                    patchChapter(chapter, { [key]: parsed });
+                                  }}
+                                />
+                                {value !== undefined && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={disabled}
+                                    onClick={() =>
+                                      clearChapterCount(chapter, key)
+                                    }
+                                  >
+                                    Default
+                                  </Button>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      {group && (
+                        <ul className="space-y-2 border-t border-sky-100 pt-4 dark:border-stone-800">
+                          <li className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                            Lesson preview
+                          </li>
+                          {group.lessons.map((lesson) => {
+                            const lessonOpen =
+                              expandedLessonId === lesson.lessonId;
+                            return (
+                              <li
+                                key={lesson.lessonId}
+                                className="rounded-md border border-sky-100 dark:border-stone-800"
+                              >
+                                <button
+                                  type="button"
+                                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-sky-50 dark:hover:bg-stone-800/70"
+                                  onClick={() =>
+                                    setExpandedLessonId(
+                                      lessonOpen ? null : lesson.lessonId,
+                                    )
+                                  }
+                                >
+                                  <span className="font-medium text-slate-900 dark:text-stone-50">
+                                    {lesson.chapter}.{lesson.section}{" "}
+                                    {lesson.lessonTitle}
+                                  </span>
+                                  <span className="text-xs text-slate-500">
+                                    Review {lesson.phases[0]?.selected ?? 0}/
+                                    {lesson.phases[0]?.requested ?? 0} · MC{" "}
+                                    {lesson.phases[1]?.selected ?? 0}/
+                                    {lesson.phases[1]?.requested ?? 0}
+                                  </span>
+                                </button>
+                                {lessonOpen && (
+                                  <div className="space-y-2 border-t border-sky-100 px-3 py-3 text-xs text-slate-600 dark:border-stone-800 dark:text-stone-400">
+                                    <ul className="list-disc space-y-1 pl-4">
+                                      {lesson.narrative.map((line) => (
+                                        <li key={line}>{line}</li>
+                                      ))}
+                                    </ul>
+                                    {lesson.phases.map((phase) => (
+                                      <div key={phase.id} className="space-y-1">
+                                        <p className="font-medium text-slate-800 dark:text-stone-200">
+                                          {phase.label}{" "}
+                                          <span className="font-normal text-slate-500">
+                                            {phase.selected}/{phase.requested}
+                                          </span>
+                                        </p>
+                                        <p>{phase.rule}</p>
+                                        {phase.sources.map((source) => (
+                                          <p
+                                            key={`${phase.id}-${source.lessonId}-${source.role}`}
+                                          >
+                                            {source.count}× from {source.chapter}.
+                                            {source.section} {source.lessonTitle}{" "}
+                                            (
+                                            {ROLE_LABELS[source.role] ??
+                                              source.role}
+                                            )
+                                          </p>
+                                        ))}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
-            Plan counts (also used by Grading)
-          </h3>
-          <p className="text-sm text-slate-600 dark:text-stone-400">
-            These control how many questions each phase requests. Saving here
-            updates the same course rubric as the Grading tab (points unchanged).
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {COUNT_FIELDS.map((field) => (
-            <label key={field.key} className="block space-y-1 text-sm">
-              <span className="font-medium text-slate-800 dark:text-stone-200">
-                {field.label}
-              </span>
-              <p className="text-xs text-slate-500 dark:text-stone-500">
-                {field.description}
-              </p>
-              <Input
-                type="number"
-                min={0}
-                value={countsDraft[field.key]}
-                onChange={(event) => {
-                  setSaveFeedback(null);
-                  const value = Number.parseInt(event.target.value, 10);
-                  setCountsDraft((current) => ({
-                    ...current,
-                    [field.key]: Number.isFinite(value)
-                      ? value
-                      : current[field.key],
-                  }));
-                }}
-              />
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
-          Current state by chapter
-        </h3>
-        <p className="text-sm text-slate-600 dark:text-stone-400">
-          Live simulation against the question banks with your draft settings
-          (not yet saved until you click Save). Expand a lesson to see every
-          phase and where each question came from.
-        </p>
-
-        {!course ? (
-          <p className="text-sm text-slate-500">No course selected.</p>
-        ) : chapterGroups.length === 0 ? (
-          <p className="text-sm text-slate-500">This course has no lessons yet.</p>
-        ) : (
-          <div className="space-y-6">
-            {chapterGroups.map((group) => (
-              <div
-                key={group.chapter}
-                className="space-y-3 rounded-lg border border-sky-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900"
-              >
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-sky-800 dark:text-stone-300">
-                  Chapter {group.chapter}
-                  {group.chapterTitle ? ` · ${group.chapterTitle}` : ""}
-                  {algorithmDraft.priorReviewChapterNumbers.includes(
-                    group.chapter,
-                  ) ? (
-                    <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                      Prior reviews for MC/FIB
-                    </span>
-                  ) : null}
-                </h4>
-                <ul className="space-y-2">
-                  {group.lessons.map((lesson) => {
-                    const open = expandedLessonId === lesson.lessonId;
-                    return (
-                      <li
-                        key={lesson.lessonId}
-                        className="rounded-md border border-sky-100 dark:border-stone-800"
-                      >
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-sky-50 dark:hover:bg-stone-800/70"
-                          onClick={() =>
-                            setExpandedLessonId(open ? null : lesson.lessonId)
-                          }
-                          aria-expanded={open}
-                        >
-                          <span className="font-medium text-slate-900 dark:text-stone-50">
-                            {lesson.chapter}.{lesson.section} {lesson.lessonTitle}
-                          </span>
-                          <span className="shrink-0 text-xs text-slate-500 dark:text-stone-500">
-                            Review {lesson.phases[0]?.selected ?? 0}/
-                            {lesson.phases[0]?.requested ?? 0} · MC{" "}
-                            {lesson.phases[1]?.selected ?? 0}/
-                            {lesson.phases[1]?.requested ?? 0} · Extra{" "}
-                            {lesson.phases[3]?.selected ?? 0}/
-                            {lesson.phases[3]?.requested ?? 0}
-                          </span>
-                        </button>
-
-                        {open && (
-                          <div className="space-y-4 border-t border-sky-100 px-3 py-3 dark:border-stone-800">
-                            <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600 dark:text-stone-400">
-                              {lesson.narrative.map((line) => (
-                                <li key={line}>{line}</li>
-                              ))}
-                            </ul>
-
-                            <p className="text-xs text-slate-500 dark:text-stone-500">
-                              Bonus /practice split: {lesson.bonusSplit.assignmentSlots}{" "}
-                              easy assignment slot
-                              {lesson.bonusSplit.assignmentSlots === 1 ? "" : "s"} of{" "}
-                              {lesson.bonusSplit.easyAvailable} easy ·{" "}
-                              {lesson.bonusSplit.practicePool} in leftover pool
-                            </p>
-
-                            <div className="space-y-3">
-                              {lesson.phases.map((phase) => (
-                                <div
-                                  key={phase.id}
-                                  className="rounded-md bg-sky-50/60 px-3 py-2 dark:bg-stone-950/50"
-                                >
-                                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                    <p className="text-sm font-medium text-slate-900 dark:text-stone-50">
-                                      {phase.label}
-                                    </p>
-                                    <p
-                                      className={cn(
-                                        "text-xs font-medium tabular-nums",
-                                        phase.selected < phase.requested
-                                          ? "text-amber-700 dark:text-amber-300"
-                                          : "text-slate-500 dark:text-stone-500",
-                                      )}
-                                    >
-                                      {phase.selected}/{phase.requested} selected
-                                      {phase.available > 0
-                                        ? ` · ${phase.available} available`
-                                        : ""}
-                                    </p>
-                                  </div>
-                                  <p className="mt-1 text-xs text-slate-600 dark:text-stone-400">
-                                    {phase.rule}
-                                  </p>
-                                  {phase.sources.length > 0 && (
-                                    <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-stone-400">
-                                      {phase.sources.map((source) => (
-                                        <li
-                                          key={`${phase.id}-${source.lessonId}-${source.role}`}
-                                        >
-                                          {source.count}× from {source.chapter}.
-                                          {source.section} {source.lessonTitle} (
-                                          {ROLE_LABELS[source.role] ?? source.role})
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                  {phase.samplePrompts.length > 0 && (
-                                    <ul className="mt-2 space-y-0.5 text-xs italic text-slate-500 dark:text-stone-500">
-                                      {phase.samplePrompts.map((prompt) => (
-                                        <li key={prompt}>“{prompt}”</li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-
-                            <Button asChild variant="ghost" size="sm">
-                              <Link href={`/admin/assignment`}>
-                                Edit chapter questions
-                              </Link>
-                            </Button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
           </div>
         )}
       </section>
     </div>
+  );
+}
+
+function Badge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      {children}
+    </span>
   );
 }
