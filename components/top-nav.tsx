@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
+import { SettingsMenu } from "@/components/settings/settings-menu";
 import { siteContainerClass } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,6 @@ const baseLinks = [
   { href: "/student", label: "Student" },
   { href: "/parent", label: "Parent" },
   { href: "/faq", label: "FAQ" },
-  { href: "/settings", label: "Settings" },
 ] as const;
 
 export function TopNav() {
@@ -70,6 +70,7 @@ export function TopNav() {
               </Button>
             );
           })}
+          <SettingsMenu />
         </nav>
       </div>
     </header>

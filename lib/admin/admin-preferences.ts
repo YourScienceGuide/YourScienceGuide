@@ -5,6 +5,7 @@ export const ADMIN_TABS = [
   "import",
   "access",
   "grading",
+  "algorithm",
   "review",
   "assignment",
   "flashcards",

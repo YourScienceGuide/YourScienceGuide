@@ -3,6 +3,8 @@ import {
   getQuestionBankFromStore,
   getReviewQuestionsFromStore,
 } from "@/lib/admin/content-store";
+import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
+import { normalizeAssignmentAlgorithm } from "@/lib/lesson/assignment-algorithm-config";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
@@ -75,7 +77,9 @@ export function selectExtraPracticeQuestions(
   lesson: CurriculumLesson,
   count: number,
   seed: string,
+  algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonQuestion[] {
+  const algorithm = normalizeAssignmentAlgorithm(algorithmInput);
   const sorted = sortLessons(course.lessons);
   const currentIndex = sorted.findIndex((entry) => entry.id === lesson.id);
   if (currentIndex < 0 || count <= 0) return [];
@@ -109,7 +113,14 @@ export function selectExtraPracticeQuestions(
   const primaryPool = isFirstSectionInChapter(lesson)
     ? previousChapter
     : previousInChapter;
-  const fromPrimary = seededShuffle(primaryPool, `${seed}-primary`).slice(0, 2);
+  const primaryTake = Math.min(
+    Math.max(0, algorithm.extraPrimaryPoolTake),
+    count,
+  );
+  const fromPrimary = seededShuffle(primaryPool, `${seed}-primary`).slice(
+    0,
+    primaryTake,
+  );
   const usedIds = new Set(fromPrimary.map((q) => q.id));
   const restPool = allOther.filter((q) => !usedIds.has(q.id));
   const fromRest = seededShuffle(restPool, `${seed}-rest`).slice(
@@ -127,6 +138,7 @@ export function buildLessonAssessmentPlan(
   course: Course,
   lesson: CurriculumLesson,
   rubric: GradingRubricConfig = normalizeGradingRubric(),
+  algorithm?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonAssessmentPlan {
   const config = normalizeGradingRubric(rubric);
   const bank = collectBankQuestions(store, course.id, lesson.id);
@@ -143,6 +155,7 @@ export function buildLessonAssessmentPlan(
       lesson,
       config.extraCount,
       seed,
+      algorithm,
     ),
     freeResponse:
       takeByType(bank, "long-answer", config.freeResponseCount)[0] ?? null,

@@ -7,7 +7,10 @@ import { useContentStore } from "@/components/admin/content-store-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
 import { QuestionPanel } from "@/components/lesson/question-panel";
 import { getCourseClient, getLessonClient } from "@/lib/student/curriculum-client";
-import { getGradingConfigFromStore } from "@/lib/admin/content-store";
+import {
+  getAlgorithmConfigFromStore,
+  getGradingConfigFromStore,
+} from "@/lib/admin/content-store";
 import { buildLessonAssessmentPlan } from "@/lib/lesson/lesson-assessment-plan";
 import {
   applyExtraCorrect,
@@ -98,14 +101,19 @@ export function GradedLessonFlow({
   const course = getCourseClient(store, courseId);
   const lesson = getLessonClient(store, courseId, lessonId);
   const storedRubric = store.gradingConfigByCourse?.[courseId];
+  const storedAlgorithm = store.algorithmConfigByCourse?.[courseId];
   const rubric = useMemo(
     () => getGradingConfigFromStore(store, courseId),
     [storedRubric, courseId],
   );
+  const algorithm = useMemo(
+    () => getAlgorithmConfigFromStore(store, courseId),
+    [storedAlgorithm, courseId],
+  );
   const plan = useMemo(() => {
     if (!course || !lesson) return null;
-    return buildLessonAssessmentPlan(store, course, lesson, rubric);
-  }, [course, lesson, rubric, store]);
+    return buildLessonAssessmentPlan(store, course, lesson, rubric, algorithm);
+  }, [course, lesson, rubric, algorithm, store]);
   const planIdentity = useMemo(() => {
     if (!plan) return null;
     return [

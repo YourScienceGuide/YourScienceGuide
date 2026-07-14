@@ -10,6 +10,8 @@ import { SEED_COURSES } from "@/lib/student/curriculum-seed";
 import { SEED_TEXTBOOKS, type Textbook } from "@/lib/student/textbook";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
+import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
+import { normalizeAssignmentAlgorithm } from "@/lib/lesson/assignment-algorithm-config";
 import {
   parseChapterFromId,
   sortLessons,
@@ -48,6 +50,8 @@ export type AdminContentStore = {
   reviewQuestionsByLesson?: Record<string, LessonQuestion[]>;
   /** Per-course grading rubric and defaults. */
   gradingConfigByCourse?: Record<string, GradingRubricConfig>;
+  /** Per-course assignment / pool-selection algorithm knobs. */
+  algorithmConfigByCourse?: Record<string, AssignmentAlgorithmConfig>;
 };
 
 const CURRENT_STORE_VERSION = 3 as const;
@@ -184,6 +188,7 @@ export function createDefaultStore(): AdminContentStore {
     flashcardsByLesson: {},
     reviewQuestionsByLesson: {},
     gradingConfigByCourse: {},
+    algorithmConfigByCourse: {},
   };
 }
 
@@ -208,13 +213,24 @@ function ensureGradingConfig(store: AdminContentStore): AdminContentStore {
   return { ...store, gradingConfigByCourse: {} };
 }
 
+function ensureAlgorithmConfig(store: AdminContentStore): AdminContentStore {
+  if (store.algorithmConfigByCourse !== undefined) {
+    return store;
+  }
+  return { ...store, algorithmConfigByCourse: {} };
+}
+
 export function sanitizeContentStore(store: AdminContentStore): AdminContentStore {
   const questionBank = normalizeQuestionBank(store);
-  const withGrading = ensureGradingConfig(store);
+  const withGrading = ensureAlgorithmConfig(ensureGradingConfig(store));
   const gradingConfigByCourse: Record<string, GradingRubricConfig> = {};
+  const algorithmConfigByCourse: Record<string, AssignmentAlgorithmConfig> = {};
   for (const course of withGrading.courses) {
     gradingConfigByCourse[course.id] = normalizeGradingRubric(
       withGrading.gradingConfigByCourse?.[course.id],
+    );
+    algorithmConfigByCourse[course.id] = normalizeAssignmentAlgorithm(
+      withGrading.algorithmConfigByCourse?.[course.id],
     );
   }
   return ensureReviewQuestions(
@@ -226,6 +242,7 @@ export function sanitizeContentStore(store: AdminContentStore): AdminContentStor
           courses: migrateCourses(withGrading.courses),
           questionBank,
           gradingConfigByCourse,
+          algorithmConfigByCourse,
           lessonQuestions: undefined,
           alcumusByLesson: undefined,
         }),
@@ -373,6 +390,27 @@ export function setGradingConfigInStore(
   };
 }
 
+export function getAlgorithmConfigFromStore(
+  store: AdminContentStore,
+  courseId: string,
+): AssignmentAlgorithmConfig {
+  return normalizeAssignmentAlgorithm(store.algorithmConfigByCourse?.[courseId]);
+}
+
+export function setAlgorithmConfigInStore(
+  store: AdminContentStore,
+  courseId: string,
+  config: AssignmentAlgorithmConfig,
+): AdminContentStore {
+  return {
+    ...store,
+    algorithmConfigByCourse: {
+      ...(store.algorithmConfigByCourse ?? {}),
+      [courseId]: normalizeAssignmentAlgorithm(config),
+    },
+  };
+}
+
 export function getTextbookFromStore(
   store: AdminContentStore,
   courseId: string,
@@ -516,6 +554,10 @@ export function removeCourseFromStore(
     ),
     gradingConfigByCourse: stripKeysForCourse(
       store.gradingConfigByCourse ?? {},
+      courseId,
+    ),
+    algorithmConfigByCourse: stripKeysForCourse(
+      store.algorithmConfigByCourse ?? {},
       courseId,
     ),
     textbooks,

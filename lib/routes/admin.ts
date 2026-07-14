@@ -9,6 +9,7 @@ export const ADMIN_TAB_ROUTES: ReadonlyArray<{
   { id: "import", label: "Bulk import (CSV)", href: "/admin/import" },
   { id: "access", label: "Lesson access", href: "/admin/access" },
   { id: "grading", label: "Grading", href: "/admin/grading" },
+  { id: "algorithm", label: "Algorithm", href: "/admin/algorithm" },
   { id: "review", label: "Review questions", href: "/admin/review" },
   { id: "assignment", label: "Chapter questions", href: "/admin/assignment" },
   { id: "flashcards", label: "Flashcards", href: "/admin/flashcards" },

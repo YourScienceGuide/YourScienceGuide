@@ -25,8 +25,9 @@ function getProblemById(pool: ChapterQuestion[], id: string) {
 export function createInitialAlcumusState(
   pool: ChapterQuestion[],
   sessionSeed: string,
+  sessionSize = EXTRA_PRACTICE_SESSION_SIZE,
 ): AlcumusState {
-  const session = selectExtraPracticeSession(pool, sessionSeed);
+  const session = selectExtraPracticeSession(pool, sessionSeed, sessionSize);
   const questionIds = session.map((question) => question.id);
 
   return {
@@ -44,6 +45,7 @@ export function normalizeAlcumusState(
   stored: Partial<AlcumusState> | null | undefined,
   pool: ChapterQuestion[],
   sessionSeed: string,
+  sessionSize = EXTRA_PRACTICE_SESSION_SIZE,
 ): AlcumusState {
   const poolIds = new Set(pool.map((question) => question.id));
   const questionIds =
@@ -69,7 +71,7 @@ export function normalizeAlcumusState(
     };
   }
 
-  return createInitialAlcumusState(pool, sessionSeed);
+  return createInitialAlcumusState(pool, sessionSeed, sessionSize);
 }
 
 export function getCurrentProblem(

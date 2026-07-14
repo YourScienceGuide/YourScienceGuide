@@ -39,6 +39,7 @@ export type CourseGradingConfigRow = {
   free_response_count: number;
   free_response_points: number;
   default_graduation_problem_count: number;
+  algorithm_config?: Record<string, unknown> | null;
 };
 
 export type CourseTextbookRow = {

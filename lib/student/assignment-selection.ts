@@ -3,6 +3,11 @@ import {
   selectAssignmentQuestions,
   type ChapterQuestion,
 } from "@/lib/lesson/chapter-questions";
+import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
+import {
+  DEFAULT_ASSIGNMENT_ALGORITHM,
+  normalizeAssignmentAlgorithm,
+} from "@/lib/lesson/assignment-algorithm-config";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { shouldPersistStudentData } from "@/lib/student/student-scope";
 
@@ -27,16 +32,24 @@ function writeStore(store: SelectionStore) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 }
 
-function easyIds(bank: ChapterQuestion[]): string[] {
-  return bank.filter((q) => q.difficulty <= 2).map((q) => q.id);
+function easyIds(
+  bank: ChapterQuestion[],
+  easyDifficultyMax: number,
+): string[] {
+  return bank
+    .filter((q) => q.difficulty <= easyDifficultyMax)
+    .map((q) => q.id);
 }
 
 function resolveFromStoredIds(
   bank: ChapterQuestion[],
   storedIds: string[],
+  easyDifficultyMax: number,
 ): LessonQuestion[] | null {
   const easy = new Map(
-    bank.filter((q) => q.difficulty <= 2).map((q) => [q.id, q]),
+    bank
+      .filter((q) => q.difficulty <= easyDifficultyMax)
+      .map((q) => [q.id, q]),
   );
   const resolved = storedIds
     .map((id) => easy.get(id))
@@ -51,20 +64,28 @@ export function getOrCreateAssignmentQuestions(
   courseId: string,
   lessonId: string,
   bank: ChapterQuestion[],
+  algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonQuestion[] {
+  const algorithm = normalizeAssignmentAlgorithm(
+    algorithmInput ?? DEFAULT_ASSIGNMENT_ALGORITHM,
+  );
   const lessonAssignmentKey = assignmentSeed(courseId, lessonId);
   const selectionSeed = `${studentScope}/${lessonAssignmentKey}`;
   if (!shouldPersistStudentData(studentScope)) {
-    return selectAssignmentQuestions(bank, selectionSeed);
+    return selectAssignmentQuestions(bank, selectionSeed, algorithm);
   }
-  const validEasy = new Set(easyIds(bank));
+  const validEasy = new Set(easyIds(bank, algorithm.easyDifficultyMax));
   const store = readStore();
   const byStudent = store[studentScope] ?? {};
   const stored = byStudent[lessonAssignmentKey];
 
   if (stored) {
     const filtered = stored.filter((id) => validEasy.has(id));
-    const resolved = resolveFromStoredIds(bank, filtered);
+    const resolved = resolveFromStoredIds(
+      bank,
+      filtered,
+      algorithm.easyDifficultyMax,
+    );
     if (resolved && resolved.length > 0) {
       if (filtered.length !== stored.length) {
         byStudent[lessonAssignmentKey] = filtered;
@@ -75,7 +96,7 @@ export function getOrCreateAssignmentQuestions(
     }
   }
 
-  const selected = selectAssignmentQuestions(bank, selectionSeed);
+  const selected = selectAssignmentQuestions(bank, selectionSeed, algorithm);
   byStudent[lessonAssignmentKey] = selected.map((q) => q.id);
   store[studentScope] = byStudent;
   writeStore(store);

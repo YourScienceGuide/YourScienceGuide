@@ -11,6 +11,7 @@ import { useStudentScope } from "@/components/student/use-student-scope";
 import { QuestionHistorySection } from "@/components/student/question-history-section";
 import { Button } from "@/components/ui/button";
 import { useContentStore } from "@/components/admin/content-store-provider";
+import { getAlgorithmConfigFromStore } from "@/lib/admin/content-store";
 import { getLessonClient } from "@/lib/student/curriculum-client";
 import { lessonPath } from "@/lib/student/paths";
 import { shouldPersistStudentData } from "@/lib/student/student-scope";
@@ -37,6 +38,7 @@ function loadPersistedState(
   courseId: string,
   lessonId: string,
   pool: ChapterQuestion[],
+  sessionSize: number,
 ): AlcumusState | null {
   if (!shouldPersistStudentData(studentScope)) return null;
   if (typeof window === "undefined") return null;
@@ -48,6 +50,7 @@ function loadPersistedState(
       parsed,
       pool,
       sessionSeed(studentScope, courseId, lessonId),
+      sessionSize,
     );
   } catch {
     return null;
@@ -108,6 +111,10 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
   const studentScope = useStudentScope();
   const lessonMeta = getLessonClient(store, courseId, lessonId);
   const { practice, ready, error } = useLessonAssessment();
+  const algorithm = useMemo(
+    () => getAlgorithmConfigFromStore(store, courseId),
+    [store, courseId],
+  );
   const practiceSignature = useMemo(
     () => listIdSignature(practice),
     [practice],
@@ -121,14 +128,29 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
     }
 
     setState(
-      loadPersistedState(studentScope, courseId, lessonId, practice) ??
+      loadPersistedState(
+        studentScope,
+        courseId,
+        lessonId,
+        practice,
+        algorithm.extraPracticeSessionSize,
+      ) ??
         normalizeAlcumusState(
           null,
           practice,
           sessionSeed(studentScope, courseId, lessonId),
+          algorithm.extraPracticeSessionSize,
         ),
     );
-  }, [ready, practiceSignature, studentScope, courseId, lessonId, practice]);
+  }, [
+    ready,
+    practiceSignature,
+    studentScope,
+    courseId,
+    lessonId,
+    practice,
+    algorithm.extraPracticeSessionSize,
+  ]);
 
   useEffect(() => {
     if (!state || !studentScope || !shouldPersistStudentData(studentScope)) return;

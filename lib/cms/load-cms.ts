@@ -25,6 +25,8 @@ import { normalizeLessonAccessTier } from "@/lib/student/lesson-access";
 import type { Textbook } from "@/lib/student/textbook";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
+import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
+import { normalizeAssignmentAlgorithm } from "@/lib/lesson/assignment-algorithm-config";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import {
@@ -171,12 +173,17 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
   }
 
   const gradingConfigByCourse: AdminContentStore["gradingConfigByCourse"] = {};
+  const algorithmConfigByCourse: AdminContentStore["algorithmConfigByCourse"] = {};
   for (const row of (gradingConfigResult.data ?? []) as CourseGradingConfigRow[]) {
     gradingConfigByCourse[row.course_id] = mapGradingConfigRow(row);
+    algorithmConfigByCourse[row.course_id] = mapAlgorithmConfigRow(row);
   }
   for (const course of courses) {
     if (!gradingConfigByCourse[course.id]) {
       gradingConfigByCourse[course.id] = normalizeGradingRubric();
+    }
+    if (!algorithmConfigByCourse[course.id]) {
+      algorithmConfigByCourse[course.id] = normalizeAssignmentAlgorithm();
     }
   }
 
@@ -189,6 +196,7 @@ export async function loadCmsAsStore(): Promise<AdminContentStore> {
     flashcardsByLesson,
     reviewQuestionsByLesson,
     gradingConfigByCourse,
+    algorithmConfigByCourse,
   });
 }
 
@@ -207,6 +215,14 @@ function mapGradingConfigRow(row: CourseGradingConfigRow): GradingRubricConfig {
     freeResponsePoints: row.free_response_points,
     defaultGraduationProblemCount: row.default_graduation_problem_count,
   });
+}
+
+function mapAlgorithmConfigRow(
+  row: CourseGradingConfigRow,
+): AssignmentAlgorithmConfig {
+  return normalizeAssignmentAlgorithm(
+    (row.algorithm_config ?? undefined) as Partial<AssignmentAlgorithmConfig> | undefined,
+  );
 }
 
 function mapLessonRow(row: LessonRow): CurriculumLesson {
@@ -270,6 +286,7 @@ export async function loadLegacyContentBlob(): Promise<AdminContentStore | null>
     flashcardsByLesson: parsed.flashcardsByLesson ?? {},
     reviewQuestionsByLesson: parsed.reviewQuestionsByLesson ?? {},
     gradingConfigByCourse: parsed.gradingConfigByCourse ?? {},
+    algorithmConfigByCourse: parsed.algorithmConfigByCourse ?? {},
   });
 }
 

@@ -9,7 +9,10 @@ import {
 
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { useStudentScope } from "@/components/student/use-student-scope";
-import { getQuestionBankFromStore } from "@/lib/admin/content-store";
+import {
+  getAlgorithmConfigFromStore,
+  getQuestionBankFromStore,
+} from "@/lib/admin/content-store";
 import {
   selectPracticeQuestions,
   type ChapterQuestion,
@@ -52,10 +55,21 @@ export function LessonAssessmentProvider({
     ? getQuestionBankFromStore(store, courseId, lessonId)
     : EMPTY_CHAPTER_QUESTIONS;
 
+  const algorithm = useMemo(
+    () => getAlgorithmConfigFromStore(store, courseId),
+    [store, courseId],
+  );
+
   const lesson = useMemo(() => {
     if (!ready || !studentScope || bank.length === 0) return EMPTY_LESSON_QUESTIONS;
-    return getOrCreateAssignmentQuestions(studentScope, courseId, lessonId, bank);
-  }, [ready, studentScope, bank, courseId, lessonId]);
+    return getOrCreateAssignmentQuestions(
+      studentScope,
+      courseId,
+      lessonId,
+      bank,
+      algorithm,
+    );
+  }, [ready, studentScope, bank, courseId, lessonId, algorithm]);
 
   const practice = useMemo(() => {
     if (!ready || bank.length === 0) return EMPTY_CHAPTER_QUESTIONS;

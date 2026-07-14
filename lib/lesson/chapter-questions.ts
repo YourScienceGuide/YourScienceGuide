@@ -1,19 +1,29 @@
 import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
 import type { AlcumusProblem } from "@/lib/lesson/alcumus-types";
+import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
+import {
+  DEFAULT_ASSIGNMENT_ALGORITHM,
+  normalizeAssignmentAlgorithm,
+} from "@/lib/lesson/assignment-algorithm-config";
 import type { LessonQuestion } from "@/lib/lesson/types";
 
 /** Max required end-of-chapter questions drawn from the easier bank. */
-export const MAX_END_OF_CHAPTER_QUESTIONS = 4;
+export const MAX_END_OF_CHAPTER_QUESTIONS =
+  DEFAULT_ASSIGNMENT_ALGORITHM.maxEndOfChapterQuestions;
 
 /** Levels 1–2 are eligible for the required assignment; 3–5 are extra practice only. */
-export const EASY_DIFFICULTY_MAX = 2;
+export const EASY_DIFFICULTY_MAX =
+  DEFAULT_ASSIGNMENT_ALGORITHM.easyDifficultyMax;
 
 export type ChapterQuestion = LessonQuestion & {
   difficulty: AlcumusLevel;
 };
 
-export function isEasyChapterQuestion(question: ChapterQuestion): boolean {
-  return question.difficulty <= EASY_DIFFICULTY_MAX;
+export function isEasyChapterQuestion(
+  question: ChapterQuestion,
+  easyDifficultyMax: AlcumusLevel = EASY_DIFFICULTY_MAX,
+): boolean {
+  return question.difficulty <= easyDifficultyMax;
 }
 
 export function stripChapterDifficulty(
@@ -23,14 +33,23 @@ export function stripChapterDifficulty(
   return lessonQuestion;
 }
 
-export function previewChapterSplit(bank: ChapterQuestion[]): {
+export function previewChapterSplit(
+  bank: ChapterQuestion[],
+  algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
+): {
   assignmentCandidates: number;
   assignmentSlots: number;
   practiceCount: number;
 } {
-  const easyCount = bank.filter(isEasyChapterQuestion).length;
+  const algorithm = normalizeAssignmentAlgorithm(algorithmInput);
+  const easyCount = bank.filter((q) =>
+    isEasyChapterQuestion(q, algorithm.easyDifficultyMax),
+  ).length;
   const hardCount = bank.length - easyCount;
-  const assignmentSlots = Math.min(MAX_END_OF_CHAPTER_QUESTIONS, easyCount);
+  const assignmentSlots = Math.min(
+    algorithm.maxEndOfChapterQuestions,
+    easyCount,
+  );
   const leftoverEasy = Math.max(0, easyCount - assignmentSlots);
 
   return {
@@ -64,9 +83,13 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 export function selectAssignmentQuestions(
   bank: ChapterQuestion[],
   seed: string,
+  algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonQuestion[] {
-  const easy = bank.filter(isEasyChapterQuestion);
-  const count = Math.min(MAX_END_OF_CHAPTER_QUESTIONS, easy.length);
+  const algorithm = normalizeAssignmentAlgorithm(algorithmInput);
+  const easy = bank.filter((q) =>
+    isEasyChapterQuestion(q, algorithm.easyDifficultyMax),
+  );
+  const count = Math.min(algorithm.maxEndOfChapterQuestions, easy.length);
   if (count === 0) return [];
 
   return seededShuffle(easy, seed)
@@ -83,7 +106,8 @@ export function selectPracticeQuestions(
 }
 
 /** Fixed extra-practice session drawn from the practice pool. */
-export const EXTRA_PRACTICE_SESSION_SIZE = 5;
+export const EXTRA_PRACTICE_SESSION_SIZE =
+  DEFAULT_ASSIGNMENT_ALGORITHM.extraPracticeSessionSize;
 
 export function selectExtraPracticeSession(
   pool: ChapterQuestion[],

@@ -21,7 +21,7 @@ export const SETTINGS_SECTIONS = [
     id: "account",
     label: "Account",
     href: "/settings/account",
-    description: "Sign out of Your Science Guide on this device.",
+    description: "Manage your account and sign out of this device.",
   },
 ] as const;
 

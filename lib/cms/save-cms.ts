@@ -5,6 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { lessonKey } from "@/lib/admin/lesson-key";
 import type { AdminFlashcard } from "@/lib/lesson/admin-flashcard-types";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
+import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
+import { normalizeAssignmentAlgorithm } from "@/lib/lesson/assignment-algorithm-config";
 import type { LessonQuestion } from "@/lib/lesson/types";
 import { type AdminContentStore } from "@/lib/admin/content-store";
 import {
@@ -111,6 +113,7 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
       supabase,
       course.id,
       store.gradingConfigByCourse?.[course.id],
+      store.algorithmConfigByCourse?.[course.id],
     );
 
     await Promise.all(
@@ -272,6 +275,7 @@ async function syncCourseGradingConfig(
   supabase: SupabaseClient,
   courseId: string,
   config: GradingRubricConfig | undefined,
+  algorithm?: AssignmentAlgorithmConfig | undefined,
 ): Promise<void> {
   if (!config) {
     const { error } = await supabase
@@ -299,6 +303,7 @@ async function syncCourseGradingConfig(
       free_response_count: config.freeResponseCount,
       free_response_points: config.freeResponsePoints,
       default_graduation_problem_count: config.defaultGraduationProblemCount,
+      algorithm_config: normalizeAssignmentAlgorithm(algorithm),
       updated_at: now(),
     },
     { onConflict: "course_id" },
