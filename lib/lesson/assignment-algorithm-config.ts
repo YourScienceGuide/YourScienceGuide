@@ -1,4 +1,6 @@
 import type { AlcumusLevel } from "@/lib/lesson/alcumus-types";
+import type { CurriculumLesson } from "@/lib/student/curriculum-types";
+import { lessonChapterNumber } from "@/lib/student/lesson-sort";
 
 /**
  * Tunables for how questions are drawn from chapter banks and review pools.
@@ -18,6 +20,13 @@ export type AssignmentAlgorithmConfig = {
   easyDifficultyMax: AlcumusLevel;
   /** Bonus Alcumus session length drawn from leftover practice pool. */
   extraPracticeSessionSize: number;
+  /**
+   * Course chapter numbers whose lessons skip local MC / fill-in-blank banks
+   * and instead draw those phases from prior lessons’ review question banks.
+   * Useful for chapters that don’t lend themselves to new MCQ/FITB content
+   * (e.g. philosophy of science). Configured per course by admins.
+   */
+  priorReviewChapterNumbers: number[];
 };
 
 export const DEFAULT_ASSIGNMENT_ALGORITHM: AssignmentAlgorithmConfig = {
@@ -25,6 +34,7 @@ export const DEFAULT_ASSIGNMENT_ALGORITHM: AssignmentAlgorithmConfig = {
   maxEndOfChapterQuestions: 4,
   easyDifficultyMax: 2,
   extraPracticeSessionSize: 5,
+  priorReviewChapterNumbers: [],
 };
 
 function positiveInt(value: unknown, fallback: number): number {
@@ -46,10 +56,21 @@ function clampLevel(value: unknown, fallback: AlcumusLevel): AlcumusLevel {
   return n as AlcumusLevel;
 }
 
+function normalizeChapterNumbers(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const numbers = value
+    .map((entry) =>
+      typeof entry === "number" ? entry : Number.parseInt(String(entry), 10),
+    )
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => Math.floor(n));
+  return [...new Set(numbers)].sort((a, b) => a - b);
+}
+
 export function normalizeAssignmentAlgorithm(
   partial?: Partial<AssignmentAlgorithmConfig> | null,
 ): AssignmentAlgorithmConfig {
-  if (!partial) return { ...DEFAULT_ASSIGNMENT_ALGORITHM };
+  if (!partial) return { ...DEFAULT_ASSIGNMENT_ALGORITHM, priorReviewChapterNumbers: [] };
   return {
     extraPrimaryPoolTake: nonNegativeInt(
       partial.extraPrimaryPoolTake,
@@ -67,11 +88,23 @@ export function normalizeAssignmentAlgorithm(
       partial.extraPracticeSessionSize,
       DEFAULT_ASSIGNMENT_ALGORITHM.extraPracticeSessionSize,
     ),
+    priorReviewChapterNumbers: normalizeChapterNumbers(
+      partial.priorReviewChapterNumbers,
+    ),
   };
 }
 
+export function lessonUsesPriorReviewForMcFib(
+  algorithm: AssignmentAlgorithmConfig,
+  lesson: CurriculumLesson,
+): boolean {
+  return algorithm.priorReviewChapterNumbers.includes(
+    lessonChapterNumber(lesson),
+  );
+}
+
 export const ALGORITHM_FIELD_META: Array<{
-  key: keyof AssignmentAlgorithmConfig;
+  key: Exclude<keyof AssignmentAlgorithmConfig, "priorReviewChapterNumbers">;
   label: string;
   description: string;
   min: number;

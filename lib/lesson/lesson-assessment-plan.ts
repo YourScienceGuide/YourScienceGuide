@@ -4,7 +4,10 @@ import {
   getReviewQuestionsFromStore,
 } from "@/lib/admin/content-store";
 import type { AssignmentAlgorithmConfig } from "@/lib/lesson/assignment-algorithm-config";
-import { normalizeAssignmentAlgorithm } from "@/lib/lesson/assignment-algorithm-config";
+import {
+  lessonUsesPriorReviewForMcFib,
+  normalizeAssignmentAlgorithm,
+} from "@/lib/lesson/assignment-algorithm-config";
 import type { GradingRubricConfig } from "@/lib/lesson/lesson-grade-config";
 import { normalizeGradingRubric } from "@/lib/lesson/lesson-grade-config";
 import type { ChapterQuestion } from "@/lib/lesson/chapter-questions";
@@ -23,6 +26,10 @@ export type LessonAssessmentPlan = {
   fillInBlank: LessonQuestion[];
   extraPractice: LessonQuestion[];
   freeResponse: LessonQuestion | null;
+};
+
+export type TaggedLessonQuestion = LessonQuestion & {
+  fromLessonId: string;
 };
 
 function hashSeed(seed: string): number {
@@ -69,6 +76,69 @@ function isFirstSectionOfCourse(lesson: CurriculumLesson): boolean {
 
 function isFirstSectionInChapter(lesson: CurriculumLesson): boolean {
   return lessonSectionNumber(lesson) === 1;
+}
+
+/** Review questions from lessons that appear before the current one. */
+export function collectPriorReviewQuestions(
+  store: AdminContentStore,
+  course: Course,
+  lesson: CurriculumLesson,
+): TaggedLessonQuestion[] {
+  const sorted = sortLessons(course.lessons);
+  const currentIndex = sorted.findIndex((entry) => entry.id === lesson.id);
+  if (currentIndex <= 0) return [];
+
+  const tagged: TaggedLessonQuestion[] = [];
+  for (let i = 0; i < currentIndex; i += 1) {
+    const entry = sorted[i];
+    for (const question of getReviewQuestionsFromStore(
+      store,
+      course.id,
+      entry.id,
+    )) {
+      tagged.push({ ...question, fromLessonId: entry.id });
+    }
+  }
+  return tagged;
+}
+
+/**
+ * Draw MC or FIB items from prior lessons’ review banks.
+ * Prefers matching question type, then fills from other prior review types
+ * so philosophy-style chapters need not invent local MC/FIB banks.
+ */
+export function selectFromPriorReviews(
+  store: AdminContentStore,
+  course: Course,
+  lesson: CurriculumLesson,
+  type: LessonQuestion["type"],
+  count: number,
+  seed: string,
+  excludeIds: Set<string> = new Set(),
+): TaggedLessonQuestion[] {
+  if (count <= 0) return [];
+
+  const prior = collectPriorReviewQuestions(store, course, lesson).filter(
+    (question) => !excludeIds.has(question.id),
+  );
+  if (prior.length === 0) return [];
+
+  const preferred = prior.filter((question) => question.type === type);
+  const others = prior.filter((question) => question.type !== type);
+  const ordered = [
+    ...seededShuffle(preferred, `${seed}-${type}`),
+    ...seededShuffle(others, `${seed}-${type}-fill`),
+  ];
+
+  const picked: TaggedLessonQuestion[] = [];
+  const used = new Set<string>();
+  for (const question of ordered) {
+    if (used.has(question.id)) continue;
+    used.add(question.id);
+    picked.push(question);
+    if (picked.length >= count) break;
+  }
+  return picked;
 }
 
 export function selectExtraPracticeQuestions(
@@ -133,22 +203,69 @@ export function selectExtraPracticeQuestions(
     .map(stripChapterDifficulty);
 }
 
+function untag(questions: TaggedLessonQuestion[]): LessonQuestion[] {
+  return questions.map(({ fromLessonId: _from, ...question }) => question);
+}
+
 export function buildLessonAssessmentPlan(
   store: AdminContentStore,
   course: Course,
   lesson: CurriculumLesson,
   rubric: GradingRubricConfig = normalizeGradingRubric(),
-  algorithm?: Partial<AssignmentAlgorithmConfig> | null,
+  algorithmInput?: Partial<AssignmentAlgorithmConfig> | null,
 ): LessonAssessmentPlan {
   const config = normalizeGradingRubric(rubric);
+  const algorithm = normalizeAssignmentAlgorithm(algorithmInput);
   const bank = collectBankQuestions(store, course.id, lesson.id);
   const reviewAll = getReviewQuestionsFromStore(store, course.id, lesson.id);
   const seed = `${course.id}/${lesson.id}/extra`;
+  const usePriorReviews = lessonUsesPriorReviewForMcFib(algorithm, lesson);
+
+  const review = reviewAll.slice(0, config.reviewCount);
+  const excludeIds = new Set(review.map((question) => question.id));
+
+  let multipleChoice: LessonQuestion[];
+  let fillInBlank: LessonQuestion[];
+
+  if (usePriorReviews) {
+    const mcTagged = selectFromPriorReviews(
+      store,
+      course,
+      lesson,
+      "multiple-choice",
+      config.mcBankSize,
+      `${seed}-mc-prior`,
+      excludeIds,
+    );
+    for (const question of mcTagged) excludeIds.add(question.id);
+
+    const fibTagged = selectFromPriorReviews(
+      store,
+      course,
+      lesson,
+      "fill-in-the-blank",
+      config.fibCount,
+      `${seed}-fib-prior`,
+      excludeIds,
+    );
+
+    multipleChoice =
+      mcTagged.length > 0
+        ? untag(mcTagged)
+        : takeByType(bank, "multiple-choice", config.mcBankSize);
+    fillInBlank =
+      fibTagged.length > 0
+        ? untag(fibTagged)
+        : takeByType(bank, "fill-in-the-blank", config.fibCount);
+  } else {
+    multipleChoice = takeByType(bank, "multiple-choice", config.mcBankSize);
+    fillInBlank = takeByType(bank, "fill-in-the-blank", config.fibCount);
+  }
 
   return {
-    review: reviewAll.slice(0, config.reviewCount),
-    multipleChoice: takeByType(bank, "multiple-choice", config.mcBankSize),
-    fillInBlank: takeByType(bank, "fill-in-the-blank", config.fibCount),
+    review,
+    multipleChoice,
+    fillInBlank,
     extraPractice: selectExtraPracticeQuestions(
       store,
       course,

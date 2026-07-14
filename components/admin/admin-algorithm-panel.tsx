@@ -33,6 +33,7 @@ import {
   normalizeGradingRubric,
   type GradingRubricConfig,
 } from "@/lib/lesson/lesson-grade-config";
+import { lessonChapterNumber, sortLessons } from "@/lib/student/lesson-sort";
 import { cn } from "@/lib/utils";
 
 const COUNT_FIELDS: Array<{
@@ -86,6 +87,7 @@ const ROLE_LABELS: Record<string, string> = {
   "prior-section": "Earlier section this chapter",
   "prior-chapter": "Previous chapter",
   "other-lesson": "Elsewhere in the course",
+  "prior-review": "Prior lesson review bank",
 };
 
 export function AdminAlgorithmPanel() {
@@ -135,6 +137,33 @@ export function AdminAlgorithmPanel() {
       algorithmDraft,
     );
   }, [course, store, countsDraft, algorithmDraft]);
+
+  const courseChapters = useMemo(() => {
+    if (!course) return [];
+    const byChapter = new Map<number, string>();
+    for (const lesson of sortLessons(course.lessons)) {
+      const chapter = lessonChapterNumber(lesson);
+      if (!byChapter.has(chapter)) {
+        byChapter.set(chapter, lesson.chapterTitle || `Chapter ${chapter}`);
+      }
+    }
+    return [...byChapter.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([chapter, title]) => ({ chapter, title }));
+  }, [course]);
+
+  function togglePriorReviewChapter(chapter: number, enabled: boolean) {
+    setSaveFeedback(null);
+    setAlgorithmDraft((current) => {
+      const set = new Set(current.priorReviewChapterNumbers);
+      if (enabled) set.add(chapter);
+      else set.delete(chapter);
+      return {
+        ...current,
+        priorReviewChapterNumbers: [...set].sort((a, b) => a - b),
+      };
+    });
+  }
 
   async function saveChanges() {
     setSaveFeedback(null);
@@ -224,8 +253,9 @@ export function AdminAlgorithmPanel() {
           </li>
           <li>
             <strong>Multiple choice / fill-in-blank / free response</strong> —
-            first N items of each type from this lesson’s Chapter questions bank
-            (difficulty is ignored here).
+            by default, first N items of each type from this lesson’s Chapter
+            questions bank. Chapters marked below can reuse prior lessons’
+            review banks for MC and fill-in-blank instead.
           </li>
           <li>
             <strong>Graded extra</strong> — prefer prior sections in the same
@@ -271,6 +301,57 @@ export function AdminAlgorithmPanel() {
             </label>
           ))}
         </div>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
+            Chapters that reuse prior review questions
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-stone-400">
+            For chapters that don’t lend themselves to new MC or fill-in-blank
+            items (for example philosophy of science), enable this so MC and
+            fill-in-blank draw from earlier lessons’ review banks. Stored in the
+            course algorithm config — not hardcoded. Warm-up review and free
+            response still use this lesson’s own content when present.
+          </p>
+        </div>
+
+        {courseChapters.length === 0 ? (
+          <p className="text-sm text-slate-500">No chapters in this course yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {courseChapters.map(({ chapter, title }) => {
+              const enabled =
+                algorithmDraft.priorReviewChapterNumbers.includes(chapter);
+              return (
+                <li key={chapter}>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-md border border-sky-100 px-3 py-2.5 text-sm hover:bg-sky-50 dark:border-stone-800 dark:hover:bg-stone-800/60">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={enabled}
+                      onChange={(event) =>
+                        togglePriorReviewChapter(chapter, event.target.checked)
+                      }
+                    />
+                    <span>
+                      <span className="font-medium text-slate-900 dark:text-stone-50">
+                        Chapter {chapter}
+                        {title ? ` · ${title}` : ""}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500 dark:text-stone-500">
+                        {enabled
+                          ? "MC & fill-in-blank come from prior lessons’ review banks."
+                          : "Uses this chapter’s own question bank for MC & fill-in-blank."}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="space-y-4 rounded-lg border border-sky-200 bg-white p-5 dark:border-stone-700 dark:bg-stone-900">
@@ -336,6 +417,13 @@ export function AdminAlgorithmPanel() {
                 <h4 className="text-sm font-semibold uppercase tracking-wide text-sky-800 dark:text-stone-300">
                   Chapter {group.chapter}
                   {group.chapterTitle ? ` · ${group.chapterTitle}` : ""}
+                  {algorithmDraft.priorReviewChapterNumbers.includes(
+                    group.chapter,
+                  ) ? (
+                    <span className="ml-2 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                      Prior reviews for MC/FIB
+                    </span>
+                  ) : null}
                 </h4>
                 <ul className="space-y-2">
                   {group.lessons.map((lesson) => {
