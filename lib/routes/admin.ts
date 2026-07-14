@@ -15,7 +15,44 @@ export const ADMIN_TAB_ROUTES: ReadonlyArray<{
   { id: "flashcards", label: "Flashcards", href: "/admin/flashcards" },
   { id: "videos", label: "Lesson videos", href: "/admin/videos" },
   { id: "emails", label: "Parent emails", href: "/admin/emails" },
-  { id: "faq", label: "FAQ", href: "/admin/faq" },
+  { id: "faq", label: "Manage FAQ", href: "/admin/faq" },
+];
+
+const TAB_BY_ID = new Map(ADMIN_TAB_ROUTES.map((tab) => [tab.id, tab] as const));
+
+function tabs(...ids: AdminTabId[]) {
+  return ids.map((id) => {
+    const tab = TAB_BY_ID.get(id);
+    if (!tab) throw new Error(`Unknown admin tab: ${id}`);
+    return tab;
+  });
+}
+
+export const ADMIN_NAV_GROUPS: ReadonlyArray<{
+  id: string;
+  label: string;
+  items: ReadonlyArray<(typeof ADMIN_TAB_ROUTES)[number]>;
+}> = [
+  {
+    id: "course-content",
+    label: "Course Content",
+    items: tabs("curriculum", "videos", "flashcards", "import"),
+  },
+  {
+    id: "question-banks",
+    label: "Question Banks",
+    items: tabs("review", "assignment"),
+  },
+  {
+    id: "grading-access",
+    label: "Grading & Access",
+    items: tabs("grading", "algorithm", "access"),
+  },
+  {
+    id: "comms-support",
+    label: "Comms & Support",
+    items: tabs("emails", "faq"),
+  },
 ];
 
 const ADMIN_TAB_BY_SEGMENT = new Map(
@@ -30,6 +67,17 @@ export function adminTabFromPathname(pathname: string): AdminTabId | null {
   const segment = pathname.replace(/^\/admin\/?/, "").split("/")[0];
   if (!segment) return null;
   return ADMIN_TAB_BY_SEGMENT.get(segment as AdminTabId) ?? null;
+}
+
+export function adminNavGroupForTab(
+  tabId: AdminTabId | null,
+): (typeof ADMIN_NAV_GROUPS)[number] | null {
+  if (!tabId) return null;
+  return (
+    ADMIN_NAV_GROUPS.find((group) =>
+      group.items.some((item) => item.id === tabId),
+    ) ?? null
+  );
 }
 
 export const DEFAULT_ADMIN_TAB: AdminTabId = "curriculum";

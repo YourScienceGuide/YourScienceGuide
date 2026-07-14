@@ -1,22 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
 import { AdminActionToast } from "@/components/admin/admin-action-toast";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import {
   AdminWorkspaceProvider,
   useAdminWorkspace,
 } from "@/components/admin/admin-workspace-provider";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import {
-  ADMIN_TAB_ROUTES,
-  adminTabFromPathname,
-} from "@/lib/routes/admin";
+import { adminTabFromPathname } from "@/lib/routes/admin";
 import { rememberAdminTab } from "@/lib/admin/admin-preferences";
 
 function AdminShellContent({ children }: { children: ReactNode }) {
@@ -78,26 +74,7 @@ function AdminShellContent({ children }: { children: ReactNode }) {
         onDismiss={clearActionFeedback}
       />
 
-      <nav
-        className="flex flex-wrap gap-2 border-b border-sky-200 pb-2 dark:border-stone-700"
-        aria-label="Admin sections"
-      >
-        {ADMIN_TAB_ROUTES.map(({ id, label, href }) => (
-          <Link
-            key={id}
-            href={href}
-            aria-current={activeTab === id ? "page" : undefined}
-            className={cn(
-              "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              activeTab === id
-                ? "bg-sky-600 text-white dark:bg-stone-100 dark:text-stone-900"
-                : "text-slate-600 hover:bg-sky-50 dark:text-stone-400 dark:hover:bg-stone-800",
-            )}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <AdminNav />
 
       {ready ? children : (
         <p className="text-sm text-slate-500 dark:text-stone-500">

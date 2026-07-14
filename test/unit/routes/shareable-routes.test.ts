@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADMIN_NAV_GROUPS,
+  adminNavGroupForTab,
   adminTabFromPathname,
   adminTabPath,
 } from "@/lib/routes/admin";
@@ -18,6 +20,35 @@ describe("shareable route helpers", () => {
     expect(adminTabFromPathname("/admin/access")).toBe("access");
     expect(adminTabFromPathname("/admin/assignment")).toBe("assignment");
     expect(adminTabPath("videos")).toBe("/admin/videos");
+  });
+
+  it("groups admin tabs into four nav menus", () => {
+    expect(ADMIN_NAV_GROUPS).toHaveLength(4);
+    expect(ADMIN_NAV_GROUPS.map((group) => group.label)).toEqual([
+      "Course Content",
+      "Question Banks",
+      "Grading & Access",
+      "Comms & Support",
+    ]);
+    expect(adminNavGroupForTab("grading")?.label).toBe("Grading & Access");
+    expect(adminNavGroupForTab("faq")?.label).toBe("Comms & Support");
+    expect(
+      ADMIN_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)).sort(),
+    ).toEqual(
+      [
+        "access",
+        "algorithm",
+        "assignment",
+        "curriculum",
+        "emails",
+        "faq",
+        "flashcards",
+        "grading",
+        "import",
+        "review",
+        "videos",
+      ].sort(),
+    );
   });
 
   it("maps parent paths to sections", () => {
