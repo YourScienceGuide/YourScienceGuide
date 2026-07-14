@@ -352,85 +352,85 @@ export function explainLessonAssessmentPlan(
       sources: [],
       samplePrompts: [],
     };
-  } else if (usePriorReviewsFlag) {
-    const mcTagged = selectFromPriorReviews(
-      store,
-      course,
-      lesson,
-      "multiple-choice",
-      rubric.mcBankSize,
-      `${seed}-mc-prior`,
-      excludeIds,
-    );
-    for (const question of mcTagged) excludeIds.add(question.id);
-    const fibTagged = selectFromPriorReviews(
-      store,
-      course,
-      lesson,
-      "fill-in-the-blank",
-      rubric.fibCount,
-      `${seed}-fib-prior`,
-      excludeIds,
-    );
-
-    const lessonById = new Map(
-      course.lessons.map((entry) => [entry.id, entry] as const),
-    );
-
-    mcPhase = {
-      id: "multiple-choice",
-      label: "Multiple choice (prior reviews)",
-      rule: `Chapter ${chapter} is configured to reuse prior lessons’ review banks for MC. Prefer matching MC types, then fill from other prior review questions. Students need ${rubric.mcTargetCorrect} correct to finish.`,
-      requested: rubric.mcBankSize,
-      selected: mcTagged.length,
-      available: collectPriorReviewAvailable(store, course, lesson),
-      sources: mergeSources(
-        mcTagged.map((question) => {
-          const from = lessonById.get(question.fromLessonId) ?? lesson;
-          return sourceFromLesson(from, 1, "prior-review");
-        }),
-      ),
-      samplePrompts: mcTagged.slice(0, 3).map((q) => truncatePrompt(q.prompt)),
-    };
-
-    fibPhase = {
-      id: "fill-in-blank",
-      label: "Fill in the blank (prior reviews)",
-      rule: `Chapter ${chapter} is configured to reuse prior lessons’ review banks for fill-in-blank. Prefer FIB types, then fill from other prior review questions.`,
-      requested: rubric.fibCount,
-      selected: fibTagged.length,
-      available: collectPriorReviewAvailable(store, course, lesson),
-      sources: mergeSources(
-        fibTagged.map((question) => {
-          const from = lessonById.get(question.fromLessonId) ?? lesson;
-          return sourceFromLesson(from, 1, "prior-review");
-        }),
-      ),
-      samplePrompts: fibTagged.slice(0, 3).map((q) => truncatePrompt(q.prompt)),
-    };
   } else {
-    mcPhase = phaseFromBank(
-      "multiple-choice",
-      "Multiple choice",
-      `Take the first ${rubric.mcBankSize} multiple-choice items from this lesson’s chapter question bank (difficulty ignored for the graded path). Students need ${rubric.mcTargetCorrect} correct to finish the phase.`,
-      lesson,
-      bank,
-      "multiple-choice",
-      rubric.mcBankSize,
-    );
+    if (usePriorReviewsFlag) {
+      const mcTagged = selectFromPriorReviews(
+        store,
+        course,
+        lesson,
+        "multiple-choice",
+        rubric.mcBankSize,
+        `${seed}-mc-prior`,
+        excludeIds,
+      );
+      for (const question of mcTagged) excludeIds.add(question.id);
+      const fibTagged = selectFromPriorReviews(
+        store,
+        course,
+        lesson,
+        "fill-in-the-blank",
+        rubric.fibCount,
+        `${seed}-fib-prior`,
+        excludeIds,
+      );
 
-    fibPhase = phaseFromBank(
-      "fill-in-blank",
-      "Fill in the blank",
-      `Take the first ${rubric.fibCount} fill-in-the-blank items from this lesson’s chapter bank.`,
-      lesson,
-      bank,
-      "fill-in-the-blank",
-      rubric.fibCount,
-    );
-  }
+      const lessonById = new Map(
+        course.lessons.map((entry) => [entry.id, entry] as const),
+      );
 
-  if (!reviewOnly) {
+      mcPhase = {
+        id: "multiple-choice",
+        label: "Multiple choice (prior reviews)",
+        rule: `Chapter ${chapter} is configured to reuse prior lessons’ review banks for MC. Prefer matching MC types, then fill from other prior review questions. Students need ${rubric.mcTargetCorrect} correct to finish.`,
+        requested: rubric.mcBankSize,
+        selected: mcTagged.length,
+        available: collectPriorReviewAvailable(store, course, lesson),
+        sources: mergeSources(
+          mcTagged.map((question) => {
+            const from = lessonById.get(question.fromLessonId) ?? lesson;
+            return sourceFromLesson(from, 1, "prior-review");
+          }),
+        ),
+        samplePrompts: mcTagged.slice(0, 3).map((q) => truncatePrompt(q.prompt)),
+      };
+
+      fibPhase = {
+        id: "fill-in-blank",
+        label: "Fill in the blank (prior reviews)",
+        rule: `Chapter ${chapter} is configured to reuse prior lessons’ review banks for fill-in-blank. Prefer FIB types, then fill from other prior review questions.`,
+        requested: rubric.fibCount,
+        selected: fibTagged.length,
+        available: collectPriorReviewAvailable(store, course, lesson),
+        sources: mergeSources(
+          fibTagged.map((question) => {
+            const from = lessonById.get(question.fromLessonId) ?? lesson;
+            return sourceFromLesson(from, 1, "prior-review");
+          }),
+        ),
+        samplePrompts: fibTagged.slice(0, 3).map((q) => truncatePrompt(q.prompt)),
+      };
+    } else {
+      mcPhase = phaseFromBank(
+        "multiple-choice",
+        "Multiple choice",
+        `Take the first ${rubric.mcBankSize} multiple-choice items from this lesson’s chapter question bank (difficulty ignored for the graded path). Students need ${rubric.mcTargetCorrect} correct to finish the phase.`,
+        lesson,
+        bank,
+        "multiple-choice",
+        rubric.mcBankSize,
+      );
+
+      fibPhase = phaseFromBank(
+        "fill-in-blank",
+        "Fill in the blank",
+        `Take the first ${rubric.fibCount} fill-in-the-blank items from this lesson’s chapter bank.`,
+        lesson,
+        bank,
+        "fill-in-the-blank",
+        rubric.fibCount,
+      );
+    }
+
     frPhase = phaseFromBank(
       "free-response",
       "Free response",

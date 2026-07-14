@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
@@ -39,11 +39,6 @@ export function useCourseProgress(course: Course, rubric?: GradingRubricConfig) 
   const [percent, setPercent] = useState(0);
   const [statuses, setStatuses] = useState<Record<string, LessonStatus>>({});
 
-  const lessonIdsKey = useMemo(
-    () => course.lessons.map((lesson) => lesson.id).join(","),
-    [course.lessons],
-  );
-
   const refresh = useCallback(() => {
     if (!studentScope) {
       setPercent((current) => (current === 0 ? current : 0));
@@ -58,7 +53,7 @@ export function useCourseProgress(course: Course, rubric?: GradingRubricConfig) 
     setStatuses((current) =>
       lessonStatusesEqual(current, nextStatuses) ? current : nextStatuses,
     );
-  }, [course, lessonIdsKey, rubric, studentScope]);
+  }, [course, rubric, studentScope]);
 
   useEffect(() => {
     refresh();
