@@ -28,6 +28,7 @@ export type SaveCmsFromStoreOptions = {
    * `structure` updates courses, lessons, textbooks, and grading/algorithm
    * config only — skips rewriting question banks, videos, flashcards, and
    * review questions. Used by curriculum / access / grading / algorithm saves.
+   * `videos` upserts lesson video metadata only.
    */
   scope?: SaveCmsScope;
 };
@@ -133,6 +134,17 @@ export async function saveCmsFromStore(
     );
 
     if (scope === "structure") {
+      continue;
+    }
+
+    if (scope === "videos") {
+      await Promise.all(
+        course.lessons.map((lesson) => {
+          const video = store.videos[lessonKey(course.id, lesson.id)];
+          if (!video) return Promise.resolve();
+          return syncLessonVideo(supabase, course.id, lesson.id, video);
+        }),
+      );
       continue;
     }
 
@@ -375,16 +387,10 @@ async function syncLessonVideo(
   lessonId: string,
   video: AdminContentStore["videos"][string] | undefined,
 ): Promise<void> {
+  // Missing store entry means "leave the DB row alone". Full-store saves used to
+  // delete here, which wiped title/description-only rows whenever a client store
+  // omitted that lesson's video key.
   if (!video) {
-    const { error } = await supabase
-      .from("lesson_videos")
-      .delete()
-      .eq("course_id", courseId)
-      .eq("lesson_id", lessonId);
-
-    if (error) {
-      throw new Error(`Failed to remove lesson video: ${error.message}`);
-    }
     return;
   }
 
@@ -392,8 +398,8 @@ async function syncLessonVideo(
     {
       course_id: courseId,
       lesson_id: lessonId,
-      title: video.title,
-      description: video.description,
+      title: video.title ?? "",
+      description: video.description ?? "",
       mux_playback_id: video.muxPlaybackId ?? null,
       file_name: video.fileName ?? null,
       updated_at: now(),

@@ -46,11 +46,16 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
   }, [courseId, lessonId]);
 
   const hasUpload = Boolean(meta?.muxPlaybackId || meta?.sourceUrl);
-  const title = hasUpload
-    ? (meta?.title?.trim() ?? "")
+  const hasSavedMeta = meta != null;
+  const customTitle = meta?.title?.trim() ?? "";
+  const customDescription = meta?.description?.trim() ?? "";
+  // Prefer any admin-saved copy. Mock marketing text is only for lessons with
+  // no lesson_videos row at all.
+  const title = hasSavedMeta
+    ? customTitle
     : MOCK_VIDEO.title;
-  const description = hasUpload
-    ? (meta?.description?.trim() ?? "")
+  const description = hasSavedMeta
+    ? customDescription
     : MOCK_VIDEO.description;
   const showTitle = title.length > 0;
   const showDescription = description.length > 0;
@@ -67,7 +72,9 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
           <p className="text-sm text-slate-600 dark:text-stone-400">
             {hasUpload
               ? "Uploaded lesson video from your instructor."
-              : "Start with a short overview, then practice below."}
+              : hasSavedMeta
+                ? "Video coming soon — read the overview below, then practice."
+                : "Start with a short overview, then practice below."}
           </p>
         </div>
         <Button
@@ -113,7 +120,7 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
             <track kind="captions" />
           </video>
         ) : (
-          <MockVideoPlayer />
+          <MockVideoPlayer title={title} description={description} />
         )}
 
         {showMetadata && (
@@ -138,7 +145,13 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
   );
 }
 
-function MockVideoPlayer() {
+function MockVideoPlayer({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -223,13 +236,20 @@ function MockVideoPlayer() {
         <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
           {hasStarted ? (
             <>
-              <p className="text-sm font-medium text-sky-100">Mock lesson video</p>
+              <p className="text-sm font-medium text-sky-100">
+                {title.trim() || "Lesson video"}
+              </p>
               <p className="mt-1 max-w-md text-xs text-sky-200/80">
-                Preview playback — upload a video in Admin to replace this.
+                {description.trim() ||
+                  "Preview playback — upload a video in Admin to replace this."}
               </p>
             </>
           ) : (
-            <p className="text-sm text-sky-100/90">Press play to start the lesson video</p>
+            <p className="text-sm text-sky-100/90">
+              {title.trim()
+                ? `Press play to start: ${title.trim()}`
+                : "Press play to start the lesson video"}
+            </p>
           )}
         </div>
 

@@ -190,6 +190,49 @@ describe("server save error handling", () => {
         saveCmsFromStore(store, { scope: "structure" }),
       ).resolves.toBeUndefined();
     });
+
+    it("upserts video metadata when scope is videos", async () => {
+      const store = minimalStore({
+        courses: [
+          {
+            id: "course-a",
+            title: "Course A",
+            subject: "Science",
+            description: "Test course",
+            lessons: [
+              {
+                id: "lesson-a",
+                chapterId: "chapter-1",
+                chapterTitle: "Chapter 1",
+                title: "Lesson A",
+                description: "Lesson",
+                order: 1,
+                chapter: 1,
+                section: 1,
+              },
+            ],
+          },
+        ],
+        videos: {
+          "course-a/lesson-a": {
+            title: "Custom title",
+            description: "Custom description",
+          },
+        },
+      });
+
+      const mock = createSupabaseMock({
+        failures: [
+          { key: "assignment_questions.delete", message: "should not run" },
+        ],
+      });
+      supabaseMocks.createSupabaseAdmin.mockReturnValue(mock);
+
+      const { saveCmsFromStore } = await import("@/lib/cms/save-cms");
+      await expect(
+        saveCmsFromStore(store, { scope: "videos" }),
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe("upsertLessonGrade", () => {

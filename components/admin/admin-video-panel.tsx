@@ -35,8 +35,8 @@ export function AdminVideoPanel() {
   const savedMeta = useMemo(
     () =>
       getVideoFromStore(store, courseId, lessonId) ?? {
-        title: "Lesson video",
-        description: "Overview for this lesson.",
+        title: "",
+        description: "",
       },
     [store, courseId, lessonId],
   );
@@ -90,7 +90,7 @@ export function AdminVideoPanel() {
         ...store,
         videos: { ...store.videos, [key]: draft },
       },
-      { silent: true },
+      { silent: true, scope: "videos" },
     );
     setSaveFeedback(applyPersistResult(result));
   }
@@ -110,7 +110,7 @@ export function AdminVideoPanel() {
         ...store,
         videos: { ...store.videos, [key]: next },
       },
-      { silent: true },
+      { silent: true, scope: "videos" },
     );
 
     if (result.ok) {

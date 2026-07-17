@@ -1,1 +1,1 @@
-export type SaveCmsScope = "full" | "structure";
+export type SaveCmsScope = "full" | "structure" | "videos";

@@ -18,7 +18,9 @@ export const maxDuration = 60;
 
 function parseSaveScope(request: Request): SaveCmsScope {
   const url = new URL(request.url);
-  return url.searchParams.get("scope") === "structure" ? "structure" : "full";
+  const scope = url.searchParams.get("scope");
+  if (scope === "structure" || scope === "videos") return scope;
+  return "full";
 }
 
 function saveErrorMessage(error: unknown): string {

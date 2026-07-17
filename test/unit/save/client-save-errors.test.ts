@@ -66,6 +66,16 @@ describe("client save error handling", () => {
         expect.objectContaining({ method: "PUT" }),
       );
     });
+
+    it("requests videos scope when saving video metadata", async () => {
+      const store = makeStore();
+      const fetchMock = installFetchMock({ ok: true, json: store });
+      await persistAdminContent(store, { scope: "videos" });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/content?scope=videos",
+        expect.objectContaining({ method: "PUT" }),
+      );
+    });
   });
 
   describe("resetAdminContent", () => {

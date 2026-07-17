@@ -33,8 +33,9 @@ export type PersistOptions = {
   /**
    * `structure` saves courses/lessons/textbooks/grading only (no question bank
    * rewrite). Use for curriculum, access, grading, and algorithm panels.
+   * `videos` upserts lesson video metadata only.
    */
-  scope?: "full" | "structure";
+  scope?: "full" | "structure" | "videos";
 };
 
 export type PersistResult =

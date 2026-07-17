@@ -20,9 +20,9 @@ export async function persistAdminContent(
   const sanitized = sanitizeContentStore(next);
   const scope = options.scope ?? "full";
   const url =
-    scope === "structure"
-      ? "/api/admin/content?scope=structure"
-      : "/api/admin/content";
+    scope === "full"
+      ? "/api/admin/content"
+      : `/api/admin/content?scope=${scope}`;
 
   try {
     const res = await fetch(url, {
