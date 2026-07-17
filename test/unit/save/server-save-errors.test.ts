@@ -141,6 +141,55 @@ describe("server save error handling", () => {
         "Failed to save grading config for course-a: permission denied",
       );
     });
+
+    it("skips rewriting question banks when scope is structure", async () => {
+      const store = minimalStore({
+        courses: [
+          {
+            id: "course-a",
+            title: "Course A",
+            subject: "Science",
+            description: "Test course",
+            lessons: [
+              {
+                id: "lesson-a",
+                chapterId: "chapter-1",
+                chapterTitle: "Chapter 1",
+                title: "Lesson A",
+                description: "Lesson",
+                order: 1,
+                chapter: 1,
+                section: 1,
+              },
+            ],
+          },
+        ],
+        questionBank: {
+          "course-a/lesson-a": [
+            {
+              type: "multiple-choice",
+              id: "q1",
+              difficulty: 1,
+              prompt: "Pick one",
+              options: ["A", "B"],
+              correctIndex: 0,
+            },
+          ],
+        },
+      });
+
+      const mock = createSupabaseMock({
+        failures: [
+          { key: "assignment_questions.delete", message: "should not run" },
+        ],
+      });
+      supabaseMocks.createSupabaseAdmin.mockReturnValue(mock);
+
+      const { saveCmsFromStore } = await import("@/lib/cms/save-cms");
+      await expect(
+        saveCmsFromStore(store, { scope: "structure" }),
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe("upsertLessonGrade", () => {

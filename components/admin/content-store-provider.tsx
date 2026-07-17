@@ -30,6 +30,11 @@ export type PersistOptions = {
   successMessage?: string;
   /** Skip success banner (use for auto-save field edits). Errors still show. */
   silent?: boolean;
+  /**
+   * `structure` saves courses/lessons/textbooks/grading only (no question bank
+   * rewrite). Use for curriculum, access, grading, and algorithm panels.
+   */
+  scope?: "full" | "structure";
 };
 
 export type PersistResult =
@@ -119,7 +124,9 @@ export function ContentStoreProvider({ children }: { children: ReactNode }) {
       setSaveError(null);
 
       try {
-        const result = await persistAdminContent(next);
+        const result = await persistAdminContent(next, {
+          scope: options?.scope ?? "full",
+        });
 
         if (!result.ok) {
           setSaveError(result.error);

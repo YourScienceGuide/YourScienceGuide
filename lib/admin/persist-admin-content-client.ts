@@ -3,6 +3,11 @@ import {
   type AdminContentStore,
 } from "@/lib/admin/content-store";
 import { formatSaveError } from "@/lib/admin/format-save-error";
+import type { SaveCmsScope } from "@/lib/cms/save-cms-scope";
+
+export type PersistAdminContentOptions = {
+  scope?: SaveCmsScope;
+};
 
 export type PersistAdminContentResult =
   | { ok: true; store: AdminContentStore }
@@ -10,11 +15,17 @@ export type PersistAdminContentResult =
 
 export async function persistAdminContent(
   next: AdminContentStore,
+  options: PersistAdminContentOptions = {},
 ): Promise<PersistAdminContentResult> {
   const sanitized = sanitizeContentStore(next);
+  const scope = options.scope ?? "full";
+  const url =
+    scope === "structure"
+      ? "/api/admin/content?scope=structure"
+      : "/api/admin/content";
 
   try {
-    const res = await fetch("/api/admin/content", {
+    const res = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(sanitized),

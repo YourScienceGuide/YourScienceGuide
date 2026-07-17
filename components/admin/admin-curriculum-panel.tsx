@@ -28,7 +28,9 @@ import type { Course, CurriculumLesson } from "@/lib/student/curriculum-types";
 import {
   duplicateLessonChapterSectionMessage,
   findLessonWithChapterSection,
+  lessonChapterNumber,
   lessonPositionLabel,
+  lessonSectionNumber,
   sortLessons,
   sortOrderForLesson,
 } from "@/lib/student/lesson-sort";
@@ -42,6 +44,77 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+
+function nextLessonSlot(lessons: CurriculumLesson[]): {
+  chapter: number;
+  section: number;
+  chapterTitle: string;
+} {
+  if (lessons.length === 0) {
+    return { chapter: 1, section: 1, chapterTitle: "Chapter 1" };
+  }
+
+  const sorted = sortLessons(lessons);
+  const last = sorted[sorted.length - 1];
+  const chapter = lessonChapterNumber(last) || 1;
+  const section = (lessonSectionNumber(last) || 0) + 1;
+  const chapterTitle =
+    last.chapterTitle?.trim() || `Chapter ${chapter}`;
+
+  if (!findLessonWithChapterSection(lessons, chapter, section)) {
+    return { chapter, section, chapterTitle };
+  }
+
+  return {
+    chapter: chapter + 1,
+    section: 1,
+    chapterTitle: `Chapter ${chapter + 1}`,
+  };
+}
+
+/** Keep title/description edits when the saved lesson list gains/loses lessons. */
+function syncLessonDraftsWithSaved(
+  saved: CurriculumLesson[],
+  drafts: CurriculumLesson[],
+): CurriculumLesson[] {
+  const draftById = new Map(drafts.map((lesson) => [lesson.id, lesson]));
+  const savedIds = new Set(saved.map((lesson) => lesson.id));
+  const draftIds = new Set(drafts.map((lesson) => lesson.id));
+  const membershipChanged =
+    saved.length !== drafts.length ||
+    saved.some((lesson) => !draftIds.has(lesson.id)) ||
+    drafts.some((lesson) => !savedIds.has(lesson.id));
+
+  if (!membershipChanged) {
+    return drafts;
+  }
+
+  return saved.map((lesson) => {
+    const draft = draftById.get(lesson.id);
+    if (!draft) return lesson;
+    if (
+      draft.title === lesson.title &&
+      draft.description === lesson.description
+    ) {
+      return lesson;
+    }
+    const next = {
+      ...lesson,
+      title: draft.title,
+      description: draft.description,
+    };
+    return { ...next, order: sortOrderForLesson(next) };
+  });
+}
+
+function lessonMembershipMatches(
+  a: CurriculumLesson[],
+  b: CurriculumLesson[],
+): boolean {
+  if (a.length !== b.length) return false;
+  const ids = new Set(a.map((lesson) => lesson.id));
+  return b.every((lesson) => ids.has(lesson.id));
+}
 
 export function AdminCurriculumPanel() {
   const { store, persist, saving } = useContentStore();
@@ -83,21 +156,58 @@ export function AdminCurriculumPanel() {
   const [lessonSaveFeedback, setLessonSaveFeedback] = useState<AdminFeedback | null>(
     null,
   );
-  const isLessonDraftDirty = JSON.stringify(lessonDrafts) !== savedLessonsKey;
+  const isLessonDraftDirty =
+    lessonMembershipMatches(lessonDrafts, savedLessons) &&
+    JSON.stringify(lessonDrafts) !== savedLessonsKey;
 
   useEffect(() => {
     setLessonDrafts(savedLessons);
     setLessonSaveFeedback(null);
+    const slot = nextLessonSlot(savedLessons);
+    setNewLesson({
+      title: "",
+      description: "",
+      chapter: slot.chapter,
+      section: slot.section,
+      chapterTitle: slot.chapterTitle,
+    });
+    setAddLessonFeedback(null);
   }, [selectedCourseId]);
 
   useEffect(() => {
-    if (!isLessonDraftDirty) {
-      setLessonDrafts(savedLessons);
-    }
-  }, [savedLessonsKey, savedLessons, isLessonDraftDirty]);
+    setLessonDrafts((current) => {
+      const next = syncLessonDraftsWithSaved(savedLessons, current);
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+    });
+  }, [savedLessonsKey, savedLessons]);
+
+  useEffect(() => {
+    setNewLesson((current) => {
+      if (current.title.trim() || current.description.trim()) {
+        return current;
+      }
+      const slot = nextLessonSlot(savedLessons);
+      if (
+        current.chapter === slot.chapter &&
+        current.section === slot.section &&
+        current.chapterTitle === slot.chapterTitle
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        chapter: slot.chapter,
+        section: slot.section,
+        chapterTitle: slot.chapterTitle,
+      };
+    });
+  }, [savedLessonsKey, savedLessons]);
 
   async function saveCourses(courses: Course[], options?: PersistOptions) {
-    return persist({ ...store, courses }, options);
+    return persist(
+      { ...store, courses },
+      { scope: "structure", ...options },
+    );
   }
 
   function handleSelectedCourseChange(nextCourseId: string) {
@@ -135,7 +245,20 @@ export function AdminCurriculumPanel() {
     e.preventDefault();
     if (!course) return;
     const id = slugifyId(newLesson.title);
-    if (!id || course.lessons.some((l) => l.id === id)) return;
+    if (!id) {
+      setAddLessonFeedback({
+        type: "error",
+        message: "Enter a lesson title that can become a URL id (letters or numbers).",
+      });
+      return;
+    }
+    if (course.lessons.some((l) => l.id === id)) {
+      setAddLessonFeedback({
+        type: "error",
+        message: `A lesson with id "${id}" already exists. Choose a different title.`,
+      });
+      return;
+    }
 
     const chapter = newLesson.chapter;
     const section = newLesson.section;
@@ -178,13 +301,15 @@ export function AdminCurriculumPanel() {
       type: "success",
       message: `Added lesson "${lesson.title}" to ${course.title}.`,
     });
+    setLessonSaveFeedback(null);
 
+    const slot = nextLessonSlot([...course.lessons, lesson]);
     setNewLesson({
       title: "",
       description: "",
-      chapter: newLesson.chapter,
-      section: newLesson.section + 1,
-      chapterTitle: newLesson.chapterTitle,
+      chapter: slot.chapter,
+      section: slot.section,
+      chapterTitle: slot.chapterTitle,
     });
   }
 
@@ -207,6 +332,7 @@ export function AdminCurriculumPanel() {
 
   async function saveLessonDetails() {
     if (!course || !isLessonDraftDirty) return;
+    if (!lessonMembershipMatches(lessonDrafts, savedLessons)) return;
 
     const courses = store.courses.map((entry) =>
       entry.id === course.id ? { ...entry, lessons: lessonDrafts } : entry,
@@ -286,10 +412,12 @@ export function AdminCurriculumPanel() {
 
     const nextStore = removeLessonFromStore(store, course.id, lessonToDelete.id);
     const result = await persist(nextStore, {
+      scope: "structure",
       successMessage: `Deleted lesson "${lessonToDelete.title}".`,
     });
     if (!result.ok) return;
 
+    setLessonSaveFeedback(null);
     setDeleteLessonDialogOpen(false);
     setLessonToDelete(null);
     setDeleteLessonConfirmText("");
@@ -300,6 +428,7 @@ export function AdminCurriculumPanel() {
 
     const nextStore = removeCourseFromStore(store, course.id);
     const result = await persist(nextStore, {
+      scope: "structure",
       successMessage: `Deleted course "${course.title}".`,
     });
     if (!result.ok) return;

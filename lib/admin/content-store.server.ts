@@ -11,7 +11,11 @@ import {
   loadLegacyContentBlob,
   seedDefaultCms,
 } from "@/lib/cms/load-cms";
-import { resetCmsToDefault, saveCmsFromStore } from "@/lib/cms/save-cms";
+import {
+  resetCmsToDefault,
+  saveCmsFromStore,
+} from "@/lib/cms/save-cms";
+import type { SaveCmsScope } from "@/lib/cms/save-cms-scope";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export type ContentStoreSource = "supabase" | "default";
@@ -85,13 +89,14 @@ export async function loadContentStoreFromDatabase(): Promise<ContentStoreLoadRe
 
 export async function saveContentStoreToDatabase(
   store: AdminContentStore,
+  options?: { scope?: SaveCmsScope },
 ): Promise<AdminContentStore> {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured");
   }
 
   const sanitized = sanitizeContentStore(store);
-  await saveCmsFromStore(sanitized);
+  await saveCmsFromStore(sanitized, { scope: options?.scope ?? "full" });
   return sanitized;
 }
 

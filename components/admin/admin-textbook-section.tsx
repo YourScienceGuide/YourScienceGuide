@@ -56,6 +56,7 @@ export function AdminTextbookSection({
 
     if (!enabled) {
       const result = await persist(removeTextbookFromStore(store, courseId), {
+        scope: "structure",
         successMessage: `Removed companion textbook from ${courseTitle}.`,
       });
       if (!result.ok) {
@@ -88,6 +89,7 @@ export function AdminTextbookSection({
     };
 
     const result = await persist(setTextbookInStore(store, courseId, textbook), {
+      scope: "structure",
       successMessage: `Saved companion textbook for ${courseTitle}.`,
     });
     if (!result.ok) {

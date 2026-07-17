@@ -88,6 +88,7 @@ export function AdminAccessPanel() {
     await persist(
       { ...store, courses },
       {
+        scope: "structure",
         successMessage: ADMIN_SAVE_PUBLISHED_MESSAGE,
       },
     );

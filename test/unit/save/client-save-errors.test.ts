@@ -56,6 +56,16 @@ describe("client save error handling", () => {
       if (!result.ok) return;
       expect(result.store.version).toBe(store.version);
     });
+
+    it("requests structure scope when saving curriculum structure", async () => {
+      const store = makeStore();
+      const fetchMock = installFetchMock({ ok: true, json: store });
+      await persistAdminContent(store, { scope: "structure" });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/content?scope=structure",
+        expect.objectContaining({ method: "PUT" }),
+      );
+    });
   });
 
   describe("resetAdminContent", () => {

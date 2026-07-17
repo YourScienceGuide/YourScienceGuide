@@ -215,7 +215,7 @@ export function AdminAlgorithmPanel() {
     let nextStore = setAlgorithmConfigInStore(store, courseId, nextAlgorithm);
     nextStore = setGradingConfigInStore(nextStore, courseId, nextRubric);
 
-    const result = await persist(nextStore, { silent: true });
+    const result = await persist(nextStore, { silent: true, scope: "structure" });
     setSaveFeedback(applyPersistResult(result, ADMIN_SAVE_PUBLISHED_MESSAGE));
     if (result.ok) {
       setAlgorithmDraft(nextAlgorithm);

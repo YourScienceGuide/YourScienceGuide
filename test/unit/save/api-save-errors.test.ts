@@ -130,7 +130,30 @@ describe("API save error handling", () => {
         jsonRequest("http://localhost/api/admin/content", { version: 3, courses: [] }),
       );
       expect(response.status).toBe(500);
-      expect((await response.json()).error).toBe("Failed to save content");
+      expect((await response.json()).error).toBe(
+        "Failed to save course course-a: timeout",
+      );
+    });
+
+    it("passes structure scope through to the database save", async () => {
+      serverMocks.saveContentStoreToDatabase.mockResolvedValue({
+        version: 3,
+        courses: [],
+        questionBank: {},
+        videos: {},
+      });
+      const { PUT } = await import("@/app/api/admin/content/route");
+      const response = await PUT(
+        jsonRequest("http://localhost/api/admin/content?scope=structure", {
+          version: 3,
+          courses: [],
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(serverMocks.saveContentStoreToDatabase).toHaveBeenCalledWith(
+        expect.anything(),
+        { scope: "structure" },
+      );
     });
   });
 
@@ -144,7 +167,9 @@ describe("API save error handling", () => {
         new Request("http://localhost/api/admin/content?action=reset", { method: "POST" }),
       );
       expect(response.status).toBe(500);
-      expect((await response.json()).error).toBe("Failed to reset content");
+      expect((await response.json()).error).toBe(
+        "Failed to reset CMS courses: db down",
+      );
     });
   });
 

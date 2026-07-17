@@ -74,6 +74,7 @@ export function AdminGradingPanel() {
   async function saveRubric() {
     const normalized = normalizeGradingRubric(draft);
     const result = await persist(setGradingConfigInStore(store, courseId, normalized), {
+      scope: "structure",
       successMessage: ADMIN_SAVE_PUBLISHED_MESSAGE,
     });
     if (result.ok) setDraft(normalized);
@@ -103,6 +104,7 @@ export function AdminGradingPanel() {
         c.id === courseId ? { ...c, lessons } : c,
       ),
     }, {
+      scope: "structure",
       successMessage: ADMIN_SAVE_PUBLISHED_MESSAGE,
     });
     if (!result.ok) return;

@@ -10,9 +10,23 @@ import {
   saveContentStoreToDatabase,
 } from "@/lib/admin/content-store.server";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import type { SaveCmsScope } from "@/lib/cms/save-cms-scope";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+function parseSaveScope(request: Request): SaveCmsScope {
+  const url = new URL(request.url);
+  return url.searchParams.get("scope") === "structure" ? "structure" : "full";
+}
+
+function saveErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return "Failed to save content";
+}
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -52,12 +66,15 @@ export async function PUT(request: Request) {
 
   try {
     const body = (await request.json()) as AdminContentStore;
-    const store = await saveContentStoreToDatabase(sanitizeContentStore(body));
+    const scope = parseSaveScope(request);
+    const store = await saveContentStoreToDatabase(sanitizeContentStore(body), {
+      scope,
+    });
     return NextResponse.json(store);
   } catch (error) {
     console.error("PUT /api/admin/content failed:", error);
     return NextResponse.json(
-      { error: "Failed to save content" },
+      { error: saveErrorMessage(error) },
       { status: 500 },
     );
   }
@@ -87,7 +104,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/admin/content?action=reset failed:", error);
     return NextResponse.json(
-      { error: "Failed to reset content" },
+      { error: saveErrorMessage(error) },
       { status: 500 },
     );
   }

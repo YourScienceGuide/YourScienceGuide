@@ -13,14 +13,30 @@ import {
   chapterQuestionToPayload,
   lessonQuestionToPayload,
 } from "@/lib/cms/question-payload";
+import type { SaveCmsScope } from "@/lib/cms/save-cms-scope";
 import { resolveTextbookCoverUrl } from "@/lib/cms/textbook-covers.server";
 import { normalizeLessonAccessTier } from "@/lib/student/lesson-access";
 import { sortOrderForLesson } from "@/lib/student/lesson-sort";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 
+export type { SaveCmsScope } from "@/lib/cms/save-cms-scope";
+
 const now = () => new Date().toISOString();
 
-export async function saveCmsFromStore(store: AdminContentStore): Promise<void> {
+export type SaveCmsFromStoreOptions = {
+  /**
+   * `structure` updates courses, lessons, textbooks, and grading/algorithm
+   * config only — skips rewriting question banks, videos, flashcards, and
+   * review questions. Used by curriculum / access / grading / algorithm saves.
+   */
+  scope?: SaveCmsScope;
+};
+
+export async function saveCmsFromStore(
+  store: AdminContentStore,
+  options: SaveCmsFromStoreOptions = {},
+): Promise<void> {
+  const scope = options.scope ?? "full";
   const supabase = createSupabaseAdmin();
   const courseIds = store.courses.map((course) => course.id);
   const timestamp = now();
@@ -116,6 +132,10 @@ export async function saveCmsFromStore(store: AdminContentStore): Promise<void> 
       store.algorithmConfigByCourse?.[course.id],
     );
 
+    if (scope === "structure") {
+      continue;
+    }
+
     await Promise.all(
       course.lessons.map((lesson) => syncLessonContent(supabase, store, course.id, lesson.id)),
     );
@@ -209,8 +229,6 @@ async function syncChapterQuestionBank(
     throw new Error(`Failed to clear chapter questions: ${deleteAssignmentError.message}`);
   }
 
-  if (!questions?.length) return;
-
   const { error: deleteAlcumusError } = await supabase
     .from("alcumus_problems")
     .delete()
@@ -220,6 +238,8 @@ async function syncChapterQuestionBank(
   if (deleteAlcumusError) {
     throw new Error(`Failed to clear legacy Alcumus rows: ${deleteAlcumusError.message}`);
   }
+
+  if (!questions?.length) return;
 
   const rows = questions.map((question, index) => ({
     course_id: courseId,
