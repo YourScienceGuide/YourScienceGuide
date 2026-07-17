@@ -16,13 +16,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { Button } from "@/components/ui/button";
 import { getVideoFromStore } from "@/lib/admin/content-store";
+import { resolveLessonVideoCopy } from "@/lib/lesson/lesson-video-copy";
 import { cn } from "@/lib/utils";
-
-const MOCK_VIDEO = {
-  title: "Introduction: Cells & Photosynthesis",
-  description:
-    "Watch how plant cells capture light and turn it into food before you practice.",
-};
 
 const MOCK_DURATION_SEC = 8 * 60 + 42;
 const PLAYBACK_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
@@ -45,21 +40,15 @@ export function LessonVideo({ courseId, lessonId }: LessonVideoProps) {
     setExpanded(false);
   }, [courseId, lessonId]);
 
-  const hasUpload = Boolean(meta?.muxPlaybackId || meta?.sourceUrl);
-  const hasSavedMeta = meta != null;
-  const customTitle = meta?.title?.trim() ?? "";
-  const customDescription = meta?.description?.trim() ?? "";
-  // Prefer any admin-saved copy. Mock marketing text is only for lessons with
-  // no lesson_videos row at all.
-  const title = hasSavedMeta
-    ? customTitle
-    : MOCK_VIDEO.title;
-  const description = hasSavedMeta
-    ? customDescription
-    : MOCK_VIDEO.description;
-  const showTitle = title.length > 0;
-  const showDescription = description.length > 0;
-  const showMetadata = showTitle || showDescription;
+  const {
+    hasUpload,
+    hasSavedMeta,
+    title,
+    description,
+    showTitle,
+    showDescription,
+    showMetadata,
+  } = resolveLessonVideoCopy(meta);
   const playerShellClass = expanded ? EXPANDED_PLAYER_CLASS : COMPACT_PLAYER_CLASS;
 
   return (

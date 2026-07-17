@@ -191,6 +191,79 @@ describe("server save error handling", () => {
       ).resolves.toBeUndefined();
     });
 
+    it("does not delete lesson_videos when a lesson has no video entry", async () => {
+      const store = minimalStore({
+        courses: [
+          {
+            id: "course-a",
+            title: "Course A",
+            subject: "Science",
+            description: "Test course",
+            lessons: [
+              {
+                id: "lesson-a",
+                chapterId: "chapter-1",
+                chapterTitle: "Chapter 1",
+                title: "Lesson A",
+                description: "Lesson",
+                order: 1,
+                chapter: 1,
+                section: 1,
+              },
+              {
+                id: "lesson-b",
+                chapterId: "chapter-1",
+                chapterTitle: "Chapter 1",
+                title: "Lesson B",
+                description: "Lesson",
+                order: 2,
+                chapter: 1,
+                section: 2,
+              },
+            ],
+          },
+        ],
+        videos: {
+          "course-a/lesson-a": {
+            title: "Custom A",
+            description: "Desc A",
+          },
+        },
+      });
+
+      const mock = createSupabaseMock({
+        failures: [
+          { key: "lesson_videos.delete", message: "should not delete videos" },
+        ],
+      });
+      supabaseMocks.createSupabaseAdmin.mockReturnValue(mock);
+
+      const { saveCmsFromStore } = await import("@/lib/cms/save-cms");
+      // lesson-b has no videos[] entry — previously this deleted DB rows.
+      await expect(saveCmsFromStore(store)).resolves.toBeUndefined();
+
+      const from = mock.from as ReturnType<typeof vi.fn>;
+      const videoChains = from.mock.calls
+        .map((call: unknown[], index: number) => ({ call, index }))
+        .filter(({ call }) => call[0] === "lesson_videos");
+      expect(videoChains.length).toBeGreaterThan(0);
+
+      for (const { index } of videoChains) {
+        const chain = from.mock.results[index]?.value as {
+          delete?: ReturnType<typeof vi.fn>;
+          upsert?: ReturnType<typeof vi.fn>;
+        };
+        expect(chain.delete).not.toHaveBeenCalled();
+      }
+      expect(
+        (
+          from.mock.results[videoChains[0].index]?.value as {
+            upsert: ReturnType<typeof vi.fn>;
+          }
+        ).upsert,
+      ).toHaveBeenCalled();
+    });
+
     it("upserts video metadata when scope is videos", async () => {
       const store = minimalStore({
         courses: [
