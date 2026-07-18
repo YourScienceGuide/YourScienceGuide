@@ -111,6 +111,7 @@ export function activateSubscription(
   return record;
 }
 
+/** Fallback display catalog when API pricing is unavailable. */
 export const SUBSCRIPTION_PLANS = {
   monthly: {
     id: "monthly" as const,
