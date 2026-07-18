@@ -96,3 +96,5 @@ Your MD file is ready
 The README has been structured to clearly communicate the technical foundation of the project. It highlights the benefits of strict typing with TypeScript, the modern App Router architecture, and deep-dives into the strategic advantages of offloading your authentication to Clerk and your infrastructure to Vercel. 
 
 You can drop this directly into the root of your repository to keep your developer documentation clean and
+
+EDIT
