@@ -1,17 +1,21 @@
 "use client";
 
+import Link from "next/link";
+
 import { useAuth } from "@/components/auth/auth-provider";
+import { StripeBuyButton } from "@/components/parent/stripe-buy-button";
 import { Button } from "@/components/ui/button";
 import {
   BILLING_CHECKOUT_ENABLED,
-  BILLING_UNAVAILABLE_MESSAGE,
   getSubscription,
   SUBSCRIPTION_PLANS,
 } from "@/lib/billing/subscription";
 import { cn } from "@/lib/utils";
 
+const AUTH_RETURN_PATH = "/parent/billing";
+
 export function BillingSection() {
-  const { username, hasLessonAccess } = useAuth();
+  const { ready, isLoggedIn, username, hasLessonAccess } = useAuth();
   const subscription = getSubscription(username);
 
   if (hasLessonAccess && subscription) {
@@ -58,12 +62,6 @@ export function BillingSection() {
               Active
             </span>
           </div>
-          {!BILLING_CHECKOUT_ENABLED && (
-            <p className="mt-6 border-t border-sky-100 pt-6 text-sm text-slate-600 dark:border-stone-800 dark:text-stone-400">
-              {BILLING_UNAVAILABLE_MESSAGE} Payment method changes will be
-              available when billing launches.
-            </p>
-          )}
         </div>
       </div>
     );
@@ -73,15 +71,12 @@ export function BillingSection() {
     <div className="space-y-8">
       <SectionHeader
         title="Get access"
-        description="Preview planned pricing. Checkout is not open yet."
+        description={
+          BILLING_CHECKOUT_ENABLED
+            ? "Preview pricing below. Create an account to subscribe securely with Stripe."
+            : "Preview planned pricing. Checkout is not open yet."
+        }
       />
-
-      <div
-        role="status"
-        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
-      >
-        {BILLING_UNAVAILABLE_MESSAGE}
-      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {(["monthly", "annual"] as const).map((planId) => {
@@ -91,7 +86,7 @@ export function BillingSection() {
             <div
               key={planId}
               className={cn(
-                "relative flex flex-col rounded-lg border bg-white p-6 opacity-90 dark:bg-stone-900",
+                "relative flex flex-col rounded-lg border bg-white p-6 dark:bg-stone-900",
                 isAnnual
                   ? "border-sky-400 ring-1 ring-sky-200 dark:border-stone-500 dark:ring-stone-700"
                   : "border-sky-200 dark:border-stone-700",
@@ -115,23 +110,61 @@ export function BillingSection() {
               <p className="mt-3 flex-1 text-sm text-slate-600 dark:text-stone-400">
                 {plan.description}
               </p>
-              <Button
-                type="button"
-                className="mt-6 w-full"
-                variant={isAnnual ? "default" : "outline"}
-                disabled
-              >
-                Coming in a future release
-              </Button>
             </div>
           );
         })}
       </div>
 
+      {BILLING_CHECKOUT_ENABLED ? (
+        <div className="space-y-3 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
+          {!ready ? (
+            <p className="text-sm text-slate-600 dark:text-stone-400">
+              Loading checkout…
+            </p>
+          ) : isLoggedIn ? (
+            <>
+              <p className="text-sm font-medium text-slate-900 dark:text-stone-50">
+                Checkout with Stripe
+              </p>
+              <p className="text-sm text-slate-600 dark:text-stone-400">
+                Payments are processed securely by Stripe. You will return here
+                after checkout completes.
+              </p>
+              <StripeBuyButton />
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-slate-900 dark:text-stone-50">
+                Account required to subscribe
+              </p>
+              <p className="text-sm text-slate-600 dark:text-stone-400">
+                Create a free account (or sign in) before checkout so your
+                subscription can be linked to your family.
+              </p>
+              <div className="flex flex-wrap gap-3 pt-1">
+                <Button asChild>
+                  <Link
+                    href={`/sign-up?redirect_url=${encodeURIComponent(AUTH_RETURN_PATH)}`}
+                  >
+                    Create account
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link
+                    href={`/sign-in?redirect_url=${encodeURIComponent(AUTH_RETURN_PATH)}`}
+                  >
+                    Sign in
+                  </Link>
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
+
       <p className="text-sm text-slate-500 dark:text-stone-500">
-        Lesson access for new accounts will require a paid subscription once
-        billing is live. Demo accounts configured by your administrator may
-        already have access.
+        Lesson access requires an active subscription. Demo accounts configured
+        by your administrator may already have access.
       </p>
     </div>
   );

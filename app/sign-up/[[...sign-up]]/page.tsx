@@ -1,9 +1,16 @@
+"use client";
+
 import { SignUp } from "@clerk/nextjs";
 import { Lock } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 import { clerkAppearance } from "@/lib/clerk-appearance";
 
-export default function SignUpPage() {
+function SignUpContent() {
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect_url");
+
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-sky-50 px-4 py-10 dark:bg-stone-950">
       <div className="mb-8 space-y-3 text-center">
@@ -21,8 +28,30 @@ export default function SignUpPage() {
         </p>
       </div>
       <div className="mx-auto flex w-full max-w-[420px] justify-center">
-        <SignUp appearance={clerkAppearance} />
+        <SignUp
+          appearance={clerkAppearance}
+          {...(redirectUrl
+            ? {
+                fallbackRedirectUrl: redirectUrl,
+                forceRedirectUrl: redirectUrl,
+              }
+            : {})}
+        />
       </div>
     </div>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center text-sm text-slate-600 dark:text-stone-400">
+          Loading…
+        </div>
+      }
+    >
+      <SignUpContent />
+    </Suspense>
   );
 }
