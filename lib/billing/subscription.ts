@@ -4,10 +4,10 @@ import {
 } from "@/lib/auth/constants";
 
 /** When false, checkout is disabled and local mock payments cannot grant access. */
-export const BILLING_CHECKOUT_ENABLED = false;
+export const BILLING_CHECKOUT_ENABLED = true;
 
 export const BILLING_UNAVAILABLE_MESSAGE =
-  "Online payments are not available yet. Subscription billing will be added in a future release.";
+  "Online payments are temporarily unavailable. Please try again later.";
 
 export type SubscriptionPlan = "monthly" | "annual";
 
@@ -111,6 +111,7 @@ export function activateSubscription(
   return record;
 }
 
+/** Fallback display catalog when API pricing is unavailable. */
 export const SUBSCRIPTION_PLANS = {
   monthly: {
     id: "monthly" as const,
