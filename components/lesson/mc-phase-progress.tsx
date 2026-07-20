@@ -2,6 +2,10 @@
 
 import { useId, useState } from "react";
 
+import {
+  isMcAnswerAllMode,
+  remainingCorrectNeeded,
+} from "@/lib/lesson/mc-phase-copy";
 import { cn } from "@/lib/utils";
 
 export type McPhaseProgressProps = {
@@ -11,12 +15,7 @@ export type McPhaseProgressProps = {
   targetCorrect: number;
 };
 
-export function remainingCorrectNeeded(
-  correct: number,
-  targetCorrect: number,
-): number {
-  return Math.max(0, targetCorrect - correct);
-}
+export { remainingCorrectNeeded } from "@/lib/lesson/mc-phase-copy";
 
 export function McPhaseProgress({
   answered,
@@ -26,11 +25,14 @@ export function McPhaseProgress({
 }: McPhaseProgressProps) {
   const [showRemaining, setShowRemaining] = useState(false);
   const toggleId = useId();
-  const remaining = remainingCorrectNeeded(correct, targetCorrect);
+  const answerAllMode = isMcAnswerAllMode(total, targetCorrect);
+  const remainingCorrect = remainingCorrectNeeded(correct, targetCorrect);
+  const remainingToAnswer = Math.max(0, total - answered);
   const answeredPct =
     total > 0 ? Math.min(100, Math.round((answered / total) * 100)) : 0;
-  const correctPct =
-    targetCorrect > 0
+  const correctPct = answerAllMode
+    ? answeredPct
+    : targetCorrect > 0
       ? Math.min(100, Math.round((correct / targetCorrect) * 100))
       : 0;
   const currentQuestion = Math.min(answered + 1, total);
@@ -72,12 +74,14 @@ export function McPhaseProgress({
           percent={answeredPct}
           barClassName="bg-sky-600 dark:bg-sky-400"
         />
-        <ProgressMeter
-          label="Correct answers"
-          valueLabel={`${correct} / ${targetCorrect} to finish`}
-          percent={correctPct}
-          barClassName="bg-emerald-600 dark:bg-emerald-400"
-        />
+        {!answerAllMode ? (
+          <ProgressMeter
+            label="Correct answers"
+            valueLabel={`${correct} / ${targetCorrect} to finish`}
+            percent={correctPct}
+            barClassName="bg-emerald-600 dark:bg-emerald-400"
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-sky-100 pt-3 dark:border-stone-800">
@@ -118,13 +122,26 @@ export function McPhaseProgress({
           role="status"
           className="rounded-md bg-white/80 px-3 py-2 text-sm text-slate-700 dark:bg-stone-950/50 dark:text-stone-300"
         >
-          {remaining === 0 ? (
+          {answerAllMode ? (
+            remainingToAnswer === 0 ? (
+              <>You’ve answered all {total} questions in this section.</>
+            ) : (
+              <>
+                Answer{" "}
+                <span className="font-semibold tabular-nums text-slate-900 dark:text-stone-50">
+                  {remainingToAnswer}
+                </span>{" "}
+                more question{remainingToAnswer === 1 ? "" : "s"} to continue
+                (you can move on even if some answers were incorrect).
+              </>
+            )
+          ) : remainingCorrect === 0 ? (
             <>You have enough correct answers to finish this section.</>
           ) : (
             <>
               Get{" "}
               <span className="font-semibold tabular-nums text-slate-900 dark:text-stone-50">
-                {remaining}
+                {remainingCorrect}
               </span>{" "}
               more correct to finish early
               {answered < total ? (

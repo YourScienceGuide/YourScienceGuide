@@ -37,6 +37,7 @@ import {
 import {
   graduationThresholdForLesson,
 } from "@/lib/lesson/lesson-grade-config";
+import { mcPhaseDescription } from "@/lib/lesson/mc-phase-copy";
 import { excerptPrompt } from "@/lib/student/question-history.types";
 import {
   loadGradedLessonProgress,
@@ -278,7 +279,10 @@ export function GradedLessonFlow({
         ) : progress.phase === "multiple-choice" && mcQuestion ? (
           <PhaseSection
             title="Multiple choice"
-            description={`Work through ${plan.multipleChoice.length} questions. Answer ${rubric.mcTargetCorrect} correctly to finish this section.`}
+            description={mcPhaseDescription(
+              plan.multipleChoice.length,
+              rubric.mcTargetCorrect,
+            )}
             progress={
               <McPhaseProgress
                 answered={progress.mcIndex}
