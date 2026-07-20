@@ -6,9 +6,12 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useActiveStudent } from "@/components/family/active-student-provider";
 import { SettingsMenu } from "@/components/settings/settings-menu";
+import { getHeaderEnvLabel } from "@/lib/deploy-label";
 import { siteContainerClass } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+
+const envLabel = getHeaderEnvLabel();
 
 const baseLinks = [
   { href: "/student", label: "Student" },
@@ -35,9 +38,17 @@ export function TopNav() {
       >
         <Link
           href="/"
-          className="text-sm font-medium tracking-tight text-sky-900 dark:text-stone-100"
+          className="relative inline-flex items-center text-sm font-medium tracking-tight text-sky-900 dark:text-stone-100"
         >
-          Your Science Guide
+          <span>Your Science Guide</span>
+          {envLabel ? (
+            <span
+              aria-label={`Environment: ${envLabel}`}
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-12deg] whitespace-nowrap rounded border border-amber-400/80 bg-amber-200/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-950 shadow-sm dark:border-amber-600 dark:bg-amber-400/90 dark:text-amber-950"
+            >
+              {envLabel}
+            </span>
+          ) : null}
         </Link>
         <nav aria-label="Main" className="flex items-center gap-1 sm:gap-2">
           {isGuest && (
