@@ -7,6 +7,7 @@ import {
   countBlanks,
   levenshtein,
   splitPromptOnBlanks,
+  withinInsertDeleteBudget,
 } from "@/lib/lesson/fill-in-blank";
 
 describe("blank parsing", () => {
@@ -30,6 +31,36 @@ describe("levenshtein", () => {
   });
 });
 
+describe("withinInsertDeleteBudget", () => {
+  it("allows exact matches", () => {
+    expect(withinInsertDeleteBudget("cell", "cell", 1, 1)).toBe(true);
+  });
+
+  it("allows one insertion", () => {
+    expect(withinInsertDeleteBudget("photosyntesis", "photosynthesis", 1, 1)).toBe(
+      true,
+    );
+  });
+
+  it("allows one deletion", () => {
+    expect(withinInsertDeleteBudget("celll", "cell", 1, 1)).toBe(true);
+  });
+
+  it("allows one insertion and one deletion in either order", () => {
+    // substitution via delete + insert
+    expect(withinInsertDeleteBudget("h20", "h2o", 1, 1)).toBe(true);
+    // different positions
+    expect(withinInsertDeleteBudget("abcd", "abxd", 1, 1)).toBe(true);
+    expect(withinInsertDeleteBudget("abxd", "abcd", 1, 1)).toBe(true);
+  });
+
+  it("rejects edits beyond one insert and one delete", () => {
+    expect(withinInsertDeleteBudget("cat", "dog", 1, 1)).toBe(false);
+    expect(withinInsertDeleteBudget("abc", "axy", 1, 1)).toBe(false);
+    expect(withinInsertDeleteBudget("ab", "wxyz", 1, 1)).toBe(false);
+  });
+});
+
 describe("checkBlankAnswer", () => {
   const variants = ["photosynthesis", "Photosynthesis"];
 
@@ -37,8 +68,15 @@ describe("checkBlankAnswer", () => {
     expect(checkBlankAnswer(variants, "photosynthesis")).toBe("correct");
   });
 
-  it("flags near-misses as spelling hints", () => {
-    expect(checkBlankAnswer(variants, "photosyntesis")).toBe("spelling");
+  it("accepts one insert and/or one delete as correct", () => {
+    expect(checkBlankAnswer(variants, "photosyntesis")).toBe("correct");
+    expect(checkBlankAnswer(["H2O"], "H20")).toBe("correct");
+    expect(checkBlankAnswer(["cell"], "celll")).toBe("correct");
+  });
+
+  it("flags farther near-misses as spelling hints", () => {
+    // Two missing letters ("th") — beyond one insert + one delete.
+    expect(checkBlankAnswer(variants, "photosynesis")).toBe("spelling");
   });
 
   it("rejects empty or wrong answers", () => {
@@ -57,10 +95,10 @@ describe("checkFillInBlankQuestion", () => {
     });
   });
 
-  it("returns spelling hint on near miss", () => {
+  it("accepts one-insert/one-delete typos as correct", () => {
     expect(checkFillInBlankQuestion(blankAnswers, ["H20", "oxygen"])).toEqual({
-      correct: false,
-      spellingHint: true,
+      correct: true,
+      spellingHint: false,
     });
   });
 

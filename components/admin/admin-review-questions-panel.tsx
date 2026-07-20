@@ -354,6 +354,10 @@ export function AdminReviewQuestionsPanel() {
                   <p className="text-xs text-slate-500">
                     Use ________ in the prompt for each blank.
                   </p>
+                  <p className="text-xs text-slate-500 dark:text-stone-500">
+                    Matching accepts exact answers, plus typos that differ by at
+                    most one character insertion and one character deletion.
+                  </p>
                   {q.blankAnswers.map((answers, blankIndex) => (
                     <label key={blankIndex} className="block text-xs text-slate-500">
                       Blank {blankIndex + 1} answers
