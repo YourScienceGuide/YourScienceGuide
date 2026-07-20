@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
+import { McPhaseProgress } from "@/components/lesson/mc-phase-progress";
 import { QuestionPanel } from "@/components/lesson/question-panel";
 import { getCourseClient, getLessonClient } from "@/lib/student/curriculum-client";
 import {
@@ -36,6 +37,7 @@ import {
 import {
   graduationThresholdForLesson,
 } from "@/lib/lesson/lesson-grade-config";
+import { mcPhaseDescription } from "@/lib/lesson/mc-phase-copy";
 import { excerptPrompt } from "@/lib/student/question-history.types";
 import {
   loadGradedLessonProgress,
@@ -47,6 +49,7 @@ import {
 } from "@/lib/student/lesson-grades-client";
 import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
 import type { LessonQuestion } from "@/lib/lesson/types";
+import { cn } from "@/lib/utils";
 
 type GradedLessonFlowProps = {
   studentScope: string;
@@ -276,8 +279,18 @@ export function GradedLessonFlow({
         ) : progress.phase === "multiple-choice" && mcQuestion ? (
           <PhaseSection
             title="Multiple choice"
-            description={`Work through ${plan.multipleChoice.length} questions. Answer ${rubric.mcTargetCorrect} correctly to finish this section.`}
-            progressLabel={`Question ${progress.mcIndex + 1} of ${plan.multipleChoice.length}`}
+            description={mcPhaseDescription(
+              plan.multipleChoice.length,
+              rubric.mcTargetCorrect,
+            )}
+            progress={
+              <McPhaseProgress
+                answered={progress.mcIndex}
+                correct={progress.mcCorrectCount}
+                total={plan.multipleChoice.length}
+                targetCorrect={rubric.mcTargetCorrect}
+              />
+            }
           >
             <QuestionPanel
               key={`mc-${mcQuestion.id}`}
@@ -495,23 +508,28 @@ function PhaseSection({
   title,
   description,
   progressLabel,
+  progress,
   children,
 }: {
   title: string;
   description: string;
-  progressLabel: string;
+  progressLabel?: string;
+  progress?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="space-y-4" aria-labelledby={title}>
-      <div className="space-y-1">
+      <div className={cn("space-y-1", progress && "space-y-3")}>
         <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50">
           {title}
         </h2>
         <p className="text-sm text-slate-600 dark:text-stone-400">{description}</p>
-        <p className="text-xs tabular-nums text-slate-500 dark:text-stone-500">
-          {progressLabel}
-        </p>
+        {progress ??
+          (progressLabel ? (
+            <p className="text-xs tabular-nums text-slate-500 dark:text-stone-500">
+              {progressLabel}
+            </p>
+          ) : null)}
       </div>
       {children}
     </section>
