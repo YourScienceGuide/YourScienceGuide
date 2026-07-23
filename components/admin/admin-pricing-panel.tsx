@@ -29,7 +29,6 @@ type PricingDraft = {
   description: string;
   badge: string;
   amountInput: string;
-  stripePriceId: string | null;
 };
 
 function toDraft(plans: BillingPlanRecord[]): PricingDraft[] {
@@ -39,7 +38,6 @@ function toDraft(plans: BillingPlanRecord[]): PricingDraft[] {
     description: plan.description,
     badge: plan.badge ?? "",
     amountInput: centsToDollarInput(plan.amountCents),
-    stripePriceId: plan.stripePriceId,
   }));
 }
 
@@ -233,13 +231,6 @@ export function AdminPricingPanel() {
                     disabled={saving}
                   />
                 </Field>
-              )}
-
-              {plan.stripePriceId && (
-                <p className="text-xs text-slate-500 dark:text-stone-500">
-                  Stripe price:{" "}
-                  <code className="text-xs">{plan.stripePriceId}</code>
-                </p>
               )}
             </div>
           );
