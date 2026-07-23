@@ -12,7 +12,11 @@ export const ADMIN_TABS = [
   "videos",
   "emails",
   "faq",
+<<<<<<< HEAD
   "waitlist",
+=======
+  "pricing",
+>>>>>>> origin/staging
 ] as const;
 
 export type AdminTabId = (typeof ADMIN_TABS)[number];

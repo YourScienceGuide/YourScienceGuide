@@ -7,7 +7,6 @@ import {
 import {
   activateSubscription,
   BILLING_CHECKOUT_ENABLED,
-  BILLING_UNAVAILABLE_MESSAGE,
   getSubscription,
   hasActiveSubscription,
   SUBSCRIPTION_PLANS,
@@ -24,18 +23,17 @@ describe("subscription billing (localStorage)", () => {
     expect(getSubscription(MOCK_USERNAME)?.plan).toBe("annual");
   });
 
-  it("does not grant access from mock checkout while billing is disabled", () => {
-    expect(BILLING_CHECKOUT_ENABLED).toBe(false);
+  it("grants access from checkout when billing is enabled", () => {
+    expect(BILLING_CHECKOUT_ENABLED).toBe(true);
     expect(hasActiveSubscription("newuser@example.com")).toBe(false);
 
-    expect(() =>
-      activateSubscription("newuser@example.com", "monthly", {
-        cardLast4: "4242",
-      }),
-    ).toThrow(BILLING_UNAVAILABLE_MESSAGE);
+    activateSubscription("newuser@example.com", "monthly", {
+      cardLast4: "4242",
+    });
 
-    expect(hasActiveSubscription("newuser@example.com")).toBe(false);
-    expect(getSubscription("newuser@example.com")).toBeNull();
+    expect(hasActiveSubscription("newuser@example.com")).toBe(true);
+    expect(getSubscription("newuser@example.com")?.plan).toBe("monthly");
+    expect(getSubscription("newuser@example.com")?.cardLast4).toBe("4242");
   });
 
   it("exposes plan catalog", () => {

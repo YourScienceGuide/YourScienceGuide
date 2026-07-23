@@ -32,8 +32,13 @@ describe("shareable route helpers", () => {
     ]);
     expect(adminNavGroupForTab("grading")?.label).toBe("Grading & Access");
     expect(adminNavGroupForTab("faq")?.label).toBe("Comms & Support");
+<<<<<<< HEAD
     expect(adminNavGroupForTab("waitlist")?.label).toBe("Comms & Support");
     expect(adminTabFromPathname("/admin/waitlist")).toBe("waitlist");
+=======
+    expect(adminNavGroupForTab("pricing")?.label).toBe("Comms & Support");
+    expect(adminTabFromPathname("/admin/pricing")).toBe("pricing");
+>>>>>>> origin/staging
     expect(
       ADMIN_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)).sort(),
     ).toEqual(
@@ -47,6 +52,7 @@ describe("shareable route helpers", () => {
         "flashcards",
         "grading",
         "import",
+        "pricing",
         "review",
         "videos",
         "waitlist",
