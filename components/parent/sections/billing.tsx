@@ -384,8 +384,7 @@ function UnpaidBillingView({
       ) : null}
 
       <p className="text-sm text-slate-500 dark:text-stone-500">
-        Lesson access requires an active subscription. Demo accounts configured
-        by your administrator may already have access.
+        Lesson access requires an active subscription.
       </p>
     </>
   );
