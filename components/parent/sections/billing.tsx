@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { WaitlistForm } from "@/components/parent/waitlist-form";
 import { Button } from "@/components/ui/button";
 import {
   BILLING_CHECKOUT_ENABLED,
@@ -73,7 +74,7 @@ export function BillingSection() {
     <div className="space-y-8">
       <SectionHeader
         title="Get access"
-        description="Preview planned pricing. Checkout is not open yet."
+        description="Preview planned pricing. Registration isn’t open yet — join the waitlist to be notified."
       />
 
       <div
@@ -81,6 +82,19 @@ export function BillingSection() {
         className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
       >
         {BILLING_UNAVAILABLE_MESSAGE}
+      </div>
+
+      <div className="space-y-4 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
+            Join the waitlist
+          </h3>
+          <p className="text-sm text-slate-600 dark:text-stone-400">
+            Leave your email and we’ll let you know when you can register for the
+            curriculum.
+          </p>
+        </div>
+        <WaitlistForm source="parent-billing" />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
