@@ -13,6 +13,8 @@ import {
   fetchParentDailyEmailSettings,
   previewParentDailyEmail,
   saveParentDailyEmailTemplate,
+  downloadCombinedManualParentEmailsFile,
+  downloadSeparateManualParentEmailFiles,
 } from "@/lib/admin/parent-daily-email-client";
 import { getLessonFromStore } from "@/lib/admin/content-store";
 import {
@@ -43,6 +45,7 @@ export function AdminEmailsPanel() {
   const [previewSubject, setPreviewSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [templateFeedback, setTemplateFeedback] = useState<AdminFeedback | null>(null);
   const [loadFeedback, setLoadFeedback] = useState<AdminFeedback | null>(null);
   const [engagementDraft, setEngagementDraft] = useState("");
@@ -112,6 +115,56 @@ export function AdminEmailsPanel() {
       });
     } finally {
       setPreviewLoading(false);
+    }
+  }
+
+  async function handleExportCombined() {
+    setExportLoading(true);
+    setTemplateFeedback(null);
+    try {
+      const result = await downloadCombinedManualParentEmailsFile();
+      setTemplateFeedback(
+        successSaveFeedback(
+          `Downloaded ${result.generated} email${result.generated === 1 ? "" : "s"} as one text file${
+            result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
+          }.`,
+        ),
+      );
+    } catch (error) {
+      const formatted = formatSaveError(error);
+      setTemplateFeedback({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  }
+
+  async function handleExportSeparate() {
+    setExportLoading(true);
+    setTemplateFeedback(null);
+    try {
+      const result = await downloadSeparateManualParentEmailFiles();
+      setTemplateFeedback(
+        successSaveFeedback(
+          result.generated === 0
+            ? `No emails to download${result.skipped > 0 ? ` (${result.skipped} skipped)` : ""}.`
+            : `Downloaded ${result.generated} text file${result.generated === 1 ? "" : "s"}${
+                result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
+              }.`,
+        ),
+      );
+    } catch (error) {
+      const formatted = formatSaveError(error);
+      setTemplateFeedback({
+        type: "error",
+        message: formatted.message,
+        tips: formatted.tips,
+      });
+    } finally {
+      setExportLoading(false);
     }
   }
 
@@ -190,6 +243,34 @@ export function AdminEmailsPanel() {
             <dd>{draft.enabled ? "Enabled" : "Disabled"}</dd>
           </div>
         </dl>
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-stone-50">
+          Manual send (no email provider)
+        </h2>
+        <p className="text-sm text-slate-700 dark:text-stone-300">
+          Download today&apos;s parent emails as plain text. Each file includes To,
+          Subject, and body so you can paste them into Gmail while automated sending
+          is unavailable.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            disabled={exportLoading}
+            onClick={() => void handleExportCombined()}
+          >
+            {exportLoading ? "Preparing…" : "Download all as one .txt"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={exportLoading}
+            onClick={() => void handleExportSeparate()}
+          >
+            {exportLoading ? "Preparing…" : "Download separate .txt files"}
+          </Button>
+        </div>
       </section>
 
       {loadFeedback && (
