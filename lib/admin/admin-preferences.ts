@@ -13,6 +13,7 @@ export const ADMIN_TABS = [
   "emails",
   "faq",
   "pricing",
+  "waitlist",
 ] as const;
 
 export type AdminTabId = (typeof ADMIN_TABS)[number];

@@ -32,6 +32,8 @@ describe("shareable route helpers", () => {
     ]);
     expect(adminNavGroupForTab("grading")?.label).toBe("Grading & Access");
     expect(adminNavGroupForTab("faq")?.label).toBe("Comms & Support");
+    expect(adminNavGroupForTab("waitlist")?.label).toBe("Comms & Support");
+    expect(adminTabFromPathname("/admin/waitlist")).toBe("waitlist");
     expect(adminNavGroupForTab("pricing")?.label).toBe("Comms & Support");
     expect(adminTabFromPathname("/admin/pricing")).toBe("pricing");
     expect(
@@ -50,6 +52,7 @@ describe("shareable route helpers", () => {
         "pricing",
         "review",
         "videos",
+        "waitlist",
       ].sort(),
     );
   });
