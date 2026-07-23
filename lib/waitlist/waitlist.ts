@@ -12,3 +12,11 @@ export function normalizeWaitlistName(name: string | null | undefined): string |
   const trimmed = name?.trim() ?? "";
   return trimmed ? trimmed.slice(0, 120) : null;
 }
+
+export type WaitlistSignup = {
+  id: string;
+  email: string;
+  name: string | null;
+  source: string;
+  createdAt: string;
+};
