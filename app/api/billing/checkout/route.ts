@@ -2,12 +2,20 @@ import { currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 import { requireAuthenticated } from "@/lib/auth/require-authenticated";
+import { isBillingEnabled } from "@/lib/billing/flags";
 import { createCheckoutSession } from "@/lib/billing/pricing.server";
 import type { SubscriptionPlan } from "@/lib/billing/subscription";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (!isBillingEnabled()) {
+    return NextResponse.json(
+      { error: "Billing is not enabled." },
+      { status: 503 },
+    );
+  }
+
   const session = await requireAuthenticated();
   if (!session.ok) {
     return NextResponse.json({ error: session.error }, { status: session.status });

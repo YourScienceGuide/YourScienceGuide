@@ -6,13 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { WaitlistForm } from "@/components/parent/waitlist-form";
 import { Button } from "@/components/ui/button";
+import { isBillingEnabled } from "@/lib/billing/flags";
 import {
   DEFAULT_BILLING_PLANS,
   toBillingPlanDisplay,
   type BillingPlanDisplay,
 } from "@/lib/billing/pricing";
 import {
-  BILLING_CHECKOUT_ENABLED,
+  BILLING_UNAVAILABLE_MESSAGE,
   getSubscription,
   type SubscriptionPlan,
   type SubscriptionRecord,
@@ -34,6 +35,7 @@ const SAMPLE_PAID_SUBSCRIPTION: SubscriptionRecord = {
 };
 
 export function BillingSection() {
+  const billingEnabled = isBillingEnabled();
   const { ready, isLoggedIn, isAdmin, username, hasLessonAccess } = useAuth();
   const subscription = getSubscription(username);
   const [plans, setPlans] = useState<BillingPlanDisplay[]>(DEFAULT_DISPLAY_PLANS);
@@ -108,6 +110,7 @@ export function BillingSection() {
         <AdminBillingPreviewToggle
           value={adminPreview}
           onChange={setAdminPreview}
+          billingEnabled={billingEnabled}
         />
       ) : null}
 
@@ -115,6 +118,7 @@ export function BillingSection() {
         <PaidBillingView subscription={paidSubscription} />
       ) : (
         <UnpaidBillingView
+          billingEnabled={billingEnabled}
           plans={plans}
           plansLoading={plansLoading}
           ready={ready}
@@ -131,9 +135,11 @@ export function BillingSection() {
 function AdminBillingPreviewToggle({
   value,
   onChange,
+  billingEnabled,
 }: {
   value: AdminBillingPreview;
   onChange: (value: AdminBillingPreview) => void;
+  billingEnabled: boolean;
 }) {
   return (
     <div
@@ -146,6 +152,11 @@ function AdminBillingPreviewToggle({
       </p>
       <p className="mt-1 text-sm text-amber-900 dark:text-amber-100">
         Toggle how this page looks for families who have or have not subscribed.
+        Billing is currently{" "}
+        <span className="font-semibold">
+          {billingEnabled ? "enabled" : "disabled (waitlist mode)"}
+        </span>
+        .
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
@@ -225,6 +236,7 @@ function PaidBillingView({
 }
 
 function UnpaidBillingView({
+  billingEnabled,
   plans,
   plansLoading,
   ready,
@@ -233,6 +245,7 @@ function UnpaidBillingView({
   checkoutError,
   onSubscribe,
 }: {
+  billingEnabled: boolean;
   plans: BillingPlanDisplay[];
   plansLoading: boolean;
   ready: boolean;
@@ -245,39 +258,37 @@ function UnpaidBillingView({
     <>
       <SectionHeader
         title="Get access"
-<<<<<<< HEAD
-        description="Preview planned pricing. Registration isn’t open yet — join the waitlist to be notified."
-      />
-
-      <div
-        role="status"
-        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
-      >
-        {BILLING_UNAVAILABLE_MESSAGE}
-      </div>
-
-      <div className="space-y-4 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
-            Join the waitlist
-          </h3>
-          <p className="text-sm text-slate-600 dark:text-stone-400">
-            Leave your email and we’ll let you know when you can register for the
-            curriculum.
-          </p>
-        </div>
-        <WaitlistForm source="parent-billing" />
-      </div>
-
-=======
         description={
-          BILLING_CHECKOUT_ENABLED
+          billingEnabled
             ? "Choose a plan below. Create an account to subscribe securely with Stripe."
-            : "Preview planned pricing. Checkout is not open yet."
+            : "Preview planned pricing. Registration isn’t open yet — join the waitlist to be notified."
         }
       />
 
->>>>>>> origin/staging
+      {!billingEnabled ? (
+        <>
+          <div
+            role="status"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            {BILLING_UNAVAILABLE_MESSAGE}
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-stone-50">
+                Join the waitlist
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-stone-400">
+                Leave your email and we’ll let you know when you can register for
+                the curriculum.
+              </p>
+            </div>
+            <WaitlistForm source="parent-billing" />
+          </div>
+        </>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         {plans.map((plan) => {
           const isAnnual = plan.id === "annual";
@@ -286,6 +297,7 @@ function UnpaidBillingView({
               key={plan.id}
               className={cn(
                 "relative flex flex-col rounded-lg border bg-white p-6 dark:bg-stone-900",
+                !billingEnabled && "opacity-90",
                 isAnnual
                   ? "border-sky-400 ring-1 ring-sky-200 dark:border-stone-500 dark:ring-stone-700"
                   : "border-sky-200 dark:border-stone-700",
@@ -309,7 +321,7 @@ function UnpaidBillingView({
               <p className="mt-3 flex-1 text-sm text-slate-600 dark:text-stone-400">
                 {plan.description}
               </p>
-              {BILLING_CHECKOUT_ENABLED && ready && isLoggedIn ? (
+              {billingEnabled && ready && isLoggedIn ? (
                 <Button
                   type="button"
                   className="mt-6 w-full"
@@ -322,12 +334,22 @@ function UnpaidBillingView({
                     : `Subscribe ${plan.price}`}
                 </Button>
               ) : null}
+              {!billingEnabled ? (
+                <Button
+                  type="button"
+                  className="mt-6 w-full"
+                  variant={isAnnual ? "default" : "outline"}
+                  disabled
+                >
+                  Coming in a future release
+                </Button>
+              ) : null}
             </div>
           );
         })}
       </div>
 
-      {BILLING_CHECKOUT_ENABLED && ready && !isLoggedIn ? (
+      {billingEnabled && ready && !isLoggedIn ? (
         <div className="space-y-3 rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900">
           <p className="text-sm font-medium text-slate-900 dark:text-stone-50">
             Account required to subscribe
