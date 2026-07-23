@@ -97,4 +97,3 @@ The README has been structured to clearly communicate the technical foundation o
 
 You can drop this directly into the root of your repository to keep your developer documentation clean and
 
-EDIT

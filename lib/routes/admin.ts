@@ -16,6 +16,8 @@ export const ADMIN_TAB_ROUTES: ReadonlyArray<{
   { id: "videos", label: "Lesson videos", href: "/admin/videos" },
   { id: "emails", label: "Parent emails", href: "/admin/emails" },
   { id: "faq", label: "Manage FAQ", href: "/admin/faq" },
+  { id: "pricing", label: "Pricing", href: "/admin/pricing" },
+  { id: "waitlist", label: "Waitlist", href: "/admin/waitlist" },
 ];
 
 const TAB_BY_ID = new Map(ADMIN_TAB_ROUTES.map((tab) => [tab.id, tab] as const));
@@ -51,7 +53,7 @@ export const ADMIN_NAV_GROUPS: ReadonlyArray<{
   {
     id: "comms-support",
     label: "Comms & Support",
-    items: tabs("emails", "faq"),
+    items: tabs("emails", "faq", "pricing", "waitlist"),
   },
 ];
 

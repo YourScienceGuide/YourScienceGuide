@@ -2,12 +2,12 @@ import {
   MOCK_ADMIN_USERNAME,
   MOCK_USERNAME,
 } from "@/lib/auth/constants";
+import { isBillingEnabled } from "@/lib/billing/flags";
 
-/** When false, checkout is disabled and local mock payments cannot grant access. */
-export const BILLING_CHECKOUT_ENABLED = false;
+export { isBillingEnabled, BILLING_CHECKOUT_ENABLED } from "@/lib/billing/flags";
 
 export const BILLING_UNAVAILABLE_MESSAGE =
-  "Online payments are not available yet. Subscription billing will be added in a future release.";
+  "Online payments are not available yet. Join the waitlist to be notified when registration opens.";
 
 export type SubscriptionPlan = "monthly" | "annual";
 
@@ -66,7 +66,7 @@ export function hasActiveSubscription(username: string | null): boolean {
   if (!username) return false;
   const key = accountKey(username);
   if (DEMO_SUBSCRIBED.has(key)) return true;
-  if (!BILLING_CHECKOUT_ENABLED) return false;
+  if (!isBillingEnabled()) return false;
   return Boolean(readStore()[key]);
 }
 
@@ -82,7 +82,7 @@ export function getSubscription(
       expiresOn: "August 15, 2026",
     };
   }
-  if (!BILLING_CHECKOUT_ENABLED) return null;
+  if (!isBillingEnabled()) return null;
   return readStore()[key] ?? null;
 }
 
@@ -91,7 +91,7 @@ export function activateSubscription(
   plan: SubscriptionPlan,
   payment?: { cardLast4: string },
 ): SubscriptionRecord {
-  if (!BILLING_CHECKOUT_ENABLED) {
+  if (!isBillingEnabled()) {
     throw new Error(BILLING_UNAVAILABLE_MESSAGE);
   }
 
@@ -111,6 +111,7 @@ export function activateSubscription(
   return record;
 }
 
+/** Fallback display catalog when API pricing is unavailable. */
 export const SUBSCRIPTION_PLANS = {
   monthly: {
     id: "monthly" as const,
