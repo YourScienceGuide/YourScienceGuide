@@ -125,7 +125,7 @@ export function AdminEmailsPanel() {
       const result = await downloadCombinedManualParentEmailsFile();
       setTemplateFeedback(
         successSaveFeedback(
-          `Downloaded ${result.generated} email${result.generated === 1 ? "" : "s"} as one text file${
+          `Started download for ${result.generated} email${result.generated === 1 ? "" : "s"} as one text file${
             result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
           }.`,
         ),
@@ -151,7 +151,7 @@ export function AdminEmailsPanel() {
         successSaveFeedback(
           result.generated === 0
             ? `No emails to download${result.skipped > 0 ? ` (${result.skipped} skipped)` : ""}.`
-            : `Downloaded ${result.generated} text file${result.generated === 1 ? "" : "s"}${
+            : `Started download for ${result.generated} text file${result.generated === 1 ? "" : "s"}${
                 result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
               }.`,
         ),

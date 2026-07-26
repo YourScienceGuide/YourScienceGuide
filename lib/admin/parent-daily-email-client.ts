@@ -94,13 +94,57 @@ export async function fetchSeparateManualParentEmails(): Promise<{
   };
 }
 
+const DOWNLOAD_BLOCKED_MESSAGE =
+  "Your browser blocked the file download. Allow downloads for this site and try again.";
+
+function userActivationExpired(): boolean {
+  return navigator.userActivation?.isActive === false;
+}
+
+function toDownloadError(error: unknown): Error {
+  if (error instanceof Error && error.message === DOWNLOAD_BLOCKED_MESSAGE) {
+    return error;
+  }
+  return new Error(DOWNLOAD_BLOCKED_MESSAGE);
+}
+
 function triggerBrowserDownload(blob: Blob, filename: string) {
+  if (userActivationExpired()) {
+    throw new Error(DOWNLOAD_BLOCKED_MESSAGE);
+  }
+
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  let downloadStarted = false;
+
+  try {
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    anchor.style.display = "none";
+    document.body.append(anchor);
+
+    const clickEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+    });
+
+    if (!anchor.dispatchEvent(clickEvent)) {
+      throw new Error(DOWNLOAD_BLOCKED_MESSAGE);
+    }
+
+    downloadStarted = true;
+  } catch (error) {
+    throw toDownloadError(error);
+  } finally {
+    anchor.remove();
+    if (downloadStarted) {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else {
+      URL.revokeObjectURL(url);
+    }
+  }
 }
 
 export async function downloadCombinedManualParentEmailsFile(): Promise<{
