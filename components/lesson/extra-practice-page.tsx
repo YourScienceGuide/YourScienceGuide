@@ -8,7 +8,6 @@ import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { AlcumusPractice } from "@/components/lesson/alcumus-practice";
 import { useLessonAssessment } from "@/components/lesson/lesson-assessment-provider";
 import { useStudentScope } from "@/components/student/use-student-scope";
-import { QuestionHistorySection } from "@/components/student/question-history-section";
 import { Button } from "@/components/ui/button";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { getAlgorithmConfigFromStore } from "@/lib/admin/content-store";
@@ -254,13 +253,6 @@ export function ExtraPracticePage({ courseId, lessonId }: ExtraPracticePageProps
         lessonId={lessonId}
         state={state}
         onStateChange={onStateChange}
-      />
-
-      <QuestionHistorySection
-        courseId={courseId}
-        lessonId={lessonId}
-        title="Your question history"
-        description="Extra practice and assignment attempts for this lesson."
       />
     </div>
     </GuestLessonGuard>

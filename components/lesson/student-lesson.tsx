@@ -11,7 +11,6 @@ import { useStudentScope } from "@/components/student/use-student-scope";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
 import { RequiredReadings } from "@/components/student/required-readings";
-import { QuestionHistorySection } from "@/components/student/question-history-section";
 import {
   getAdjacentLessonsClient,
   getCourseClient,
@@ -146,13 +145,6 @@ export function StudentLesson({ courseId, lessonId }: StudentLessonProps) {
                 )}
               </div>
             </section>
-
-            <QuestionHistorySection
-              courseId={courseId}
-              lessonId={lessonId}
-              title="Your question history"
-              description="Attempts for this lesson."
-            />
 
             <section
               className="rounded-lg border border-sky-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-900"
