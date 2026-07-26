@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateLessonCompletionPercent,
   calculateLessonScore,
+  applyFreeResponseSubmitted,
   applyMcResult,
   applyReviewHeldForToday,
   currentReviewQuestionId,
@@ -124,6 +125,28 @@ describe("graded lesson machine", () => {
     expect(isGradedLessonPhasePast("fill-in-blank", "multiple-choice")).toBe(true);
     expect(isGradedLessonPhasePast("fill-in-blank", "fill-in-blank")).toBe(false);
     expect(isGradedLessonPhasePast("complete", "free-response")).toBe(true);
+  });
+
+  it("does not mark the lesson complete when free response is submitted early", () => {
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "multiple-choice" as const,
+      freeResponseQuestionId: "fr-1",
+    };
+    const next = applyFreeResponseSubmitted(progress, "sub-1");
+    expect(next.freeResponseSubmitted).toBe(true);
+    expect(next.freeResponseSubmissionId).toBe("sub-1");
+    expect(next.phase).toBe("multiple-choice");
+  });
+
+  it("completes the lesson when free response is submitted in its phase", () => {
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "free-response" as const,
+      freeResponseQuestionId: "fr-1",
+    };
+    const next = applyFreeResponseSubmitted(progress, "sub-1");
+    expect(next.phase).toBe("complete");
   });
 
   it("stops MC phase after 9 correct", () => {

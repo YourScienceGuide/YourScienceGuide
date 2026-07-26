@@ -43,8 +43,8 @@ type QuestionPanelProps = {
   /** Extra practice skips per-day attempt limits. */
   skipAttemptLimits?: boolean;
   onSubmit: (correct: boolean) => void;
-  /** Called with full text when a long-answer passes validation. */
-  onLongAnswerSubmit?: (answer: string) => void;
+  /** Called with full text when a long-answer passes validation. May be async. */
+  onLongAnswerSubmit?: (answer: string) => void | Promise<void>;
   /** Called when this question is held until tomorrow after exhausting tries. */
   onHeldForToday?: () => void;
   onAnswerChecked?: (result: {
@@ -81,6 +81,10 @@ export function QuestionPanel({
   );
   const [transitionPending, setTransitionPending] = useState(false);
   const [parentSubmitted, setParentSubmitted] = useState(false);
+  const [longAnswerSubmitting, setLongAnswerSubmitting] = useState(false);
+  const [longAnswerSubmitError, setLongAnswerSubmitError] = useState<string | null>(
+    null,
+  );
   const [attemptVersion, setAttemptVersion] = useState(0);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -100,7 +104,7 @@ export function QuestionPanel({
 
   const isLocked = limited && attemptState.isLocked;
   const disabled =
-    disabledExternal || isLocked || transitionPending;
+    disabledExternal || isLocked || transitionPending || longAnswerSubmitting;
   const remaining = limited
     ? attemptsRemaining(attemptState.attemptsUsed, maxAttempts)
     : null;
@@ -139,6 +143,8 @@ export function QuestionPanel({
     setFeedbackTone(null);
     setTransitionPending(false);
     setParentSubmitted(false);
+    setLongAnswerSubmitting(false);
+    setLongAnswerSubmitError(null);
     setAttemptVersion((v) => v + 1);
   }, [question.id, blankCount]);
 
@@ -246,6 +252,8 @@ export function QuestionPanel({
       setFeedbackTone(null);
     }
     setParentSubmitted(false);
+    setLongAnswerSubmitting(false);
+    setLongAnswerSubmitError(null);
   }
 
   function updateBlankAnswer(index: number, value: string) {
@@ -365,14 +373,28 @@ export function QuestionPanel({
             id="long-answer"
             rows={5}
             value={longAnswer}
-            onChange={(e) => setLongAnswer(e.target.value)}
+            onChange={(e) => {
+              setLongAnswer(e.target.value);
+              if (longAnswerSubmitError) setLongAnswerSubmitError(null);
+            }}
             disabled={disabled || parentSubmitted}
             placeholder="Write your explanation here..."
             className="w-full resize-y rounded-md border border-sky-200 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:opacity-60 dark:border-stone-600 dark:bg-stone-950 dark:text-stone-100"
           />
           {parentSubmitted && (
-            <p className="text-sm text-sky-700 dark:text-stone-300">
-              Sent to your parent for review. Great work explaining your thinking!
+            <p
+              role="status"
+              className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-100"
+            >
+              Your response has been submitted for your parent to review.
+            </p>
+          )}
+          {longAnswerSubmitError && !parentSubmitted && (
+            <p
+              role="alert"
+              className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              {longAnswerSubmitError}
             </p>
           )}
         </div>
@@ -432,20 +454,55 @@ export function QuestionPanel({
         {question.type === "long-answer" ? (
           <Button
             type="button"
-            disabled={disabled || parentSubmitted}
+            disabled={disabled || parentSubmitted || longAnswer.trim().length === 0}
             onClick={() => {
-              const correct = validateAnswer(questionForValidation, {
-                text: longAnswer,
-              });
-              if (correct) {
-                setParentSubmitted(true);
-                onLongAnswerSubmit?.(longAnswer.trim());
-              }
-              notifyChecked(correct);
-              onSubmit(correct);
+              void (async () => {
+                if (parentSubmitted || longAnswerSubmitting) return;
+
+                const correct = validateAnswer(questionForValidation, {
+                  text: longAnswer,
+                });
+                if (!correct) {
+                  const minLength =
+                    question.type === "long-answer" ? question.minLength : 1;
+                  setLongAnswerSubmitError(null);
+                  setFeedback(INCORRECT_ANSWER_MESSAGE);
+                  setFeedbackDetail(
+                    `Write at least ${minLength} characters before submitting.`,
+                  );
+                  setFeedbackTone("retry");
+                  notifyChecked(false);
+                  onSubmit(false);
+                  return;
+                }
+
+                setFeedback(null);
+                setFeedbackDetail(null);
+                setFeedbackTone(null);
+                setLongAnswerSubmitError(null);
+                setLongAnswerSubmitting(true);
+                try {
+                  await onLongAnswerSubmit?.(longAnswer.trim());
+                  setParentSubmitted(true);
+                  notifyChecked(true);
+                  onSubmit(true);
+                } catch (error) {
+                  const message =
+                    error instanceof Error && error.message.trim()
+                      ? error.message
+                      : "Could not submit your response. Check your network connection and try again.";
+                  setLongAnswerSubmitError(message);
+                } finally {
+                  setLongAnswerSubmitting(false);
+                }
+              })();
             }}
           >
-            Submit for Parent Review
+            {longAnswerSubmitting
+              ? "Submitting…"
+              : parentSubmitted
+                ? "Submitted"
+                : "Submit"}
           </Button>
         ) : question.type === "fill-in-the-blank" ? (
           <Button
@@ -493,7 +550,7 @@ export function QuestionPanel({
             Check answer
           </Button>
         )}
-        {!disabled && (
+        {!disabled && !parentSubmitted && (
           <Button type="button" variant="ghost" onClick={resetInputs}>
             Clear
           </Button>

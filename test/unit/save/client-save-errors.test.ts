@@ -203,7 +203,24 @@ describe("client save error handling", () => {
           answerText: "Plants use sunlight.",
           maxPoints: 10,
         }),
-      ).rejects.toThrow("Failed to submit answer");
+      ).rejects.toThrow(
+        "Could not submit your response. Check your network connection and try again.",
+      );
+    });
+
+    it("throws a network message when long answer fetch fails", async () => {
+      installFetchMock({ networkError: new Error("Failed to fetch") });
+      await expect(
+        submitLongAnswer({
+          familyStudentId: "student-1",
+          courseId: "biology-year-1",
+          lessonId: "lesson-a",
+          questionId: "q1",
+          promptExcerpt: "Explain photosynthesis",
+          answerText: "Plants use sunlight.",
+          maxPoints: 10,
+        }),
+      ).rejects.toThrow("Check your network connection and try again.");
     });
 
     it("propagates network failures from grade sync", async () => {

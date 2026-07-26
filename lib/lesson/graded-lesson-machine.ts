@@ -126,19 +126,22 @@ export function hydrateGradedProgress(
     phase = "multiple-choice";
   }
   if (phase === "multiple-choice" && isMcPhaseComplete(normalized, plan.multipleChoice.length)) {
-    phase = plan.fillInBlank.length > 0 ? "fill-in-blank" : nextAfterFib(plan);
+    phase = plan.fillInBlank.length > 0 ? "fill-in-blank" : nextAfterFib(plan, normalized.freeResponseSubmitted);
   }
   if (phase === "fill-in-blank" && normalized.fibCorrectIds.length >= plan.fillInBlank.length && plan.fillInBlank.length > 0) {
-    phase = nextAfterFib(plan);
+    phase = nextAfterFib(plan, normalized.freeResponseSubmitted);
   }
   if (phase === "extra-practice" && normalized.extraCorrectIds.length >= plan.extraPractice.length && plan.extraPractice.length > 0) {
-    phase = plan.freeResponse ? "free-response" : "complete";
+    phase =
+      plan.freeResponse && !normalized.freeResponseSubmitted
+        ? "free-response"
+        : "complete";
   }
   if (phase === "free-response" && normalized.freeResponseSubmitted) {
     phase = "complete";
   }
   if (plan.review.length === 0 && phase === "review") {
-    phase = plan.multipleChoice.length > 0 ? "multiple-choice" : nextAfterFib(plan);
+    phase = plan.multipleChoice.length > 0 ? "multiple-choice" : nextAfterFib(plan, normalized.freeResponseSubmitted);
   }
 
   const problemsSolved = countProblemsSolved({
@@ -190,13 +193,19 @@ function skipEmptyPhases(
       ...next,
       phase: plan.extraPractice.length > 0
         ? "extra-practice"
-        : plan.freeResponse
+        : plan.freeResponse && !next.freeResponseSubmitted
           ? "free-response"
           : "complete",
     };
   }
   if (next.phase === "extra-practice" && plan.extraPractice.length === 0) {
-    next = { ...next, phase: plan.freeResponse ? "free-response" : "complete" };
+    next = {
+      ...next,
+      phase:
+        plan.freeResponse && !next.freeResponseSubmitted
+          ? "free-response"
+          : "complete",
+    };
   }
   if (next.phase === "free-response" && !plan.freeResponse) {
     next = { ...next, phase: "complete" };
@@ -211,9 +220,9 @@ function nextAfterFib(plan: {
   fillInBlank: unknown[];
   extraPractice: unknown[];
   freeResponse: unknown | null;
-}): GradedLessonPhase {
+}, freeResponseSubmitted = false): GradedLessonPhase {
   if (plan.extraPractice.length > 0) return "extra-practice";
-  if (plan.freeResponse) return "free-response";
+  if (plan.freeResponse && !freeResponseSubmitted) return "free-response";
   return "complete";
 }
 
@@ -295,7 +304,9 @@ export function applyMcResult(
         : progress.extraQuestionIds.length > 0
           ? "extra-practice"
           : progress.freeResponseQuestionId
-            ? "free-response"
+            ? progress.freeResponseSubmitted
+              ? "complete"
+              : "free-response"
             : "complete";
     return { ...next, phase: nextPhase };
   }
@@ -316,7 +327,8 @@ export function applyFibCorrect(
   let phase: GradedLessonPhase = progress.phase;
   if (fibCorrectIds.length >= fibTotal) {
     if (hasExtra) phase = "extra-practice";
-    else if (hasFreeResponse) phase = "free-response";
+    else if (hasFreeResponse)
+      phase = progress.freeResponseSubmitted ? "complete" : "free-response";
     else phase = "complete";
   }
   return { ...progress, fibCorrectIds, fibIndex: progress.fibIndex + 1, problemsSolved, phase };
@@ -337,7 +349,8 @@ export function applyFibHeldForToday(
   let phase: GradedLessonPhase = progress.phase;
   if (fibIndex >= fibTotal) {
     if (hasExtra) phase = "extra-practice";
-    else if (hasFreeResponse) phase = "free-response";
+    else if (hasFreeResponse)
+      phase = progress.freeResponseSubmitted ? "complete" : "free-response";
     else phase = "complete";
   }
   return { ...progress, fibHeldIds, fibIndex, phase };
@@ -355,7 +368,11 @@ export function applyExtraCorrect(
     progress.mcCorrectIds.length + progress.fibCorrectIds.length + extraCorrectIds.length;
   let phase: GradedLessonPhase = progress.phase;
   if (extraCorrectIds.length >= extraTotal) {
-    phase = hasFreeResponse ? "free-response" : "complete";
+    phase = hasFreeResponse
+      ? progress.freeResponseSubmitted
+        ? "complete"
+        : "free-response"
+      : "complete";
   }
   return { ...progress, extraCorrectIds, extraIndex: progress.extraIndex + 1, problemsSolved, phase };
 }
@@ -364,11 +381,14 @@ export function applyFreeResponseSubmitted(
   progress: GradedLessonProgress,
   submissionId: string,
 ): GradedLessonProgress {
+  const priorWorkDone =
+    progress.phase === "free-response" || progress.phase === "complete";
   return {
     ...progress,
     freeResponseSubmitted: true,
     freeResponseSubmissionId: submissionId,
-    phase: "complete",
+    // Only finish the lesson once earlier graded sections are already done.
+    phase: priorWorkDone ? "complete" : progress.phase,
   };
 }
 
