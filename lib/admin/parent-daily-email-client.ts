@@ -105,7 +105,7 @@ function toDownloadError(error: unknown): Error {
   if (error instanceof Error && error.message === DOWNLOAD_BLOCKED_MESSAGE) {
     return error;
   }
-  return new Error(DOWNLOAD_BLOCKED_MESSAGE);
+  return new Error(DOWNLOAD_BLOCKED_MESSAGE, { cause: error });
 }
 
 function triggerBrowserDownload(blob: Blob, filename: string) {
