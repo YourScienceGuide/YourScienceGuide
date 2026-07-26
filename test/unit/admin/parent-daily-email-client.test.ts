@@ -106,6 +106,7 @@ describe("parent daily email manual export downloads", () => {
 
   it("returns server counts after the combined download starts", async () => {
     vi.stubGlobal("fetch", mockCombinedExport());
+    vi.spyOn(HTMLAnchorElement.prototype, "dispatchEvent").mockReturnValue(true);
 
     await expect(downloadCombinedManualParentEmailsFile()).resolves.toEqual({
       generated: 2,
@@ -118,40 +119,27 @@ describe("parent daily email manual export downloads", () => {
 
   it("rejects the combined export when the browser cancels the download click", async () => {
     vi.stubGlobal("fetch", mockCombinedExport());
-    const cancelDownload = (event: MouseEvent) => event.preventDefault();
-    document.addEventListener("click", cancelDownload, { capture: true });
+    vi.spyOn(HTMLAnchorElement.prototype, "dispatchEvent").mockReturnValue(false);
 
-    try {
-      await expect(downloadCombinedManualParentEmailsFile()).rejects.toThrow(
-        DOWNLOAD_BLOCKED_MESSAGE,
-      );
-    } finally {
-      document.removeEventListener("click", cancelDownload, { capture: true });
-    }
+    await expect(downloadCombinedManualParentEmailsFile()).rejects.toThrow(
+      DOWNLOAD_BLOCKED_MESSAGE,
+    );
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:parent-email-export");
   });
 
   it("rejects the separate export when a later file download is cancelled", async () => {
     vi.stubGlobal("fetch", mockSeparateExport());
-    let clicks = 0;
-    const cancelSecondDownload = (event: MouseEvent) => {
-      clicks += 1;
-      if (clicks === 2) {
-        event.preventDefault();
-      }
-    };
-    document.addEventListener("click", cancelSecondDownload, { capture: true });
+    const dispatchEvent = vi
+      .spyOn(HTMLAnchorElement.prototype, "dispatchEvent")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
 
-    try {
-      await expect(downloadSeparateManualParentEmailFiles()).rejects.toThrow(
-        DOWNLOAD_BLOCKED_MESSAGE,
-      );
-    } finally {
-      document.removeEventListener("click", cancelSecondDownload, { capture: true });
-    }
+    await expect(downloadSeparateManualParentEmailFiles()).rejects.toThrow(
+      DOWNLOAD_BLOCKED_MESSAGE,
+    );
 
-    expect(clicks).toBe(2);
+    expect(dispatchEvent).toHaveBeenCalledTimes(2);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:parent-email-export");
   });
