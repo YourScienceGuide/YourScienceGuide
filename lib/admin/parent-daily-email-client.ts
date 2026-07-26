@@ -124,7 +124,7 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
     anchor.style.display = "none";
     document.body.append(anchor);
 
-    const clickEvent = new MouseEvent("click", {
+    const clickEvent = new window.MouseEvent("click", {
       bubbles: true,
       cancelable: true,
       view: window,
