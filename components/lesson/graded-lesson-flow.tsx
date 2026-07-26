@@ -332,13 +332,13 @@ export function GradedLessonFlow({
           (progress.phase === "fill-in-blank" && !fibQuestion)) ? (
           <CompletedPhaseSection
             title="Fill in the blank"
-            summary={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
+            summary={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} correct`}
           />
         ) : progress.phase === "fill-in-blank" && fibQuestion ? (
           <PhaseSection
             title="Fill in the blank"
             description={`${plan.fillInBlank.length} fill-in-the-blank questions.`}
-            progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
+            progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} correct`}
           >
             <QuestionPanel
               key={`fib-${fibQuestion.id}`}
