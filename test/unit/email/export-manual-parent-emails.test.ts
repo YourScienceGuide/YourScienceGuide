@@ -1,10 +1,40 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { buildManualParentDailyEmailExport } from "@/lib/email/export-manual-parent-emails.server";
 
 import {
   formatCombinedManualParentEmails,
   formatManualParentEmailFile,
   type ManualParentEmailExport,
 } from "@/lib/email/manual-parent-email-format";
+
+const emailMocks = vi.hoisted(() => ({
+  buildParentDailyDigest: vi.fn(),
+  digestTemplateVariables: vi.fn(),
+  getParentPrimaryEmail: vi.fn(),
+  listFamilyStudentsForDailyEmail: vi.fn(),
+  loadParentDailyEmailTemplate: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+
+vi.mock("@/lib/auth/parent-email.server", () => ({
+  getParentPrimaryEmail: emailMocks.getParentPrimaryEmail,
+}));
+
+vi.mock("@/lib/email/parent-daily-digest.server", () => ({
+  buildParentDailyDigest: emailMocks.buildParentDailyDigest,
+  digestTemplateVariables: emailMocks.digestTemplateVariables,
+  listFamilyStudentsForDailyEmail: emailMocks.listFamilyStudentsForDailyEmail,
+}));
+
+vi.mock("@/lib/email/parent-daily-email-template.server", () => ({
+  loadParentDailyEmailTemplate: emailMocks.loadParentDailyEmailTemplate,
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("manual parent email export formatting", () => {
   const sample: ManualParentEmailExport = {
@@ -35,5 +65,28 @@ describe("manual parent email export formatting", () => {
     expect(combined).toContain("EMAIL 1 of 1");
     expect(combined).toContain("SKIPPED");
     expect(combined).toContain("Sam: No activity today");
+  });
+});
+
+describe("buildManualParentDailyEmailExport", () => {
+  it("does not generate manual drafts when the parent daily template is disabled", async () => {
+    emailMocks.loadParentDailyEmailTemplate.mockResolvedValue({
+      subject: "Daily progress for {{studentName}}",
+      body: "Hello {{parentName}}",
+      enabled: false,
+    });
+
+    const exportData = await buildManualParentDailyEmailExport({
+      forDate: new Date("2026-07-22T12:00:00.000Z"),
+    });
+
+    expect(exportData).toEqual({
+      forDate: "2026-07-22",
+      generated: [],
+      skipped: [],
+    });
+    expect(emailMocks.listFamilyStudentsForDailyEmail).not.toHaveBeenCalled();
+    expect(emailMocks.buildParentDailyDigest).not.toHaveBeenCalled();
+    expect(emailMocks.getParentPrimaryEmail).not.toHaveBeenCalled();
   });
 });

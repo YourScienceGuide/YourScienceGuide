@@ -44,6 +44,11 @@ export async function buildManualParentDailyEmailExport(input?: {
   const forDate = input?.forDate ?? new Date();
   const forDateLabel = sentOnDateString(forDate);
   const template = await loadParentDailyEmailTemplate();
+
+  if (!template.enabled) {
+    return { forDate: forDateLabel, generated: [], skipped: [] };
+  }
+
   const students = await listFamilyStudentsForDailyEmail();
 
   const generated: ManualParentEmailDraft[] = [];
