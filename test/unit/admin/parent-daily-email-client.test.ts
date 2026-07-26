@@ -106,7 +106,7 @@ describe("parent daily email manual export downloads", () => {
 
   it("returns server counts after the combined download starts", async () => {
     vi.stubGlobal("fetch", mockCombinedExport());
-    vi.spyOn(HTMLAnchorElement.prototype, "dispatchEvent").mockReturnValue(true);
+    vi.spyOn(EventTarget.prototype, "dispatchEvent").mockReturnValue(true);
 
     await expect(downloadCombinedManualParentEmailsFile()).resolves.toEqual({
       generated: 2,
@@ -119,7 +119,7 @@ describe("parent daily email manual export downloads", () => {
 
   it("rejects the combined export when the browser cancels the download click", async () => {
     vi.stubGlobal("fetch", mockCombinedExport());
-    vi.spyOn(HTMLAnchorElement.prototype, "dispatchEvent").mockReturnValue(false);
+    vi.spyOn(EventTarget.prototype, "dispatchEvent").mockReturnValue(false);
 
     await expect(downloadCombinedManualParentEmailsFile()).rejects.toThrow(
       DOWNLOAD_BLOCKED_MESSAGE,
@@ -131,7 +131,7 @@ describe("parent daily email manual export downloads", () => {
   it("rejects the separate export when a later file download is cancelled", async () => {
     vi.stubGlobal("fetch", mockSeparateExport());
     const dispatchEvent = vi
-      .spyOn(HTMLAnchorElement.prototype, "dispatchEvent")
+      .spyOn(EventTarget.prototype, "dispatchEvent")
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(false);
 
