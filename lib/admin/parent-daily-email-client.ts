@@ -46,3 +46,145 @@ export async function previewParentDailyEmail(input: {
   }
   return (await res.json()) as { subject: string; text: string };
 }
+
+export type ManualParentEmailFile = {
+  filename: string;
+  content: string;
+  to: string;
+  subject: string;
+  studentName: string;
+};
+
+export async function downloadCombinedManualParentEmails(): Promise<{
+  blob: Blob;
+  filename: string;
+  generated: number;
+  skipped: number;
+}> {
+  const res = await fetch("/api/admin/parent-daily-email/export-manual?format=combined");
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "Failed to export parent emails");
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return {
+    blob,
+    filename: match?.[1] ?? "parent-daily-emails.txt",
+    generated: Number(res.headers.get("X-YSG-Email-Generated") ?? "0"),
+    skipped: Number(res.headers.get("X-YSG-Email-Skipped") ?? "0"),
+  };
+}
+
+export async function fetchSeparateManualParentEmails(): Promise<{
+  forDate: string;
+  skipped: Array<{ studentName: string; reason: string }>;
+  files: ManualParentEmailFile[];
+}> {
+  const res = await fetch("/api/admin/parent-daily-email/export-manual?format=separate");
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error ?? "Failed to export parent emails");
+  }
+  return (await res.json()) as {
+    forDate: string;
+    skipped: Array<{ studentName: string; reason: string }>;
+    files: ManualParentEmailFile[];
+  };
+}
+
+const DOWNLOAD_BLOCKED_MESSAGE =
+  "Your browser blocked the file download. Allow downloads for this site and try again.";
+
+function userActivationExpired(): boolean {
+  return navigator.userActivation?.isActive === false;
+}
+
+function toDownloadError(error: unknown): Error {
+  if (error instanceof Error && error.message === DOWNLOAD_BLOCKED_MESSAGE) {
+    return error;
+  }
+  return new Error(DOWNLOAD_BLOCKED_MESSAGE, { cause: error });
+}
+
+function uniqueDownloadFilename(filename: string, usedFilenames: Set<string>): string {
+  const extensionIndex = filename.lastIndexOf(".");
+  const hasExtension = extensionIndex > 0;
+  const base = hasExtension ? filename.slice(0, extensionIndex) : filename;
+  const extension = hasExtension ? filename.slice(extensionIndex) : "";
+
+  let suffix = 1;
+  let uniqueFilename = filename;
+
+  while (usedFilenames.has(uniqueFilename.toLowerCase())) {
+    suffix += 1;
+    uniqueFilename = `${base}-${suffix}${extension}`;
+  }
+
+  usedFilenames.add(uniqueFilename.toLowerCase());
+  return uniqueFilename;
+}
+
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  if (userActivationExpired()) {
+    throw new Error(DOWNLOAD_BLOCKED_MESSAGE);
+  }
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  let downloadStarted = false;
+
+  try {
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    anchor.style.display = "none";
+    document.body.append(anchor);
+
+    const clickEvent = new window.MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    if (!anchor.dispatchEvent(clickEvent)) {
+      throw new Error(DOWNLOAD_BLOCKED_MESSAGE);
+    }
+
+    downloadStarted = true;
+  } catch (error) {
+    throw toDownloadError(error);
+  } finally {
+    anchor.remove();
+    if (downloadStarted) {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else {
+      URL.revokeObjectURL(url);
+    }
+  }
+}
+
+export async function downloadCombinedManualParentEmailsFile(): Promise<{
+  generated: number;
+  skipped: number;
+}> {
+  const result = await downloadCombinedManualParentEmails();
+  triggerBrowserDownload(result.blob, result.filename);
+  return { generated: result.generated, skipped: result.skipped };
+}
+
+export async function downloadSeparateManualParentEmailFiles(): Promise<{
+  generated: number;
+  skipped: number;
+}> {
+  const result = await fetchSeparateManualParentEmails();
+  const usedFilenames = new Set<string>();
+
+  for (const file of result.files) {
+    triggerBrowserDownload(
+      new Blob([file.content], { type: "text/plain;charset=utf-8" }),
+      uniqueDownloadFilename(file.filename, usedFilenames),
+    );
+  }
+  return { generated: result.files.length, skipped: result.skipped.length };
+}
