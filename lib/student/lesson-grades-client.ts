@@ -36,14 +36,21 @@ export type SubmitLongAnswerInput = {
 export async function submitLongAnswer(
   payload: SubmitLongAnswerInput,
 ): Promise<{ id: string }> {
-  const response = await fetch("/api/student/long-answer-submissions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/student/long-answer-submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error("Check your network connection and try again.");
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? "Failed to submit answer");
+    throw new Error(
+      body.error ?? "Could not submit your response. Check your network connection and try again.",
+    );
   }
   return (await response.json()) as { id: string };
 }

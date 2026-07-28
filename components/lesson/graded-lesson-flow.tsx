@@ -1,10 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
+import {
+  LessonFreeResponseProvider,
+  type LessonFreeResponseContextValue,
+} from "@/components/lesson/lesson-free-response-section";
 import { McPhaseProgress } from "@/components/lesson/mc-phase-progress";
 import { QuestionPanel } from "@/components/lesson/question-panel";
 import { getCourseClient, getLessonClient } from "@/lib/student/curriculum-client";
@@ -59,6 +63,8 @@ type GradedLessonFlowProps = {
   onAccessChange?: (canAccessLesson: boolean) => void;
   /** Notifies listeners when lesson completion changes (for course progress refresh). */
   onCompletionChange?: (percent: number) => void;
+  /** Rendered after graded phases (e.g. bonus practice, free response, flashcards). */
+  afterContent?: ReactNode;
   children?: ReactNode;
 };
 
@@ -98,6 +104,7 @@ export function GradedLessonFlow({
   lessonId,
   onAccessChange,
   onCompletionChange,
+  afterContent,
   children,
 }: GradedLessonFlowProps) {
   const { store } = useContentStore();
@@ -129,6 +136,7 @@ export function GradedLessonFlow({
   }, [plan]);
 
   const [progress, setProgress] = useState<GradedLessonProgress | null>(null);
+  const progressRef = useRef<GradedLessonProgress | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -137,6 +145,7 @@ export function GradedLessonFlow({
       isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
     const stored = loadGradedLessonProgress(studentScope, courseId, lessonId);
     const next = hydrateGradedProgress(stored, plan, isLockedToday);
+    progressRef.current = next;
     setProgress(next);
     setHydrated(true);
   }, [courseId, lessonId, planIdentity, studentScope]);
@@ -148,6 +157,7 @@ export function GradedLessonFlow({
 
   const persist = useCallback(
     (next: GradedLessonProgress) => {
+      progressRef.current = next;
       setProgress(next);
       saveGradedLessonProgress(studentScope, courseId, lessonId, next);
       notifyProgressUpdated();
@@ -213,7 +223,43 @@ export function GradedLessonFlow({
     isLockedToday,
   );
 
+  const freeResponseContext: LessonFreeResponseContextValue | null =
+    freeResponse
+      ? {
+          studentScope,
+          courseId,
+          lessonId,
+          familyStudentId,
+          question: freeResponse,
+          submitted: progress.freeResponseSubmitted,
+          onSubmitAnswer: async (answerText: string) => {
+            const submissionStartProgress = progressRef.current;
+            if (
+              !familyStudentId ||
+              !submissionStartProgress ||
+              submissionStartProgress.freeResponseSubmitted
+            ) {
+              return;
+            }
+            const { id } = await submitLongAnswer({
+              familyStudentId,
+              courseId,
+              lessonId,
+              questionId: freeResponse.id,
+              promptExcerpt: excerptPrompt(freeResponse.prompt),
+              answerText,
+              maxPoints: rubric.freeResponsePoints,
+            });
+            const latestProgress = progressRef.current;
+            if (!latestProgress || latestProgress.freeResponseSubmitted) return;
+            const next = applyFreeResponseSubmitted(latestProgress, id);
+            persist(next);
+          },
+        }
+      : null;
+
   return (
+    <LessonFreeResponseProvider value={freeResponseContext}>
     <div className="space-y-8">
       <p className="text-sm tabular-nums text-slate-600 dark:text-stone-400">
         Lesson {lessonCompletionPercent}% complete
@@ -411,52 +457,19 @@ export function GradedLessonFlow({
           </PhaseSection>
         ) : null)}
 
-      {reviewComplete &&
+      {progress.phase === "free-response" &&
         freeResponse &&
-        ((isGradedLessonPhasePast(progress.phase, "free-response") ||
-          progress.freeResponseSubmitted) ? (
-          <CompletedPhaseSection
-            title="Free response"
-            summary={
-              progress.freeResponseSubmitted
-                ? "Submitted for your parent to review"
-                : "Complete"
-            }
-          />
-        ) : progress.phase === "free-response" ? (
-          <PhaseSection
-            title="Free response"
-            description="Write a longer answer for your parent to review."
-            progressLabel="Not submitted"
-          >
-            <QuestionPanel
-              key={`fr-${freeResponse.id}`}
-              studentScope={studentScope}
-              courseId={courseId}
-              lessonId={lessonId}
-              question={freeResponse}
-              difficulty={1}
-              disabled={progress.freeResponseSubmitted}
-              onLongAnswerSubmit={async (answerText) => {
-                if (!familyStudentId || progress.freeResponseSubmitted) return;
-                const { id } = await submitLongAnswer({
-                  familyStudentId,
-                  courseId,
-                  lessonId,
-                  questionId: freeResponse.id,
-                  promptExcerpt: excerptPrompt(freeResponse.prompt),
-                  answerText,
-                  maxPoints: rubric.freeResponsePoints,
-                });
-                const next = applyFreeResponseSubmitted(progress, id);
-                persist(next);
-              }}
-              onSubmit={(correct) => {
-                if (!correct) return;
-              }}
-            />
-          </PhaseSection>
-        ) : null)}
+        !progress.freeResponseSubmitted && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
+          <p className="font-medium text-slate-900 dark:text-stone-50">
+            Almost done
+          </p>
+          <p className="mt-1">
+            Submit your free response below (under Bonus extra practice) to finish
+            this lesson.
+          </p>
+        </div>
+      )}
 
       {progress.graduated && progress.phase !== "complete" && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
@@ -479,7 +492,10 @@ export function GradedLessonFlow({
             )}
         </div>
       )}
+
+      {afterContent ? <div className="space-y-10">{afterContent}</div> : null}
     </div>
+    </LessonFreeResponseProvider>
   );
 }
 

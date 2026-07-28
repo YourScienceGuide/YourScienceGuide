@@ -31,6 +31,25 @@ type DeleteTarget =
   | { kind: "all" }
   | { kind: "one"; index: number; question: ChapterQuestion };
 
+type QuestionTypeFilter = Record<ChapterQuestion["type"], boolean>;
+
+const QUESTION_TYPE_OPTIONS: {
+  type: ChapterQuestion["type"];
+  label: string;
+}[] = [
+  { type: "multiple-choice", label: "Multiple choice" },
+  { type: "fill-in-the-blank", label: "Fill in the blank" },
+  { type: "long-answer", label: "Free response" },
+  { type: "short-answer", label: "Short answer" },
+];
+
+const ALL_TYPES_VISIBLE: QuestionTypeFilter = {
+  "multiple-choice": true,
+  "fill-in-the-blank": true,
+  "long-answer": true,
+  "short-answer": true,
+};
+
 function newQuestionId() {
   return `custom-${Date.now()}`;
 }
@@ -49,12 +68,29 @@ export function AdminAssignmentPanel() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [typeFilter, setTypeFilter] =
+    useState<QuestionTypeFilter>(ALL_TYPES_VISIBLE);
 
   const lessonTitle =
     getLessonFromStore(store, courseId, lessonId)?.title ?? "this lesson";
 
   const splitPreview = useMemo(() => previewChapterSplit(draft), [draft]);
   const isDirty = JSON.stringify(draft) !== savedKey;
+
+  const visibleQuestions = useMemo(
+    () =>
+      draft
+        .map((question, index) => ({ question, index }))
+        .filter(({ question }) => typeFilter[question.type]),
+    [draft, typeFilter],
+  );
+
+  const anyTypeSelected = QUESTION_TYPE_OPTIONS.some(
+    (option) => typeFilter[option.type],
+  );
+  const allTypesSelected = QUESTION_TYPE_OPTIONS.every(
+    (option) => typeFilter[option.type],
+  );
 
   useEffect(() => {
     setDraft(savedQuestions);
@@ -233,6 +269,12 @@ export function AdminAssignmentPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium text-slate-700 dark:text-stone-300">
           {draft.length} question{draft.length === 1 ? "" : "s"} in the bank
+          {!allTypesSelected && draft.length > 0 && (
+            <span className="font-normal text-slate-500 dark:text-stone-500">
+              {" "}
+              · showing {visibleQuestions.length}
+            </span>
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" onClick={addQuestion}>
@@ -252,13 +294,59 @@ export function AdminAssignmentPanel() {
         </div>
       </div>
 
+      {draft.length > 0 && (
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-stone-500">
+            Show question types
+          </legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {QUESTION_TYPE_OPTIONS.map((option) => (
+              <label
+                key={option.type}
+                className="flex items-center gap-2 text-sm text-slate-700 dark:text-stone-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={typeFilter[option.type]}
+                  onChange={(e) =>
+                    setTypeFilter((current) => ({
+                      ...current,
+                      [option.type]: e.target.checked,
+                    }))
+                  }
+                  className="rounded border-sky-300 text-sky-700 focus:ring-sky-400 dark:border-stone-600"
+                />
+                {option.label}
+              </label>
+            ))}
+            {!allTypesSelected && (
+              <button
+                type="button"
+                onClick={() => setTypeFilter(ALL_TYPES_VISIBLE)}
+                className="text-sm text-sky-700 underline-offset-2 hover:underline dark:text-sky-300"
+              >
+                Show all
+              </button>
+            )}
+          </div>
+        </fieldset>
+      )}
+
       {draft.length === 0 ? (
         <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
           No chapter questions for this lesson yet.
         </p>
+      ) : !anyTypeSelected ? (
+        <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
+          Select at least one question type to view.
+        </p>
+      ) : visibleQuestions.length === 0 ? (
+        <p className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-600 dark:border-stone-700 dark:bg-stone-800/50 dark:text-stone-400">
+          No questions match the selected types for this lesson.
+        </p>
       ) : (
         <ol className="space-y-6">
-          {draft.map((q, index) => (
+          {visibleQuestions.map(({ question: q, index }) => (
             <li
               key={q.id}
               className="space-y-3 rounded-lg border border-sky-200 p-4 dark:border-stone-700"
