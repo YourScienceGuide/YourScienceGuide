@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import { useContentStore } from "@/components/admin/content-store-provider";
@@ -133,6 +133,7 @@ export function GradedLessonFlow({
   }, [plan]);
 
   const [progress, setProgress] = useState<GradedLessonProgress | null>(null);
+  const progressRef = useRef<GradedLessonProgress | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -141,6 +142,7 @@ export function GradedLessonFlow({
       isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
     const stored = loadGradedLessonProgress(studentScope, courseId, lessonId);
     const next = hydrateGradedProgress(stored, plan, isLockedToday);
+    progressRef.current = next;
     setProgress(next);
     setHydrated(true);
   }, [courseId, lessonId, planIdentity, studentScope]);
@@ -152,6 +154,7 @@ export function GradedLessonFlow({
 
   const persist = useCallback(
     (next: GradedLessonProgress) => {
+      progressRef.current = next;
       setProgress(next);
       saveGradedLessonProgress(studentScope, courseId, lessonId, next);
       notifyProgressUpdated();
@@ -227,7 +230,14 @@ export function GradedLessonFlow({
           question: freeResponse,
           submitted: progress.freeResponseSubmitted,
           onSubmitAnswer: async (answerText: string) => {
-            if (!familyStudentId || progress.freeResponseSubmitted) return;
+            const submissionStartProgress = progressRef.current;
+            if (
+              !familyStudentId ||
+              !submissionStartProgress ||
+              submissionStartProgress.freeResponseSubmitted
+            ) {
+              return;
+            }
             const { id } = await submitLongAnswer({
               familyStudentId,
               courseId,
@@ -237,7 +247,9 @@ export function GradedLessonFlow({
               answerText,
               maxPoints: rubric.freeResponsePoints,
             });
-            const next = applyFreeResponseSubmitted(progress, id);
+            const latestProgress = progressRef.current;
+            if (!latestProgress || latestProgress.freeResponseSubmitted) return;
+            const next = applyFreeResponseSubmitted(latestProgress, id);
             persist(next);
           },
         }
