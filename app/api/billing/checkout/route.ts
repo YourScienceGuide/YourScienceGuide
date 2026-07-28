@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       planId: body.plan as SubscriptionPlan,
       userId: session.userId,
       customerEmail: email,
+      request,
     });
 
     return NextResponse.json(checkout);
