@@ -79,6 +79,30 @@ export function AdminWaitlistPanel() {
     );
   }
 
+  function downloadEmailsTxt() {
+    const content = [
+      "Your Science Guide — waitlist emails",
+      `Exported: ${filtered.length}`,
+      "",
+      ...filtered.map((row) => {
+        const name = row.name ? ` (${row.name})` : "";
+        return `${row.email}${name}`;
+      }),
+      "",
+    ].join("\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `waitlist-emails-${new Date().toISOString().slice(0, 10)}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setFeedback({
+      type: "success",
+      message: `Downloaded ${filtered.length} waitlist email${filtered.length === 1 ? "" : "s"} as a text file.`,
+    });
+  }
+
   return (
     <div className="space-y-6">
       <AdminActionFeedback
@@ -115,6 +139,15 @@ export function AdminWaitlistPanel() {
             onClick={copyEmails}
           >
             Copy emails
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loading || filtered.length === 0}
+            onClick={downloadEmailsTxt}
+          >
+            Download .txt
           </Button>
           <Button
             type="button"
