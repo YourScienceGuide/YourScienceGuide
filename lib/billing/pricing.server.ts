@@ -229,6 +229,7 @@ export async function createCheckoutSession(options: {
   planId: SubscriptionPlan;
   userId: string;
   customerEmail?: string | null;
+  request?: Request;
 }): Promise<{ url: string }> {
   if (!isStripeSecretConfigured()) {
     throw new Error("Stripe is not configured.");
@@ -243,7 +244,7 @@ export async function createCheckoutSession(options: {
   }
 
   const stripe = getStripe();
-  const baseUrl = getAppBaseUrl();
+  const baseUrl = getAppBaseUrl(options.request);
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
