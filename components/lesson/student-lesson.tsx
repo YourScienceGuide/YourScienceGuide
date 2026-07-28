@@ -11,6 +11,7 @@ import { LessonFreeResponseSection } from "@/components/lesson/lesson-free-respo
 import { useStudentScope } from "@/components/student/use-student-scope";
 import { GuestLessonGuard } from "@/components/guest/guest-lesson-guard";
 import { LessonNav } from "@/components/student/lesson-nav";
+import { QuestionHistorySection } from "@/components/student/question-history-section";
 import { RequiredReadings } from "@/components/student/required-readings";
 import {
   getAdjacentLessonsClient,
