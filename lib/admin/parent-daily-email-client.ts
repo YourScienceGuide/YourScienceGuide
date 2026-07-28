@@ -108,6 +108,24 @@ function toDownloadError(error: unknown): Error {
   return new Error(DOWNLOAD_BLOCKED_MESSAGE, { cause: error });
 }
 
+function uniqueDownloadFilename(filename: string, usedFilenames: Set<string>): string {
+  const extensionIndex = filename.lastIndexOf(".");
+  const hasExtension = extensionIndex > 0;
+  const base = hasExtension ? filename.slice(0, extensionIndex) : filename;
+  const extension = hasExtension ? filename.slice(extensionIndex) : "";
+
+  let suffix = 1;
+  let uniqueFilename = filename;
+
+  while (usedFilenames.has(uniqueFilename.toLowerCase())) {
+    suffix += 1;
+    uniqueFilename = `${base}-${suffix}${extension}`;
+  }
+
+  usedFilenames.add(uniqueFilename.toLowerCase());
+  return uniqueFilename;
+}
+
 function triggerBrowserDownload(blob: Blob, filename: string) {
   if (userActivationExpired()) {
     throw new Error(DOWNLOAD_BLOCKED_MESSAGE);
@@ -160,10 +178,12 @@ export async function downloadSeparateManualParentEmailFiles(): Promise<{
   skipped: number;
 }> {
   const result = await fetchSeparateManualParentEmails();
+  const usedFilenames = new Set<string>();
+
   for (const file of result.files) {
     triggerBrowserDownload(
       new Blob([file.content], { type: "text/plain;charset=utf-8" }),
-      file.filename,
+      uniqueDownloadFilename(file.filename, usedFilenames),
     );
   }
   return { generated: result.files.length, skipped: result.skipped.length };

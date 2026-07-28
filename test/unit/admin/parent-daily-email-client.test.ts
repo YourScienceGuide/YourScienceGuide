@@ -21,28 +21,30 @@ function mockCombinedExport() {
   );
 }
 
-function mockSeparateExport() {
+function mockSeparateExport(
+  files = [
+    {
+      filename: "alex.txt",
+      content: "To: parent@example.com\nSubject: Alex",
+      to: "parent@example.com",
+      subject: "Alex",
+      studentName: "Alex",
+    },
+    {
+      filename: "jordan.txt",
+      content: "To: parent2@example.com\nSubject: Jordan",
+      to: "parent2@example.com",
+      subject: "Jordan",
+      studentName: "Jordan",
+    },
+  ],
+) {
   return vi.fn(async () =>
     new Response(
       JSON.stringify({
         forDate: "2026-07-26",
         skipped: [{ studentName: "Sam", reason: "No activity today" }],
-        files: [
-          {
-            filename: "alex.txt",
-            content: "To: parent@example.com\nSubject: Alex",
-            to: "parent@example.com",
-            subject: "Alex",
-            studentName: "Alex",
-          },
-          {
-            filename: "jordan.txt",
-            content: "To: parent2@example.com\nSubject: Jordan",
-            to: "parent2@example.com",
-            subject: "Jordan",
-            studentName: "Jordan",
-          },
-        ],
+        files,
       }),
       {
         status: 200,
@@ -142,6 +144,47 @@ describe("parent daily email manual export downloads", () => {
     expect(dispatchEvent).toHaveBeenCalledTimes(2);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:parent-email-export");
+  });
+
+  it("deduplicates separate export filenames before starting downloads", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockSeparateExport([
+        {
+          filename: "parent-daily-2026-07-26-alex.txt",
+          content: "To: parent@example.com\nSubject: Alex",
+          to: "parent@example.com",
+          subject: "Alex",
+          studentName: "Alex",
+        },
+        {
+          filename: "parent-daily-2026-07-26-alex.txt",
+          content: "To: parent2@example.com\nSubject: alex",
+          to: "parent2@example.com",
+          subject: "alex",
+          studentName: "alex",
+        },
+      ]),
+    );
+    const filenames: string[] = [];
+    vi.spyOn(window.EventTarget.prototype, "dispatchEvent").mockImplementation(
+      function (this: EventTarget) {
+        if (this instanceof HTMLAnchorElement) {
+          filenames.push(this.download);
+        }
+        return true;
+      },
+    );
+
+    await expect(downloadSeparateManualParentEmailFiles()).resolves.toEqual({
+      generated: 2,
+      skipped: 1,
+    });
+
+    expect(filenames).toEqual([
+      "parent-daily-2026-07-26-alex.txt",
+      "parent-daily-2026-07-26-alex-2.txt",
+    ]);
   });
 
   it("rejects instead of reporting success when user activation expired", async () => {

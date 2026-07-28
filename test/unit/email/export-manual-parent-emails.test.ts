@@ -89,4 +89,38 @@ describe("buildManualParentDailyEmailExport", () => {
     expect(emailMocks.buildParentDailyDigest).not.toHaveBeenCalled();
     expect(emailMocks.getParentPrimaryEmail).not.toHaveBeenCalled();
   });
+
+  it("generates unique filenames when student names normalize to the same slug", async () => {
+    emailMocks.loadParentDailyEmailTemplate.mockResolvedValue({
+      subject: "Daily progress",
+      body: "Hello parent",
+      enabled: true,
+    });
+    emailMocks.listFamilyStudentsForDailyEmail.mockResolvedValue([
+      {
+        id: "student-1",
+        display_name: "Alex",
+        parent_clerk_user_id: "parent-1",
+      },
+      {
+        id: "student-2",
+        display_name: "alex",
+        parent_clerk_user_id: "parent-2",
+      },
+    ]);
+    emailMocks.buildParentDailyDigest.mockResolvedValue({
+      pendingFreeResponses: [],
+    });
+    emailMocks.digestTemplateVariables.mockReturnValue({});
+    emailMocks.getParentPrimaryEmail.mockResolvedValue("parent@example.com");
+
+    const exportData = await buildManualParentDailyEmailExport({
+      forDate: new Date("2026-07-22T12:00:00.000Z"),
+    });
+
+    expect(exportData.generated.map((draft) => draft.filename)).toEqual([
+      "parent-daily-2026-07-22-alex.txt",
+      "parent-daily-2026-07-22-alex-2.txt",
+    ]);
+  });
 });

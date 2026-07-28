@@ -34,6 +34,19 @@ function safeFilenamePart(value: string): string {
   );
 }
 
+function uniqueFilename(base: string, extension: string, usedFilenames: Set<string>): string {
+  let suffix = 1;
+  let filename = `${base}${extension}`;
+
+  while (usedFilenames.has(filename.toLowerCase())) {
+    suffix += 1;
+    filename = `${base}-${suffix}${extension}`;
+  }
+
+  usedFilenames.add(filename.toLowerCase());
+  return filename;
+}
+
 /**
  * Builds plain-text parent daily emails for manual sending (e.g. paste into Gmail)
  * without requiring Resend / EMAIL_FROM.
@@ -53,6 +66,7 @@ export async function buildManualParentDailyEmailExport(input?: {
 
   const generated: ManualParentEmailDraft[] = [];
   const skipped: Array<{ studentName: string; reason: string }> = [];
+  const usedFilenames = new Set<string>();
 
   for (const student of students) {
     const digest = await buildParentDailyDigest({
@@ -87,7 +101,11 @@ export async function buildManualParentDailyEmailExport(input?: {
       }),
     }).trim();
 
-    const filename = `parent-daily-${forDateLabel}-${safeFilenamePart(student.display_name)}.txt`;
+    const filename = uniqueFilename(
+      `parent-daily-${forDateLabel}-${safeFilenamePart(student.display_name)}`,
+      ".txt",
+      usedFilenames,
+    );
 
     generated.push({
       to: parentEmail,
