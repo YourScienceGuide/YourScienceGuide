@@ -5,13 +5,16 @@ import {
   getMaxAttempts,
 } from "@/lib/lesson/question-attempt-limits";
 import {
+  applyExtraHeldForToday,
   applyFibHeldForToday,
   applyMcResult,
   applyReviewHeldForToday,
   canAccessLessonDuringReview,
+  currentExtraQuestionId,
   currentFibQuestionId,
   currentMcQuestionId,
   currentReviewQuestionId,
+  extraPhaseComplete,
   INITIAL_GRADED_LESSON_PROGRESS,
   reviewPhaseComplete,
 } from "@/lib/lesson/graded-lesson-machine";
@@ -219,6 +222,57 @@ describe("graded lesson fill-in-blank exhaustion", () => {
 
     expect(currentFibQuestionId(next)).toBeNull();
     expect(next.phase).toBe("extra-practice");
+  });
+});
+
+describe("graded lesson extra-practice exhaustion", () => {
+  it("advances to the next extra-practice question after holding the current one", () => {
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "extra-practice" as const,
+      extraQuestionIds: ["extra-1", "extra-2"],
+      extraIndex: 0,
+    };
+    const isLockedToday = (id: string) => id === "extra-1";
+
+    const held = applyExtraHeldForToday(progress, "extra-1");
+
+    expect(currentExtraQuestionId(held, isLockedToday)).toBe("extra-2");
+    expect(held.extraCorrectIds).toEqual([]);
+    expect(held.extraHeldIds).toEqual(["extra-1"]);
+    expect(held.phase).toBe("extra-practice");
+    expect(held.extraIndex).toBe(0);
+  });
+
+  it("completes the lesson after holding every remaining extra-practice question", () => {
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "extra-practice" as const,
+      extraQuestionIds: ["extra-1", "extra-2"],
+      extraCorrectIds: ["extra-1"],
+      extraIndex: 1,
+    };
+    const isLockedToday = (id: string) => id === "extra-2";
+
+    const held = applyExtraHeldForToday(progress, "extra-2");
+    expect(extraPhaseComplete(held, [{ id: "extra-1" }, { id: "extra-2" }], isLockedToday)).toBe(
+      true,
+    );
+    expect(currentExtraQuestionId(held, isLockedToday)).toBeNull();
+  });
+
+  it("keeps the phase open when a held question is no longer locked", () => {
+    const progress = {
+      ...INITIAL_GRADED_LESSON_PROGRESS,
+      phase: "extra-practice" as const,
+      extraQuestionIds: ["extra-1", "extra-2"],
+      extraHeldIds: ["extra-1"],
+    };
+
+    expect(
+      extraPhaseComplete(progress, [{ id: "extra-1" }, { id: "extra-2" }], () => false),
+    ).toBe(false);
+    expect(currentExtraQuestionId(progress, () => false)).toBe("extra-1");
   });
 });
 

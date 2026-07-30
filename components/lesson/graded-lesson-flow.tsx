@@ -19,6 +19,7 @@ import {
 import { buildLessonAssessmentPlan } from "@/lib/lesson/lesson-assessment-plan";
 import {
   applyExtraCorrect,
+  applyExtraHeldForToday,
   applyFibCorrect,
   applyFibHeldForToday,
   applyFreeResponseSubmitted,
@@ -33,6 +34,7 @@ import {
   currentFibQuestionId,
   currentMcQuestionId,
   currentReviewQuestionId,
+  extraPhaseComplete,
   hydrateGradedProgress,
   isGradedLessonPhasePast,
   reviewPhaseComplete,
@@ -95,6 +97,23 @@ function advanceAfterReview(
   return {
     ...progress,
     phase: plan.multipleChoice.length > 0 ? "multiple-choice" : "fill-in-blank",
+  };
+}
+
+function advanceAfterExtra(
+  progress: GradedLessonProgress,
+  plan: NonNullable<ReturnType<typeof buildLessonAssessmentPlan>>,
+  isLockedToday: (questionId: string) => boolean,
+): GradedLessonProgress {
+  if (!extraPhaseComplete(progress, plan.extraPractice, isLockedToday)) {
+    return progress;
+  }
+  return {
+    ...progress,
+    phase:
+      plan.freeResponse && !progress.freeResponseSubmitted
+        ? "free-response"
+        : "complete",
   };
 }
 
@@ -224,7 +243,7 @@ export function GradedLessonFlow({
   const reviewQuestion = findQuestion(plan, reviewQuestionId);
   const mcId = currentMcQuestionId(progress);
   const fibId = currentFibQuestionId(progress);
-  const extraId = currentExtraQuestionId(progress);
+  const extraId = currentExtraQuestionId(progress, isLockedToday);
   const mcQuestion = findQuestion(plan, mcId);
   const fibQuestion = findQuestion(plan, fibId);
   const extraQuestion = findQuestion(plan, extraId);
@@ -471,7 +490,6 @@ export function GradedLessonFlow({
               lessonId={lessonId}
               question={extraQuestion}
               difficulty={2}
-              skipAttemptLimits
               onSubmit={(correct) => {
                 if (!correct) return;
                 let next = applyExtraCorrect(
@@ -480,6 +498,13 @@ export function GradedLessonFlow({
                   plan.extraPractice.length,
                   Boolean(plan.freeResponse),
                 );
+                next = advanceAfterExtra(next, plan, isLockedToday);
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+              onHeldForToday={() => {
+                let next = applyExtraHeldForToday(progress, extraQuestion.id);
+                next = advanceAfterExtra(next, plan, isLockedToday);
                 next = checkGraduation(next, rubric, lesson.graduationProblemCount);
                 persist(next);
               }}
