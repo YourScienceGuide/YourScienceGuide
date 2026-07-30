@@ -46,6 +46,7 @@ export type GradedLessonProgress = {
   fibIndex: number;
   extraQuestionIds: string[];
   extraCorrectIds: string[];
+  extraHeldIds: string[];
   extraIndex: number;
   freeResponseQuestionId: string | null;
   freeResponseSubmitted: boolean;
@@ -80,6 +81,7 @@ export const INITIAL_GRADED_LESSON_PROGRESS: GradedLessonProgress = {
   fibIndex: 0,
   extraQuestionIds: [],
   extraCorrectIds: [],
+  extraHeldIds: [],
   extraIndex: 0,
   freeResponseQuestionId: null,
   freeResponseSubmitted: false,
@@ -103,7 +105,8 @@ export function hydrateGradedProgress(
   const base = { ...INITIAL_GRADED_LESSON_PROGRESS, ...stored };
   const reviewHeldIds = base.reviewHeldIds.filter(isLockedToday);
   const fibHeldIds = base.fibHeldIds.filter(isLockedToday);
-  const normalized = { ...base, reviewHeldIds, fibHeldIds };
+  const extraHeldIds = (base.extraHeldIds ?? []).filter(isLockedToday);
+  const normalized = { ...base, reviewHeldIds, fibHeldIds, extraHeldIds };
   const mcQuestionIds =
     normalized.mcQuestionIds.length > 0
       ? normalized.mcQuestionIds
@@ -131,11 +134,13 @@ export function hydrateGradedProgress(
   if (phase === "fill-in-blank" && normalized.fibCorrectIds.length >= plan.fillInBlank.length && plan.fillInBlank.length > 0) {
     phase = nextAfterFib(plan, normalized.freeResponseSubmitted);
   }
-  if (phase === "extra-practice" && normalized.extraCorrectIds.length >= plan.extraPractice.length && plan.extraPractice.length > 0) {
-    phase =
-      plan.freeResponse && !normalized.freeResponseSubmitted
-        ? "free-response"
-        : "complete";
+  if (phase === "extra-practice" && plan.extraPractice.length > 0) {
+    if (extraPhaseComplete(normalized, plan.extraPractice, isLockedToday)) {
+      phase =
+        plan.freeResponse && !normalized.freeResponseSubmitted
+          ? "free-response"
+          : "complete";
+    }
   }
   if (phase === "free-response" && normalized.freeResponseSubmitted) {
     phase = "complete";
@@ -364,17 +369,38 @@ export function applyExtraCorrect(
 ): GradedLessonProgress {
   if (progress.extraCorrectIds.includes(questionId)) return progress;
   const extraCorrectIds = [...progress.extraCorrectIds, questionId];
+  const extraHeldIds = (progress.extraHeldIds ?? []).filter((id) => id !== questionId);
   const problemsSolved =
     progress.mcCorrectIds.length + progress.fibCorrectIds.length + extraCorrectIds.length;
   let phase: GradedLessonPhase = progress.phase;
-  if (extraCorrectIds.length >= extraTotal) {
+  if (extraCorrectIds.length >= extraTotal && extraTotal > 0) {
     phase = hasFreeResponse
       ? progress.freeResponseSubmitted
         ? "complete"
         : "free-response"
       : "complete";
   }
-  return { ...progress, extraCorrectIds, extraIndex: progress.extraIndex + 1, problemsSolved, phase };
+  return {
+    ...progress,
+    extraCorrectIds,
+    extraHeldIds,
+    extraIndex: progress.extraIndex + 1,
+    problemsSolved,
+    phase,
+  };
+}
+
+/** Same pattern as applyReviewHeldForToday: record the hold only; selection skips it. */
+export function applyExtraHeldForToday(
+  progress: GradedLessonProgress,
+  questionId: string,
+): GradedLessonProgress {
+  if (progress.extraCorrectIds.includes(questionId)) return progress;
+  const existingHeld = progress.extraHeldIds ?? [];
+  const extraHeldIds = existingHeld.includes(questionId)
+    ? existingHeld
+    : [...existingHeld, questionId];
+  return { ...progress, extraHeldIds };
 }
 
 export function applyFreeResponseSubmitted(
@@ -468,8 +494,15 @@ export function calculateLessonCompletionPercent(
         isLockedToday(question.id)),
   ).length;
 
+  const extraDone = plan.extraPractice.filter(
+    (question) =>
+      progress.extraCorrectIds.includes(question.id) ||
+      ((progress.extraHeldIds ?? []).includes(question.id) &&
+        isLockedToday(question.id)),
+  ).length;
+
   let completedSteps =
-    reviewDone + progress.mcIndex + progress.fibIndex + progress.extraIndex;
+    reviewDone + progress.mcIndex + progress.fibIndex + extraDone;
   if (progress.freeResponseSubmitted) completedSteps += 1;
 
   return Math.min(100, Math.round((completedSteps / totalSteps) * 100));
@@ -504,6 +537,20 @@ export function reviewPhaseComplete(
   );
 }
 
+export function extraPhaseComplete(
+  progress: GradedLessonProgress,
+  extraQuestions: { id: string }[],
+  isLockedToday: (questionId: string) => boolean,
+): boolean {
+  if (extraQuestions.length === 0) return true;
+  const heldIds = progress.extraHeldIds ?? [];
+  return extraQuestions.every(
+    (question) =>
+      progress.extraCorrectIds.includes(question.id) ||
+      (heldIds.includes(question.id) && isLockedToday(question.id)),
+  );
+}
+
 export function currentReviewQuestionId(
   progress: GradedLessonProgress,
   reviewQuestions: { id: string }[],
@@ -535,8 +582,16 @@ export function currentFibQuestionId(progress: GradedLessonProgress): string | n
   return progress.fibQuestionIds[progress.fibIndex] ?? null;
 }
 
-export function currentExtraQuestionId(progress: GradedLessonProgress): string | null {
+export function currentExtraQuestionId(
+  progress: GradedLessonProgress,
+  isLockedToday: (questionId: string) => boolean = () => false,
+): string | null {
   if (progress.phase !== "extra-practice") return null;
-  if (progress.extraIndex >= progress.extraQuestionIds.length) return null;
-  return progress.extraQuestionIds[progress.extraIndex] ?? null;
+  const heldIds = progress.extraHeldIds ?? [];
+  for (const questionId of progress.extraQuestionIds) {
+    if (progress.extraCorrectIds.includes(questionId)) continue;
+    if (heldIds.includes(questionId) && isLockedToday(questionId)) continue;
+    return questionId;
+  }
+  return null;
 }
