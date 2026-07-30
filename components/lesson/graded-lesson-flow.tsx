@@ -42,6 +42,7 @@ import {
   graduationThresholdForLesson,
 } from "@/lib/lesson/lesson-grade-config";
 import { mcPhaseDescription } from "@/lib/lesson/mc-phase-copy";
+import { correctOfCompleteLabel } from "@/lib/lesson/progress-labels";
 import { excerptPrompt } from "@/lib/student/question-history.types";
 import {
   loadGradedLessonProgress,
@@ -204,6 +205,17 @@ export function GradedLessonFlow({
   const isLockedToday = (questionId: string) =>
     isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
   const reviewComplete = reviewPhaseComplete(progress, plan.review, isLockedToday);
+  const reviewCorrectCount = progress.reviewCorrectIds.length;
+  const reviewCompleteCount = plan.review.filter(
+    (question) =>
+      progress.reviewCorrectIds.includes(question.id) ||
+      (progress.reviewHeldIds.includes(question.id) &&
+        isLockedToday(question.id)),
+  ).length;
+  const fibCorrectCount = progress.fibCorrectIds.length;
+  const fibCompleteCount =
+    progress.fibCorrectIds.length +
+    progress.fibHeldIds.filter((id) => isLockedToday(id)).length;
   const reviewQuestionId = currentReviewQuestionId(
     progress,
     plan.review,
@@ -270,13 +282,19 @@ export function GradedLessonFlow({
           (progress.phase === "review" && !reviewQuestion)) ? (
           <CompletedPhaseSection
             title="Review questions"
-            summary={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
+            summary={correctOfCompleteLabel(
+              reviewCorrectCount,
+              reviewCompleteCount,
+            )}
           />
         ) : progress.phase === "review" && reviewQuestion ? (
           <PhaseSection
             title="Review questions"
             description={`${plan.review.length} warm-up questions before the video.`}
-            progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
+            progressLabel={correctOfCompleteLabel(
+              reviewCorrectCount,
+              reviewCompleteCount,
+            )}
           >
             <QuestionPanel
               key={`review-${reviewQuestion.id}`}
@@ -320,7 +338,10 @@ export function GradedLessonFlow({
           (progress.phase === "multiple-choice" && !mcQuestion)) ? (
           <CompletedPhaseSection
             title="Multiple choice"
-            summary={`${progress.mcCorrectCount} correct of ${plan.multipleChoice.length} questions`}
+            summary={correctOfCompleteLabel(
+              progress.mcCorrectCount,
+              progress.mcIndex,
+            )}
           />
         ) : progress.phase === "multiple-choice" && mcQuestion ? (
           <PhaseSection
@@ -378,13 +399,16 @@ export function GradedLessonFlow({
           (progress.phase === "fill-in-blank" && !fibQuestion)) ? (
           <CompletedPhaseSection
             title="Fill in the blank"
-            summary={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} correct`}
+            summary={correctOfCompleteLabel(fibCorrectCount, fibCompleteCount)}
           />
         ) : progress.phase === "fill-in-blank" && fibQuestion ? (
           <PhaseSection
             title="Fill in the blank"
             description={`${plan.fillInBlank.length} fill-in-the-blank questions.`}
-            progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} correct`}
+            progressLabel={correctOfCompleteLabel(
+              fibCorrectCount,
+              fibCompleteCount,
+            )}
           >
             <QuestionPanel
               key={`fib-${fibQuestion.id}`}
@@ -426,13 +450,19 @@ export function GradedLessonFlow({
           (progress.phase === "extra-practice" && !extraQuestion)) ? (
           <CompletedPhaseSection
             title="Review / extra practice"
-            summary={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
+            summary={correctOfCompleteLabel(
+              progress.extraCorrectIds.length,
+              progress.extraIndex,
+            )}
           />
         ) : progress.phase === "extra-practice" && extraQuestion ? (
           <PhaseSection
             title="Review / extra practice"
             description={`${plan.extraPractice.length} mixed review questions.`}
-            progressLabel={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
+            progressLabel={correctOfCompleteLabel(
+              progress.extraCorrectIds.length,
+              progress.extraIndex,
+            )}
           >
             <QuestionPanel
               key={`extra-${extraQuestion.id}`}
