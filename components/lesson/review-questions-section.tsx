@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { LessonToast } from "@/components/lesson/lesson-toast";
 import { QuestionPanel } from "@/components/lesson/question-panel";
+import { correctOfCompleteLabel } from "@/lib/lesson/progress-labels";
 import { reviewStepLabel } from "@/lib/lesson/review-labels";
 import {
   applyReviewCorrectAnswer,
@@ -135,10 +136,15 @@ export function ReviewQuestionsSection({
     hasHeldQuestionsRemaining(questions, state, isLockedToday);
 
   const percent = progressPercent(state);
+  const correctCount = state.completedQuestionIds.length;
+  const completeCount =
+    state.completedQuestionIds.length + state.heldQuestionIds.length;
   const stepLabel = reviewStepLabel(
     activeQuestionIndex ?? state.completedQuestionIds.length,
     state.assignmentCount,
     state.isComplete,
+    correctCount,
+    completeCount,
   );
 
   return (
@@ -191,10 +197,11 @@ export function ReviewQuestionsSection({
               : `${state.heldQuestionIds.length} review questions are on hold until tomorrow.`}
           </p>
           <p className="mt-2 text-amber-900 dark:text-amber-200">
-            You&apos;ve completed {state.completedQuestionIds.length} of{" "}
-            {state.assignmentCount} review question
-            {state.assignmentCount === 1 ? "" : "s"}. Come back tomorrow to finish the
-            question
+            {correctOfCompleteLabel(
+              state.completedQuestionIds.length,
+              state.completedQuestionIds.length + state.heldQuestionIds.length,
+            )}
+            . Come back tomorrow to finish the question
             {state.heldQuestionIds.length === 1 ? "" : "s"} still on hold. You can
             continue with the lesson below.
           </p>

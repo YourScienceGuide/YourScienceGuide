@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { lessonStepLabel } from "@/lib/lesson/progress-labels";
+import { correctOfCompleteLabel } from "@/lib/lesson/progress-labels";
+import { reviewStepLabel } from "@/lib/lesson/review-labels";
 
-describe("lessonStepLabel", () => {
-  it("labels in-progress and complete states", () => {
-    expect(lessonStepLabel(0, 3, false)).toBe("Question 1 of 3");
-    expect(lessonStepLabel(2, 3, false)).toBe("Question 3 of 3");
+describe("correctOfCompleteLabel", () => {
+  it("labels correct vs complete counts, not bank size", () => {
+    expect(correctOfCompleteLabel(3, 4)).toBe("3 correct of 4 complete");
+    expect(correctOfCompleteLabel(5, 5)).toBe("5 correct of 5 complete");
   });
+});
 
-  it("labels completion", () => {
-    expect(lessonStepLabel(2, 3, true)).toBe("Lesson complete · 3 of 3");
+describe("reviewStepLabel", () => {
+  it("uses correct/complete counts when review is finished", () => {
+    expect(reviewStepLabel(3, 4, true, 3, 4)).toBe(
+      "Review complete · 3 correct of 4 complete",
+    );
   });
 });

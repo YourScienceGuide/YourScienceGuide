@@ -14,6 +14,7 @@ export const ADMIN_TABS = [
   "faq",
   "pricing",
   "waitlist",
+  "magic-links",
 ] as const;
 
 export type AdminTabId = (typeof ADMIN_TABS)[number];

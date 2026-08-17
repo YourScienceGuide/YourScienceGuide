@@ -1,13 +1,4 @@
-export function lessonStepLabel(
-  questionIndex: number,
-  assignmentCount: number,
-  isComplete: boolean,
-): string {
-  if (assignmentCount <= 0) {
-    return "No assignment questions";
-  }
-  if (isComplete) {
-    return `Lesson complete · ${assignmentCount} of ${assignmentCount}`;
-  }
-  return `Question ${questionIndex + 1} of ${assignmentCount}`;
+/** Student-facing count: correct answers vs questions finished (not bank size). */
+export function correctOfCompleteLabel(correct: number, complete: number): string {
+  return `${correct} correct of ${complete} complete`;
 }

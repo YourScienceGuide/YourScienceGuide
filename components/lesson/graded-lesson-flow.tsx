@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { notifyProgressUpdated } from "@/components/student/use-course-progress";
 import { useContentStore } from "@/components/admin/content-store-provider";
 import { GradingRubricSummary } from "@/components/grading/grading-rubric-summary";
+import {
+  LessonFreeResponseProvider,
+  type LessonFreeResponseContextValue,
+} from "@/components/lesson/lesson-free-response-section";
+import { McPhaseProgress } from "@/components/lesson/mc-phase-progress";
 import { QuestionPanel } from "@/components/lesson/question-panel";
 import { getCourseClient, getLessonClient } from "@/lib/student/curriculum-client";
 import {
@@ -14,6 +19,7 @@ import {
 import { buildLessonAssessmentPlan } from "@/lib/lesson/lesson-assessment-plan";
 import {
   applyExtraCorrect,
+  applyExtraHeldForToday,
   applyFibCorrect,
   applyFibHeldForToday,
   applyFreeResponseSubmitted,
@@ -28,6 +34,7 @@ import {
   currentFibQuestionId,
   currentMcQuestionId,
   currentReviewQuestionId,
+  extraPhaseComplete,
   hydrateGradedProgress,
   isGradedLessonPhasePast,
   reviewPhaseComplete,
@@ -36,6 +43,8 @@ import {
 import {
   graduationThresholdForLesson,
 } from "@/lib/lesson/lesson-grade-config";
+import { mcPhaseDescription } from "@/lib/lesson/mc-phase-copy";
+import { correctOfCompleteLabel } from "@/lib/lesson/progress-labels";
 import { excerptPrompt } from "@/lib/student/question-history.types";
 import {
   loadGradedLessonProgress,
@@ -47,6 +56,7 @@ import {
 } from "@/lib/student/lesson-grades-client";
 import { isQuestionLockedToday } from "@/lib/student/question-attempt-state";
 import type { LessonQuestion } from "@/lib/lesson/types";
+import { cn } from "@/lib/utils";
 
 type GradedLessonFlowProps = {
   studentScope: string;
@@ -56,6 +66,8 @@ type GradedLessonFlowProps = {
   onAccessChange?: (canAccessLesson: boolean) => void;
   /** Notifies listeners when lesson completion changes (for course progress refresh). */
   onCompletionChange?: (percent: number) => void;
+  /** Rendered after graded phases (e.g. bonus practice, free response, flashcards). */
+  afterContent?: ReactNode;
   children?: ReactNode;
 };
 
@@ -88,6 +100,23 @@ function advanceAfterReview(
   };
 }
 
+function advanceAfterExtra(
+  progress: GradedLessonProgress,
+  plan: NonNullable<ReturnType<typeof buildLessonAssessmentPlan>>,
+  isLockedToday: (questionId: string) => boolean,
+): GradedLessonProgress {
+  if (!extraPhaseComplete(progress, plan.extraPractice, isLockedToday)) {
+    return progress;
+  }
+  return {
+    ...progress,
+    phase:
+      plan.freeResponse && !progress.freeResponseSubmitted
+        ? "free-response"
+        : "complete",
+  };
+}
+
 export function GradedLessonFlow({
   studentScope,
   familyStudentId,
@@ -95,6 +124,7 @@ export function GradedLessonFlow({
   lessonId,
   onAccessChange,
   onCompletionChange,
+  afterContent,
   children,
 }: GradedLessonFlowProps) {
   const { store } = useContentStore();
@@ -126,6 +156,7 @@ export function GradedLessonFlow({
   }, [plan]);
 
   const [progress, setProgress] = useState<GradedLessonProgress | null>(null);
+  const progressRef = useRef<GradedLessonProgress | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -134,6 +165,7 @@ export function GradedLessonFlow({
       isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
     const stored = loadGradedLessonProgress(studentScope, courseId, lessonId);
     const next = hydrateGradedProgress(stored, plan, isLockedToday);
+    progressRef.current = next;
     setProgress(next);
     setHydrated(true);
   }, [courseId, lessonId, planIdentity, studentScope]);
@@ -145,6 +177,7 @@ export function GradedLessonFlow({
 
   const persist = useCallback(
     (next: GradedLessonProgress) => {
+      progressRef.current = next;
       setProgress(next);
       saveGradedLessonProgress(studentScope, courseId, lessonId, next);
       notifyProgressUpdated();
@@ -191,6 +224,17 @@ export function GradedLessonFlow({
   const isLockedToday = (questionId: string) =>
     isQuestionLockedToday(studentScope, courseId, lessonId, questionId);
   const reviewComplete = reviewPhaseComplete(progress, plan.review, isLockedToday);
+  const reviewCorrectCount = progress.reviewCorrectIds.length;
+  const reviewCompleteCount = plan.review.filter(
+    (question) =>
+      progress.reviewCorrectIds.includes(question.id) ||
+      (progress.reviewHeldIds.includes(question.id) &&
+        isLockedToday(question.id)),
+  ).length;
+  const fibCorrectCount = progress.fibCorrectIds.length;
+  const fibCompleteCount =
+    progress.fibCorrectIds.length +
+    progress.fibHeldIds.filter((id) => isLockedToday(id)).length;
   const reviewQuestionId = currentReviewQuestionId(
     progress,
     plan.review,
@@ -199,7 +243,7 @@ export function GradedLessonFlow({
   const reviewQuestion = findQuestion(plan, reviewQuestionId);
   const mcId = currentMcQuestionId(progress);
   const fibId = currentFibQuestionId(progress);
-  const extraId = currentExtraQuestionId(progress);
+  const extraId = currentExtraQuestionId(progress, isLockedToday);
   const mcQuestion = findQuestion(plan, mcId);
   const fibQuestion = findQuestion(plan, fibId);
   const extraQuestion = findQuestion(plan, extraId);
@@ -210,7 +254,43 @@ export function GradedLessonFlow({
     isLockedToday,
   );
 
+  const freeResponseContext: LessonFreeResponseContextValue | null =
+    freeResponse
+      ? {
+          studentScope,
+          courseId,
+          lessonId,
+          familyStudentId,
+          question: freeResponse,
+          submitted: progress.freeResponseSubmitted,
+          onSubmitAnswer: async (answerText: string) => {
+            const submissionStartProgress = progressRef.current;
+            if (
+              !familyStudentId ||
+              !submissionStartProgress ||
+              submissionStartProgress.freeResponseSubmitted
+            ) {
+              return;
+            }
+            const { id } = await submitLongAnswer({
+              familyStudentId,
+              courseId,
+              lessonId,
+              questionId: freeResponse.id,
+              promptExcerpt: excerptPrompt(freeResponse.prompt),
+              answerText,
+              maxPoints: rubric.freeResponsePoints,
+            });
+            const latestProgress = progressRef.current;
+            if (!latestProgress || latestProgress.freeResponseSubmitted) return;
+            const next = applyFreeResponseSubmitted(latestProgress, id);
+            persist(next);
+          },
+        }
+      : null;
+
   return (
+    <LessonFreeResponseProvider value={freeResponseContext}>
     <div className="space-y-8">
       <p className="text-sm tabular-nums text-slate-600 dark:text-stone-400">
         Lesson {lessonCompletionPercent}% complete
@@ -221,13 +301,19 @@ export function GradedLessonFlow({
           (progress.phase === "review" && !reviewQuestion)) ? (
           <CompletedPhaseSection
             title="Review questions"
-            summary={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
+            summary={correctOfCompleteLabel(
+              reviewCorrectCount,
+              reviewCompleteCount,
+            )}
           />
         ) : progress.phase === "review" && reviewQuestion ? (
           <PhaseSection
             title="Review questions"
             description={`${plan.review.length} warm-up questions before the video.`}
-            progressLabel={`${progress.reviewCorrectIds.length} of ${plan.review.length} complete`}
+            progressLabel={correctOfCompleteLabel(
+              reviewCorrectCount,
+              reviewCompleteCount,
+            )}
           >
             <QuestionPanel
               key={`review-${reviewQuestion.id}`}
@@ -271,13 +357,26 @@ export function GradedLessonFlow({
           (progress.phase === "multiple-choice" && !mcQuestion)) ? (
           <CompletedPhaseSection
             title="Multiple choice"
-            summary={`${progress.mcCorrectCount} correct of ${plan.multipleChoice.length} questions`}
+            summary={correctOfCompleteLabel(
+              progress.mcCorrectCount,
+              progress.mcIndex,
+            )}
           />
         ) : progress.phase === "multiple-choice" && mcQuestion ? (
           <PhaseSection
             title="Multiple choice"
-            description={`Work through ${plan.multipleChoice.length} questions. Answer ${rubric.mcTargetCorrect} correctly to finish this section.`}
-            progressLabel={`Question ${progress.mcIndex + 1} of ${plan.multipleChoice.length}`}
+            description={mcPhaseDescription(
+              plan.multipleChoice.length,
+              rubric.mcTargetCorrect,
+            )}
+            progress={
+              <McPhaseProgress
+                answered={progress.mcIndex}
+                correct={progress.mcCorrectCount}
+                total={plan.multipleChoice.length}
+                targetCorrect={rubric.mcTargetCorrect}
+              />
+            }
           >
             <QuestionPanel
               key={`mc-${mcQuestion.id}`}
@@ -319,13 +418,16 @@ export function GradedLessonFlow({
           (progress.phase === "fill-in-blank" && !fibQuestion)) ? (
           <CompletedPhaseSection
             title="Fill in the blank"
-            summary={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
+            summary={correctOfCompleteLabel(fibCorrectCount, fibCompleteCount)}
           />
         ) : progress.phase === "fill-in-blank" && fibQuestion ? (
           <PhaseSection
             title="Fill in the blank"
             description={`${plan.fillInBlank.length} fill-in-the-blank questions.`}
-            progressLabel={`${progress.fibCorrectIds.length} of ${plan.fillInBlank.length} complete`}
+            progressLabel={correctOfCompleteLabel(
+              fibCorrectCount,
+              fibCompleteCount,
+            )}
           >
             <QuestionPanel
               key={`fib-${fibQuestion.id}`}
@@ -367,13 +469,19 @@ export function GradedLessonFlow({
           (progress.phase === "extra-practice" && !extraQuestion)) ? (
           <CompletedPhaseSection
             title="Review / extra practice"
-            summary={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
+            summary={correctOfCompleteLabel(
+              progress.extraCorrectIds.length,
+              progress.extraIndex,
+            )}
           />
         ) : progress.phase === "extra-practice" && extraQuestion ? (
           <PhaseSection
             title="Review / extra practice"
             description={`${plan.extraPractice.length} mixed review questions.`}
-            progressLabel={`${progress.extraCorrectIds.length} of ${plan.extraPractice.length} complete`}
+            progressLabel={correctOfCompleteLabel(
+              progress.extraCorrectIds.length,
+              progress.extraIndex,
+            )}
           >
             <QuestionPanel
               key={`extra-${extraQuestion.id}`}
@@ -382,7 +490,6 @@ export function GradedLessonFlow({
               lessonId={lessonId}
               question={extraQuestion}
               difficulty={2}
-              skipAttemptLimits
               onSubmit={(correct) => {
                 if (!correct) return;
                 let next = applyExtraCorrect(
@@ -391,6 +498,13 @@ export function GradedLessonFlow({
                   plan.extraPractice.length,
                   Boolean(plan.freeResponse),
                 );
+                next = advanceAfterExtra(next, plan, isLockedToday);
+                next = checkGraduation(next, rubric, lesson.graduationProblemCount);
+                persist(next);
+              }}
+              onHeldForToday={() => {
+                let next = applyExtraHeldForToday(progress, extraQuestion.id);
+                next = advanceAfterExtra(next, plan, isLockedToday);
                 next = checkGraduation(next, rubric, lesson.graduationProblemCount);
                 persist(next);
               }}
@@ -398,52 +512,19 @@ export function GradedLessonFlow({
           </PhaseSection>
         ) : null)}
 
-      {reviewComplete &&
+      {progress.phase === "free-response" &&
         freeResponse &&
-        ((isGradedLessonPhasePast(progress.phase, "free-response") ||
-          progress.freeResponseSubmitted) ? (
-          <CompletedPhaseSection
-            title="Free response"
-            summary={
-              progress.freeResponseSubmitted
-                ? "Submitted for your parent to review"
-                : "Complete"
-            }
-          />
-        ) : progress.phase === "free-response" ? (
-          <PhaseSection
-            title="Free response"
-            description="Write a longer answer for your parent to review."
-            progressLabel="Not submitted"
-          >
-            <QuestionPanel
-              key={`fr-${freeResponse.id}`}
-              studentScope={studentScope}
-              courseId={courseId}
-              lessonId={lessonId}
-              question={freeResponse}
-              difficulty={1}
-              disabled={progress.freeResponseSubmitted}
-              onLongAnswerSubmit={async (answerText) => {
-                if (!familyStudentId || progress.freeResponseSubmitted) return;
-                const { id } = await submitLongAnswer({
-                  familyStudentId,
-                  courseId,
-                  lessonId,
-                  questionId: freeResponse.id,
-                  promptExcerpt: excerptPrompt(freeResponse.prompt),
-                  answerText,
-                  maxPoints: rubric.freeResponsePoints,
-                });
-                const next = applyFreeResponseSubmitted(progress, id);
-                persist(next);
-              }}
-              onSubmit={(correct) => {
-                if (!correct) return;
-              }}
-            />
-          </PhaseSection>
-        ) : null)}
+        !progress.freeResponseSubmitted && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50/50 px-4 py-3 text-sm text-slate-700 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-300">
+          <p className="font-medium text-slate-900 dark:text-stone-50">
+            Almost done
+          </p>
+          <p className="mt-1">
+            Submit your free response below (under Bonus extra practice) to finish
+            this lesson.
+          </p>
+        </div>
+      )}
 
       {progress.graduated && progress.phase !== "complete" && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-950 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
@@ -466,7 +547,10 @@ export function GradedLessonFlow({
             )}
         </div>
       )}
+
+      {afterContent ? <div className="space-y-10">{afterContent}</div> : null}
     </div>
+    </LessonFreeResponseProvider>
   );
 }
 
@@ -495,23 +579,28 @@ function PhaseSection({
   title,
   description,
   progressLabel,
+  progress,
   children,
 }: {
   title: string;
   description: string;
-  progressLabel: string;
+  progressLabel?: string;
+  progress?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="space-y-4" aria-labelledby={title}>
-      <div className="space-y-1">
+      <div className={cn("space-y-1", progress && "space-y-3")}>
         <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-stone-50">
           {title}
         </h2>
         <p className="text-sm text-slate-600 dark:text-stone-400">{description}</p>
-        <p className="text-xs tabular-nums text-slate-500 dark:text-stone-500">
-          {progressLabel}
-        </p>
+        {progress ??
+          (progressLabel ? (
+            <p className="text-xs tabular-nums text-slate-500 dark:text-stone-500">
+              {progressLabel}
+            </p>
+          ) : null)}
       </div>
       {children}
     </section>

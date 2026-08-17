@@ -6,6 +6,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -57,6 +58,11 @@ function resolveUsername(user: ReturnType<typeof useUser>["user"]): string | nul
   );
 }
 
+type MagicSessionState = {
+  label: string;
+  expiresAt: string;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useClerkAuth();
   const { user } = useUser();
@@ -67,21 +73,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [signupModalOpen, setSignupModalOpen] = useState(false);
   const [signupModalReason, setSignupModalReason] =
     useState<SignupModalReason | null>(null);
+  const [magicReady, setMagicReady] = useState(false);
+  const [magicSession, setMagicSession] = useState<MagicSessionState | null>(
+    null,
+  );
 
-  const ready = isLoaded;
-  const authenticated = !!isSignedIn;
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMagicSession() {
+      try {
+        const response = await fetch("/api/magic-links/session", {
+          cache: "no-store",
+        });
+        const data = (await response.json()) as {
+          active?: boolean;
+          label?: string;
+          expiresAt?: string;
+        };
+        if (cancelled) return;
+        if (data.active && data.label && data.expiresAt) {
+          setMagicSession({ label: data.label, expiresAt: data.expiresAt });
+        } else {
+          setMagicSession(null);
+        }
+      } catch {
+        if (!cancelled) setMagicSession(null);
+      } finally {
+        if (!cancelled) setMagicReady(true);
+      }
+    }
+    void loadMagicSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ready = isLoaded && magicReady;
+  const clerkSignedIn = !!isSignedIn;
+  const authenticated = clerkSignedIn || Boolean(magicSession);
   const isLoggedIn = authenticated;
   const isGuest = !authenticated;
-  const username = resolveUsername(user);
-  const role = resolveRole(user);
+  const username = clerkSignedIn
+    ? resolveUsername(user)
+    : (magicSession?.label ?? null);
+  const role = clerkSignedIn ? resolveRole(user) : magicSession ? "student" : null;
   const isAdmin = role === "admin";
 
   const hasLessonAccess = useMemo(() => {
-    if (!isLoggedIn || !username) return false;
+    if (!isLoggedIn) return false;
+    if (!clerkSignedIn && magicSession) return true;
+    if (!username) return false;
     if (isAdmin) return true;
     void subscriptionVersion;
     return hasActiveSubscription(username);
-  }, [isLoggedIn, username, isAdmin, subscriptionVersion]);
+  }, [isLoggedIn, clerkSignedIn, magicSession, username, isAdmin, subscriptionVersion]);
 
   const openSignupModal = useCallback((reason: SignupModalReason = "default") => {
     setSignupModalReason(reason);
@@ -114,7 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    void clerkSignOut({ redirectUrl: "/" });
+    void fetch("/api/magic-links/session", { method: "DELETE" })
+      .catch(() => undefined)
+      .finally(() => {
+        setMagicSession(null);
+        void clerkSignOut({ redirectUrl: "/" });
+      });
   }, [clerkSignOut]);
 
   return (

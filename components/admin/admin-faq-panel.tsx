@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { AdminFeedback } from "@/components/admin/admin-action-feedback";
@@ -156,9 +157,9 @@ export function AdminFaqPanel() {
         </h2>
         <p className="max-w-2xl text-sm text-slate-600 dark:text-stone-400">
           Edit the public FAQ at{" "}
-          <a href="/faq" className="font-medium text-sky-700 underline dark:text-sky-300">
+          <Link href="/faq" className="font-medium text-sky-700 underline dark:text-sky-300">
             /faq
-          </a>
+          </Link>
           . Published entries are visible to everyone; drafts stay hidden until you
           publish them again.
         </p>

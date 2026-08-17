@@ -144,6 +144,20 @@ export function AdminGradingPanel() {
           the same breakdown on their progress page.
         </p>
 
+        <p
+          role="note"
+          className="rounded-md border border-sky-200 bg-sky-50/80 px-3 py-2 text-sm text-slate-700 dark:border-stone-600 dark:bg-stone-950/60 dark:text-stone-300"
+        >
+          <span className="font-medium text-slate-900 dark:text-stone-100">
+            Fill-in-the-blank matching:{" "}
+          </span>
+          A student answer is marked correct if it matches an accepted answer
+          exactly, or if it can be turned into that answer with at most one
+          character insertion and one character deletion (in either order). This
+          covers common typos such as a missing letter, an extra letter, or a
+          single wrong character. Larger mistakes may still show a spelling hint.
+        </p>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {RUBRIC_FIELDS.map(({ key, label }) => (
             <label key={key} className="block text-sm">

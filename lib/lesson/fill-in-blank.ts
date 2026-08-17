@@ -39,6 +39,52 @@ export function levenshtein(a: string, b: string): number {
   return matrix[a.length][b.length];
 }
 
+/**
+ * True if `source` can be turned into `target` using at most `maxInserts`
+ * character insertions and `maxDeletes` character deletions (any order).
+ */
+export function withinInsertDeleteBudget(
+  source: string,
+  target: string,
+  maxInserts: number,
+  maxDeletes: number,
+): boolean {
+  if (source === target) return true;
+  if (target.length - source.length > maxInserts) return false;
+  if (source.length - target.length > maxDeletes) return false;
+
+  const memo = new Map<string, boolean>();
+
+  function dfs(i: number, j: number, insertsLeft: number, deletesLeft: number): boolean {
+    if (i === source.length && j === target.length) return true;
+
+    const remainingSource = source.length - i;
+    const remainingTarget = target.length - j;
+    if (remainingTarget - remainingSource > insertsLeft) return false;
+    if (remainingSource - remainingTarget > deletesLeft) return false;
+
+    const key = `${i},${j},${insertsLeft},${deletesLeft}`;
+    const cached = memo.get(key);
+    if (cached !== undefined) return cached;
+
+    let ok = false;
+    if (i < source.length && j < target.length && source[i] === target[j]) {
+      ok = dfs(i + 1, j + 1, insertsLeft, deletesLeft);
+    }
+    if (!ok && deletesLeft > 0 && i < source.length) {
+      ok = dfs(i + 1, j, insertsLeft, deletesLeft - 1);
+    }
+    if (!ok && insertsLeft > 0 && j < target.length) {
+      ok = dfs(i, j + 1, insertsLeft - 1, deletesLeft);
+    }
+
+    memo.set(key, ok);
+    return ok;
+  }
+
+  return dfs(0, 0, maxInserts, maxDeletes);
+}
+
 export type BlankAnswerCheck = "correct" | "spelling" | "incorrect";
 
 export function checkBlankAnswer(
@@ -49,7 +95,11 @@ export function checkBlankAnswer(
   if (!normalized) return "incorrect";
 
   for (const accepted of acceptedVariants) {
-    if (normalizeBlankAnswer(accepted) === normalized) {
+    const target = normalizeBlankAnswer(accepted);
+    if (
+      target === normalized ||
+      withinInsertDeleteBudget(normalized, target, 1, 1)
+    ) {
       return "correct";
     }
   }
