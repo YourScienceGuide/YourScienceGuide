@@ -65,13 +65,11 @@ function urlFromVercelEnv(): string | null {
 
 /**
  * Public site origin for Stripe redirects and absolute links.
- * Prefer the live request host, then a non-localhost APP_URL, then Vercel.
+ * Prefer a configured non-localhost APP_URL, then Vercel, then localhost request.
+ * Never trust an untrusted request Origin/Host for non-localhost redirects.
  */
 export function getAppBaseUrl(request?: Request): string {
   const fromRequest = request ? urlFromRequest(request) : null;
-  if (fromRequest && !isLocalhostUrl(fromRequest)) {
-    return fromRequest;
-  }
 
   const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (configured) {
@@ -84,7 +82,9 @@ export function getAppBaseUrl(request?: Request): string {
   const fromVercel = urlFromVercelEnv();
   if (fromVercel) return fromVercel;
 
-  if (fromRequest) return fromRequest;
+  if (fromRequest && isLocalhostUrl(fromRequest)) {
+    return fromRequest;
+  }
 
   return "http://localhost:3000";
 }

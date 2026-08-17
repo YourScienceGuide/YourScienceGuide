@@ -235,6 +235,13 @@ export function GradedLessonFlow({
   const fibCompleteCount =
     progress.fibCorrectIds.length +
     progress.fibHeldIds.filter((id) => isLockedToday(id)).length;
+  const extraCorrectCount = progress.extraCorrectIds.length;
+  const extraCompleteCount = plan.extraPractice.filter(
+    (question) =>
+      progress.extraCorrectIds.includes(question.id) ||
+      ((progress.extraHeldIds ?? []).includes(question.id) &&
+        isLockedToday(question.id)),
+  ).length;
   const reviewQuestionId = currentReviewQuestionId(
     progress,
     plan.review,
@@ -470,8 +477,8 @@ export function GradedLessonFlow({
           <CompletedPhaseSection
             title="Review / extra practice"
             summary={correctOfCompleteLabel(
-              progress.extraCorrectIds.length,
-              progress.extraIndex,
+              extraCorrectCount,
+              extraCompleteCount,
             )}
           />
         ) : progress.phase === "extra-practice" && extraQuestion ? (
@@ -479,8 +486,8 @@ export function GradedLessonFlow({
             title="Review / extra practice"
             description={`${plan.extraPractice.length} mixed review questions.`}
             progressLabel={correctOfCompleteLabel(
-              progress.extraCorrectIds.length,
-              progress.extraIndex,
+              extraCorrectCount,
+              extraCompleteCount,
             )}
           >
             <QuestionPanel
