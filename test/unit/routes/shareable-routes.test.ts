@@ -34,6 +34,9 @@ describe("shareable route helpers", () => {
     expect(adminNavGroupForTab("faq")?.label).toBe("Comms & Support");
     expect(adminNavGroupForTab("waitlist")?.label).toBe("Comms & Support");
     expect(adminTabFromPathname("/admin/waitlist")).toBe("waitlist");
+    expect(adminNavGroupForTab("magic-links")?.label).toBe("Comms & Support");
+    expect(adminTabFromPathname("/admin/magic-links")).toBe("magic-links");
+    expect(adminTabPath("magic-links")).toBe("/admin/magic-links");
     expect(adminNavGroupForTab("pricing")?.label).toBe("Comms & Support");
     expect(adminTabFromPathname("/admin/pricing")).toBe("pricing");
     expect(
@@ -49,6 +52,7 @@ describe("shareable route helpers", () => {
         "flashcards",
         "grading",
         "import",
+        "magic-links",
         "pricing",
         "review",
         "videos",

@@ -2,12 +2,20 @@ import "server-only";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
 
+import { readMagicLinkSession } from "@/lib/magic-links/magic-links.server";
+
 export async function requireAuthenticated() {
   const { isAuthenticated, userId } = await auth();
-  if (!isAuthenticated || !userId) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
+  if (isAuthenticated && userId) {
+    return { ok: true as const, userId };
   }
-  return { ok: true as const, userId };
+
+  const magic = await readMagicLinkSession();
+  if (magic) {
+    return { ok: true as const, userId: magic.userId };
+  }
+
+  return { ok: false as const, status: 401, error: "Unauthorized" };
 }
 
 export async function requireStudentOrAdminForUser(targetUserId: string) {
