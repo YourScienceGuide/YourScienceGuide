@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useActiveStudent } from "@/components/family/active-student-provider";
 import { cn } from "@/lib/utils";
 
@@ -67,12 +69,12 @@ export function StudentPicker() {
 
       <p className="text-center text-sm text-slate-500 sm:text-left dark:text-stone-500">
         Parents can add students and set preferences in the{" "}
-        <a
+        <Link
           href="/parent/students"
           className="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-stone-300"
         >
           parent portal
-        </a>
+        </Link>
         .
       </p>
     </div>
