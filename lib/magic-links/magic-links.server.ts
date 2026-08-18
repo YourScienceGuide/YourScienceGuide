@@ -5,7 +5,6 @@ import {
   clearMagicSessionCookie,
   getMagicSigningSecret,
   readMagicCookiePayload,
-  writeMagicSessionCookie,
 } from "@/lib/magic-links/cookie.server";
 import {
   countFamilyStudents,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/magic-links/token";
 import {
   MAGIC_LINK_EXPIRY_DAYS,
+  type MagicCookiePayload,
   type MagicLinkAccessMode,
   type MagicLinkExpiryDays,
   type MagicLinkRecord,
@@ -230,7 +230,10 @@ async function recordRedeem(
 
 export async function redeemMagicLink(
   token: string,
-): Promise<{ ok: true } | { ok: false; reason: MagicLinkRedeemError }> {
+): Promise<
+  | { ok: true; cookie: MagicCookiePayload }
+  | { ok: false; reason: MagicLinkRedeemError }
+> {
   if (!isSupabaseConfigured()) {
     return { ok: false, reason: "unavailable" };
   }
@@ -264,20 +267,21 @@ export async function redeemMagicLink(
     await recordRedeem(link);
   }
 
-  await writeMagicSessionCookie({
-    v: 1,
-    id: link.id,
-    n: nonce,
-    exp: Math.floor(new Date(link.expiresAt).getTime() / 1000),
-  });
-
   try {
     await ensureDemoStudent(link);
   } catch (error) {
     console.error("Failed to create demo student for magic link:", error);
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    cookie: {
+      v: 1,
+      id: link.id,
+      n: nonce,
+      exp: Math.floor(new Date(link.expiresAt).getTime() / 1000),
+    },
+  };
 }
 
 export async function readMagicLinkSession(): Promise<MagicLinkSession | null> {

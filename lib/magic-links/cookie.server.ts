@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 
 import {
   MAGIC_SESSION_COOKIE,
@@ -16,6 +17,46 @@ export function getMagicSigningSecret(): string | null {
   return secret || null;
 }
 
+type MagicSessionCookieOptions = {
+  httpOnly: true;
+  sameSite: "lax";
+  secure: boolean;
+  path: "/";
+  maxAge: number;
+};
+
+export function buildMagicSessionCookie(payload: MagicCookiePayload): {
+  name: string;
+  value: string;
+  options: MagicSessionCookieOptions;
+} {
+  const secret = getMagicSigningSecret();
+  if (!secret) {
+    throw new Error("Magic link signing secret is not configured.");
+  }
+  const maxAge = Math.max(0, payload.exp - Math.floor(Date.now() / 1000));
+  return {
+    name: MAGIC_SESSION_COOKIE,
+    value: encodeCookieValue(payload, secret),
+    options: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge,
+    },
+  };
+}
+
+export function applyMagicSessionCookie(
+  response: NextResponse,
+  payload: MagicCookiePayload,
+): NextResponse {
+  const cookie = buildMagicSessionCookie(payload);
+  response.cookies.set(cookie.name, cookie.value, cookie.options);
+  return response;
+}
+
 export async function readMagicCookiePayload(): Promise<MagicCookiePayload | null> {
   const secret = getMagicSigningSecret();
   if (!secret) return null;
@@ -26,19 +67,9 @@ export async function readMagicCookiePayload(): Promise<MagicCookiePayload | nul
 }
 
 export async function writeMagicSessionCookie(payload: MagicCookiePayload): Promise<void> {
-  const secret = getMagicSigningSecret();
-  if (!secret) {
-    throw new Error("Magic link signing secret is not configured.");
-  }
-  const maxAge = Math.max(0, payload.exp - Math.floor(Date.now() / 1000));
+  const cookie = buildMagicSessionCookie(payload);
   const store = await cookies();
-  store.set(MAGIC_SESSION_COOKIE, encodeCookieValue(payload, secret), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge,
-  });
+  store.set(cookie.name, cookie.value, cookie.options);
 }
 
 export async function clearMagicSessionCookie(): Promise<void> {
