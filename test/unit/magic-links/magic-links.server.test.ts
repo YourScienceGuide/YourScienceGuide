@@ -205,17 +205,17 @@ describe("magic link server redeem and session", () => {
     supabaseMocks.createSupabaseAdmin.mockReturnValue(client);
 
     const { redeemMagicLink } = await loadServer();
-    await expect(redeemMagicLink(TOKEN)).resolves.toEqual({ ok: true });
+    await expect(redeemMagicLink(TOKEN)).resolves.toMatchObject({
+      ok: true,
+      cookie: {
+        v: 1,
+        id: LINK_ID,
+        n: expect.any(String),
+        exp: expect.any(Number),
+      },
+    });
 
-    expect(cookieStore.set).toHaveBeenCalledWith(
-      MAGIC_SESSION_COOKIE,
-      expect.any(String),
-      expect.objectContaining({
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-      }),
-    );
+    expect(cookieStore.set).not.toHaveBeenCalled();
     expect(familyMocks.createFamilyStudent).toHaveBeenCalledWith(
       `magic_${LINK_ID}`,
       {
@@ -231,7 +231,7 @@ describe("magic link server redeem and session", () => {
     );
 
     const { redeemMagicLink } = await loadServer();
-    await expect(redeemMagicLink(TOKEN)).resolves.toEqual({ ok: true });
+    await expect(redeemMagicLink(TOKEN)).resolves.toMatchObject({ ok: true });
     expect(familyMocks.createFamilyStudent).toHaveBeenCalledWith(
       `magic_${LINK_ID}`,
       {
@@ -248,7 +248,7 @@ describe("magic link server redeem and session", () => {
     familyMocks.countFamilyStudents.mockResolvedValue(1);
 
     const { redeemMagicLink } = await loadServer();
-    await expect(redeemMagicLink(TOKEN)).resolves.toEqual({ ok: true });
+    await expect(redeemMagicLink(TOKEN)).resolves.toMatchObject({ ok: true });
     expect(familyMocks.createFamilyStudent).not.toHaveBeenCalled();
   });
 
@@ -296,8 +296,8 @@ describe("magic link server redeem and session", () => {
     );
 
     const { redeemMagicLink } = await loadServer();
-    await expect(redeemMagicLink(TOKEN)).resolves.toEqual({ ok: true });
-    expect(cookieStore.set).toHaveBeenCalled();
+    await expect(redeemMagicLink(TOKEN)).resolves.toMatchObject({ ok: true });
+    expect(cookieStore.set).not.toHaveBeenCalled();
   });
 
   it("rejects a first-browser claim when another browser wins the race", async () => {
