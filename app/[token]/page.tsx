@@ -1,13 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 
 import { isMagicLinkToken } from "@/lib/magic-links/access";
-import { redeemMagicLink } from "@/lib/magic-links/magic-links.server";
 import type { MagicLinkRedeemError } from "@/lib/magic-links/types";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ reason?: string }>;
 };
 
 const ERROR_COPY: Record<MagicLinkRedeemError, { title: string; body: string }> = {
@@ -33,24 +33,34 @@ const ERROR_COPY: Record<MagicLinkRedeemError, { title: string; body: string }> 
   },
 };
 
-export default async function MagicLinkPage({ params }: PageProps) {
+function isRedeemError(value: string | undefined): value is MagicLinkRedeemError {
+  return (
+    value === "invalid" ||
+    value === "disabled" ||
+    value === "expired" ||
+    value === "claimed" ||
+    value === "unavailable"
+  );
+}
+
+export default async function MagicLinkPage({ params, searchParams }: PageProps) {
   const { token } = await params;
   if (!isMagicLinkToken(token)) {
     notFound();
   }
 
-  const result = await redeemMagicLink(token);
-  if (result.ok) {
-    redirect("/student");
+  const { reason } = await searchParams;
+  if (isRedeemError(reason)) {
+    const copy = ERROR_COPY[reason];
+    return (
+      <div className="mx-auto max-w-lg space-y-3">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
+          {copy.title}
+        </h1>
+        <p className="text-base text-slate-600 dark:text-stone-400">{copy.body}</p>
+      </div>
+    );
   }
 
-  const copy = ERROR_COPY[result.reason];
-  return (
-    <div className="mx-auto max-w-lg space-y-3">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-stone-50">
-        {copy.title}
-      </h1>
-      <p className="text-base text-slate-600 dark:text-stone-400">{copy.body}</p>
-    </div>
-  );
+  redirect(`/api/magic-links/redeem?token=${encodeURIComponent(token)}`);
 }
